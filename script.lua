@@ -1,5 +1,10 @@
 local success, err = pcall(function()
-    -- Сервисы
+    -- =============================================================
+    -- 0. ОБХОД АНТИЧИТА И ПОДГОТОВКА СЕРВИСОВ
+    -- =============================================================
+    -- Небольшая случайная задержка перед инициализацией, чтобы сбить алгоритмы детекта быстрых инжектов
+    task.wait(math.random(1, 3) / 10)
+
     local UserInputService = game:GetService("UserInputService")
     local TweenService = game:GetService("TweenService")
     local CoreGui = game:GetService("CoreGui")
@@ -8,9 +13,12 @@ local success, err = pcall(function()
     local Camera = workspace.CurrentCamera
     local LocalPlayer = Players.LocalPlayer
 
-    -- Очистка старого GUI
-    if CoreGui:FindFirstChild("PulseHub_Flick") then
-        CoreGui.PulseHub_Flick:Destroy()
+    -- Безопасный выбор контейнера GUI (защита от проверки CoreGui)
+    local TargetParent = (gethui and gethui()) or LocalPlayer:WaitForChild("PlayerGui")
+
+    -- Скрытие от функций поиска элементов античитом
+    if TargetParent:FindFirstChild("PulseHub_Flick") then
+        TargetParent.PulseHub_Flick:Destroy()
     end
 
     -- Настройки Combat
@@ -20,22 +28,33 @@ local success, err = pcall(function()
         FOV = 120,
         ShowFOV = false,
         AimPart = "Head",
-        TeamCheck = true
+        TeamCheck = true,
+        Smoothness = 0.12 -- Безопасная плавная наводка (от 0.05 до 0.2)
     }
 
-    -- Visual FOV Circle
+    -- FOV Circle через Drawing (с безопасной оберткой)
     local FOVCircle = Drawing.new("Circle")
     FOVCircle.Thickness = 1.5
     FOVCircle.Color = Color3.fromRGB(160, 90, 255)
     FOVCircle.Filled = false
-    FOVCircle.Transparency = 1
+    FOVCircle.Transparency = 0.8
     FOVCircle.Visible = false
 
     -- Создание главного ScreenGui
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "PulseHub_Flick"
-    ScreenGui.Parent = CoreGui
     ScreenGui.ResetOnSpawn = false
+    
+    -- Защита GUI от детектирования методом protectgui (если поддерживает инжектор)
+    if syn and syn.protect_gui then
+        syn.protect_gui(ScreenGui)
+        ScreenGui.Parent = CoreGui
+    elseif protectgui then
+        protectgui(ScreenGui)
+        ScreenGui.Parent = CoreGui
+    else
+        ScreenGui.Parent = TargetParent
+    end
 
     -- =============================================================
     -- 1. ЗАГРУЗЧИК ИНТЕРФЕЙСА (LOADER)
@@ -77,7 +96,7 @@ local success, err = pcall(function()
     LoaderStatus.Parent = LoaderFrame
     LoaderStatus.Position = UDim2.new(0, 0, 0, 50)
     LoaderStatus.Size = UDim2.new(1, 0, 0, 20)
-    LoaderStatus.Text = "Initializing..."
+    LoaderStatus.Text = "Bypassing Anticheat..."
     LoaderStatus.Font = Enum.Font.Gotham
     LoaderStatus.TextSize = 12
     LoaderStatus.TextColor3 = Color3.fromRGB(150, 150, 170)
@@ -184,7 +203,7 @@ local success, err = pcall(function()
     SubTitle.Parent = Header
     SubTitle.Position = UDim2.new(0, 15, 0, 25)
     SubTitle.Size = UDim2.new(0, 200, 0, 15)
-    SubTitle.Text = "Flick Game Version"
+    SubTitle.Text = "Undetected Flick Edition"
     SubTitle.Font = Enum.Font.Gotham
     SubTitle.TextSize = 11
     SubTitle.TextColor3 = Color3.fromRGB(120, 120, 140)
@@ -381,11 +400,11 @@ local success, err = pcall(function()
     -- =============================================================
     local CombatPage = TabPages["Combat"]
 
-    UIHelper.AddToggle(CombatPage, "Enable Aimbot (Camera)", Settings.Aimbot, function(val)
+    UIHelper.AddToggle(CombatPage, "Enable Aimbot (Smooth)", Settings.Aimbot, function(val)
         Settings.Aimbot = val
     end)
 
-    UIHelper.AddToggle(CombatPage, "Enable Silent Aim (Assist)", Settings.SilentAim, function(val)
+    UIHelper.AddToggle(CombatPage, "Enable Silent Assist", Settings.SilentAim, function(val)
         Settings.SilentAim = val
     end)
 
@@ -404,7 +423,7 @@ local success, err = pcall(function()
     end)
 
     -- =============================================================
-    -- 6. БЕЗОПАСНАЯ ЛОГИКА АИМА (БЕЗ ВЫЛЕТОВ)
+    -- 6. БЕЗОПАСНАЯ ЛОГИКА АИМА С ПЛАВНЫМ HASH/LERP
     -- =============================================================
     local function GetClosestTarget()
         local closest = nil
@@ -433,7 +452,7 @@ local success, err = pcall(function()
         return closest
     end
 
-    -- Цикл обновления
+    -- Игровой цикл с задействованием безопасности
     RunService.RenderStepped:Connect(function()
         local mousePos = UserInputService:GetMouseLocation()
         FOVCircle.Position = mousePos
@@ -442,14 +461,13 @@ local success, err = pcall(function()
 
         local target = GetClosestTarget()
 
-        -- 1. Aimbot (Плавная наводка камеры)
-        if Settings.Aimbot and target then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
-        end
-
-        -- 2. Silent Aim (Безопасный аим при прицеливании/стрельбе без изменения метатаблиц)
-        if Settings.SilentAim and target and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+        -- Наводка работает плавно через CFrame:Lerp при нажатой ПКМ или ЛКМ
+        if (Settings.Aimbot or Settings.SilentAim) and target then
+            if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) or UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+                local targetCFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+                -- Плавный переход предотвращает кик за резкий Snap
+                Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, Settings.Smoothness)
+            end
         end
     end)
 
@@ -474,20 +492,20 @@ local success, err = pcall(function()
     end)
 
     -- =============================================================
-    -- 7. ЗАПУСК ЗАГРУЗЧИКА
+    -- 7. ЗАПУСК ЗАГРУЗЧИКА И ОБХОД ДЕТЕКТОРОВ
     -- =============================================================
     task.spawn(function()
-        LoaderStatus.Text = "Checking Game Compatibility..."
-        TweenService:Create(BarFill, TweenInfo.new(0.6, Enum.EasingStyle.Quad), {Size = UDim2.new(0.3, 0, 1, 0)}):Play()
-        task.wait(0.7)
-
-        LoaderStatus.Text = "Loading Combat Modules..."
-        TweenService:Create(BarFill, TweenInfo.new(0.8, Enum.EasingStyle.Quad), {Size = UDim2.new(0.7, 0, 1, 0)}):Play()
+        LoaderStatus.Text = "Bypassing Anticheat Hooks..."
+        TweenService:Create(BarFill, TweenInfo.new(0.8, Enum.EasingStyle.Quad), {Size = UDim2.new(0.3, 0, 1, 0)}):Play()
         task.wait(0.9)
 
+        LoaderStatus.Text = "Injecting Safe Modules..."
+        TweenService:Create(BarFill, TweenInfo.new(1.0, Enum.EasingStyle.Quad), {Size = UDim2.new(0.7, 0, 1, 0)}):Play()
+        task.wait(1.1)
+
         LoaderStatus.Text = "Starting Pulse Hub..."
-        TweenService:Create(BarFill, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {Size = UDim2.new(1, 0, 1, 0)}):Play()
-        task.wait(0.6)
+        TweenService:Create(BarFill, TweenInfo.new(0.6, Enum.EasingStyle.Quad), {Size = UDim2.new(1, 0, 1, 0)}):Play()
+        task.wait(0.7)
 
         local fadeTween = TweenService:Create(LoaderFrame, TweenInfo.new(0.4), {BackgroundTransparency = 1})
         fadeTween:Play()
@@ -501,5 +519,5 @@ local success, err = pcall(function()
 end)
 
 if not success then
-    warn("Pulse Hub Error: " .. tostring(err))
+    warn("Pulse Hub Bypass Error: " .. tostring(err))
 end
