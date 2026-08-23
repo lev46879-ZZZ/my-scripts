@@ -9,15 +9,16 @@ if not PlayerGui then return end
 
 -- 1. Создание ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "PulseHubGui"
+ScreenGui.Name = "NekoVHubGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
 
--- ПАЛИЦА ЦВЕТОВ (Стиль Pulse Hub)
+-- ПАЛИТРА ЦВЕТОВ (Стиль Pulse Hub)
 local MAIN_BG = Color3.fromRGB(15, 15, 20)
 local TOPBAR_BG = Color3.fromRGB(20, 20, 28)
 local PANEL_BG = Color3.fromRGB(11, 11, 16)
 local PURPLE_NEON = Color3.fromRGB(140, 50, 255)
+local PURPLE_HOVER = Color3.fromRGB(170, 90, 255)
 local TEXT_WHITE = Color3.fromRGB(240, 240, 250)
 local TEXT_DARK = Color3.fromRGB(120, 120, 140)
 
@@ -46,7 +47,10 @@ ButtonStroke.Parent = FloatingButton
 local MainMenu = Instance.new("Frame")
 MainMenu.Name = "MainMenu"
 MainMenu.Size = UDim2.new(0, 420, 0, 260)
-MainMenu.Position = UDim2.new(0.5, -210, 0.5, -130)
+
+-- Позиция по центру, но приподнята чуть выше
+MainMenu.Position = UDim2.new(0.5, -210, 0.35, -130)
+
 MainMenu.BackgroundColor3 = MAIN_BG
 MainMenu.Visible = false
 MainMenu.Parent = ScreenGui
@@ -55,7 +59,6 @@ local MenuCorner = Instance.new("UICorner")
 MenuCorner.CornerRadius = UDim.new(0, 10)
 MenuCorner.Parent = MainMenu
 
--- Фиолетовая обводка Pulse Hub
 local MenuStroke = Instance.new("UIStroke")
 MenuStroke.Color = PURPLE_NEON
 MenuStroke.Thickness = 1.5
@@ -72,7 +75,6 @@ local TopBarCorner = Instance.new("UICorner")
 TopBarCorner.CornerRadius = UDim.new(0, 10)
 TopBarCorner.Parent = TopBar
 
--- Линия под шапкой
 local TopBarLine = Instance.new("Frame")
 TopBarLine.Size = UDim2.new(1, 0, 0, 1)
 TopBarLine.Position = UDim2.new(0, 0, 1, -1)
@@ -84,17 +86,16 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -40, 1, 0)
 Title.Position = UDim2.new(0, 15, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "PULSE HUB"
+Title.Text = "NekoV" -- ИЗМЕНЕНО НАЗВАНИЕ ТУТ
 Title.TextColor3 = TEXT_WHITE
 Title.TextSize = 16
 Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
--- Разделитель в названии
 local TitleAccent = Instance.new("TextLabel")
 TitleAccent.Size = UDim2.new(1, 0, 1, 0)
-TitleAccent.Position = UDim2.new(0, 110, 0, 0)
+TitleAccent.Position = UDim2.new(0, 75, 0, 0) -- Немного подвинул ближе к новому слову
 TitleAccent.BackgroundTransparency = 1
 TitleAccent.Text = ".v1"
 TitleAccent.TextColor3 = PURPLE_NEON
@@ -103,26 +104,31 @@ TitleAccent.Font = Enum.Font.GothamBold
 TitleAccent.TextXAlignment = Enum.TextXAlignment.Left
 TitleAccent.Parent = TopBar
 
--- Левая панель вкладок
+-- ЛЕВАЯ ПАНЕЛЬ ВКЛАДОК
 local TabPanel = Instance.new("Frame")
 TabPanel.Name = "TabPanel"
 TabPanel.Size = UDim2.new(0, 110, 1, -40)
 TabPanel.Position = UDim2.new(0, 0, 0, 40)
 TabPanel.BackgroundColor3 = PANEL_BG
+TabPanel.BorderSizePixel = 0
 TabPanel.Parent = MainMenu
+
+local TabPanelCorner = Instance.new("UICorner")
+TabPanelCorner.CornerRadius = UDim.new(0, 10)
+TabPanelCorner.Parent = TabPanel
 
 local TabLayout = Instance.new("UIListLayout")
 TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-TabLayout.Padding = UDim.new(0, 4)
+TabLayout.Padding = UDim.new(0, 6)
 TabLayout.Parent = TabPanel
 
 local TabPadding = Instance.new("UIPadding")
-TabPadding.PaddingTop = UDim.new(0, 10)
-TabPadding.PaddingLeft = UDim.new(0, 5)
-TabPadding.PaddingRight = UDim.new(0, 5)
+TabPadding.PaddingTop = UDim.new(0, 12)
+TabPadding.PaddingLeft = UDim.new(0, 6)
+TabPadding.PaddingRight = UDim.new(0, 6)
 TabPadding.Parent = TabPanel
 
--- Линия-разделитель для табов
+-- Разделитель
 local TabLine = Instance.new("Frame")
 TabLine.Size = UDim2.new(0, 1, 1, -40)
 TabLine.Position = UDim2.new(0, 110, 0, 40)
@@ -130,7 +136,7 @@ TabLine.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 TabLine.BorderSizePixel = 0
 TabLine.Parent = MainMenu
 
--- Контейнер контента
+-- КОНТЕНТ-ПАНЕЛЬ
 local ContentPanel = Instance.new("Frame")
 ContentPanel.Name = "ContentPanel"
 ContentPanel.Size = UDim2.new(1, -125, 1, -55)
@@ -138,7 +144,7 @@ ContentPanel.Position = UDim2.new(0, 120, 0, 50)
 ContentPanel.BackgroundTransparency = 1
 ContentPanel.Parent = MainMenu
 
--- Функция Drag (Перетаскивание)
+-- Функция Drag
 local function makeDraggable(guiElement, dragHandle)
 	local dragging, dragInput, dragStart, startPosition
 	local function update(input)
@@ -166,24 +172,25 @@ end
 makeDraggable(FloatingButton, FloatingButton)
 makeDraggable(MainMenu, TopBar)
 
--- Открытие / Закрытие
+-- Включение / Отключение меню
 FloatingButton.MouseButton1Click:Connect(function()
 	MainMenu.Visible = not MainMenu.Visible
 end)
 
--- Кастомная система вкладок
+-- Система вкладок
 local tabs = {}
 local contents = {}
+local activeTab = nil
 
 local function createTab(tabName)
 	local tabBtn = Instance.new("TextButton")
 	tabBtn.Name = tabName .. "Tab"
-	tabBtn.Size = UDim2.new(1, 0, 0, 32)
+	tabBtn.Size = UDim2.new(1, 0, 0, 35)
 	tabBtn.BackgroundColor3 = PURPLE_NEON
 	tabBtn.BackgroundTransparency = 1
 	tabBtn.Text = tabName
 	tabBtn.TextColor3 = TEXT_DARK
-	tabBtn.TextSize = 13
+	tabBtn.TextSize = 14
 	tabBtn.Font = Enum.Font.GothamMedium
 	tabBtn.Parent = TabPanel
 	
@@ -201,22 +208,46 @@ local function createTab(tabName)
 	tabs[tabName] = tabBtn
 	contents[tabName] = contentFrame
 
+	tabBtn.MouseEnter:Connect(function()
+		if activeTab ~= tabName then
+			TweenService:Create(tabBtn, TweenInfo.new(0.2), {TextColor3 = TEXT_WHITE}):Play()
+		end
+	end)
+	tabBtn.MouseLeave:Connect(function()
+		if activeTab ~= tabName then
+			TweenService:Create(tabBtn, TweenInfo.new(0.2), {TextColor3 = TEXT_DARK}):Play()
+		end
+	end)
+
 	tabBtn.MouseButton1Click:Connect(function()
+		activeTab = tabName
 		for name, btn in pairs(tabs) do
-			TweenService:Create(btn, Color3.fromRGB(15, 15, 20), {BackgroundTransparency = 1, TextColor3 = TEXT_DARK}):Play()
+			TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundTransparency = 1, TextColor3 = TEXT_DARK}):Play()
 			contents[name].Visible = false
 		end
-		TweenService:Create(tabBtn, Color3.fromRGB(15, 15, 20), {BackgroundTransparency = 0.8, TextColor3 = PURPLE_NEON}):Play()
+		TweenService:Create(tabBtn, TweenInfo.new(0.2), {BackgroundTransparency = 0.8, TextColor3 = PURPLE_NEON}):Play()
 		contentFrame.Visible = true
 	end)
+	
 	return contentFrame
 end
 
 local worldContent = createTab("World")
 local visualContent = createTab("Visual")
 
+-- Заглушка во вкладке Visual
+local visualText = Instance.new("TextLabel")
+visualText.Size = UDim2.new(1, 0, 0, 30)
+visualText.BackgroundTransparency = 1
+visualText.Text = "Visual Settings"
+visualText.TextColor3 = TEXT_DARK
+visualText.TextSize = 14
+visualText.Font = Enum.Font.GothamMedium
+visualText.TextXAlignment = Enum.TextXAlignment.Left
+visualText.Parent = visualContent
+
 ----------------------------------------------------
--- КНОПКА СМЕНЫ НЕБА (ФИОЛЕТОВЫЙ PULSE СТИЛЬ)
+-- КНОПКА СМЕНЫ НЕБА ВО ВКАДКУ WORLD
 ----------------------------------------------------
 local SkyButton = Instance.new("TextButton")
 SkyButton.Name = "CustomSkyButton"
@@ -243,46 +274,27 @@ local originalLightingSettings = {}
 
 SkyButton.MouseButton1Click:Connect(function()
 	skyActive = not skyActive
-	
 	if skyActive then
-		-- Визуальное изменение кнопки
 		SkyButton.Text = "Purple Sky: ON"
 		SkyButton.TextColor3 = PURPLE_NEON
 		SkyStroke.Color = PURPLE_NEON
 		
-		-- Сохраняем оригинальные настройки света игры
 		originalLightingSettings.Ambient = Lighting.Ambient
 		originalLightingSettings.OutdoorAmbient = Lighting.OutdoorAmbient
 		originalLightingSettings.ClockTime = Lighting.ClockTime
 		originalLightingSettings.FogColor = Lighting.FogColor
 		originalLightingSettings.FogEnd = Lighting.FogEnd
 
-		-- Применяем красивую неоновую фиолетовую атмосферу
-		Lighting.ClockTime = 0 -- Ночь
+		Lighting.ClockTime = 0
 		Lighting.Ambient = Color3.fromRGB(40, 20, 70)
 		Lighting.OutdoorAmbient = Color3.fromRGB(20, 10, 40)
 		Lighting.FogColor = Color3.fromRGB(15, 5, 25)
 		Lighting.FogEnd = 500
 	else
-		-- Возвращаем кнопку в исходное состояние
 		SkyButton.Text = "Purple Sky: OFF"
 		SkyButton.TextColor3 = Color3.fromRGB(230, 80, 80)
 		SkyStroke.Color = Color3.fromRGB(45, 45, 60)
 		
-		-- Восстанавливаем оригинальный свет игры
 		if originalLightingSettings.Ambient then
 			Lighting.Ambient = originalLightingSettings.Ambient
 			Lighting.OutdoorAmbient = originalLightingSettings.OutdoorAmbient
-			Lighting.ClockTime = originalLightingSettings.ClockTime
-			Lighting.FogColor = originalLightingSettings.FogColor
-			Lighting.FogEnd = originalLightingSettings.FogEnd
-		end
-	end
-end)
-
--- Дефолтное открытие первой вкладки
-if tabs["World"] then
-	tabs["World"].BackgroundTransparency = 0.8
-	tabs["World"].TextColor3 = PURPLE_NEON
-	contents["World"].Visible = true
-end
