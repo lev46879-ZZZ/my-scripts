@@ -19,7 +19,7 @@ local success, err = pcall(function()
         SilentAim = false,
         FOV = 120,
         ShowFOV = false,
-        AimPart = "Head", -- "Head" или "HumanoidRootPart"
+        AimPart = "Head",
         TeamCheck = true
     }
 
@@ -268,7 +268,7 @@ local success, err = pcall(function()
         end)
     end
 
-    -- Хелперы UI Элементов для быстрого создания интерфейсов
+    -- UI Хелперы
     local UIHelper = {}
     
     function UIHelper.AddToggle(parent, text, default, callback)
@@ -377,7 +377,7 @@ local success, err = pcall(function()
     end
 
     -- =============================================================
-    -- 5. НАПОЛНЕНИЕ ВКЛАДКИ COMBAT (Aimbot & Silent Aim)
+    -- 5. ВКЛАДКА COMBAT
     -- =============================================================
     local CombatPage = TabPages["Combat"]
 
@@ -385,7 +385,7 @@ local success, err = pcall(function()
         Settings.Aimbot = val
     end)
 
-    UIHelper.AddToggle(CombatPage, "Enable Silent Aim", Settings.SilentAim, function(val)
+    UIHelper.AddToggle(CombatPage, "Enable Silent Aim (Assist)", Settings.SilentAim, function(val)
         Settings.SilentAim = val
     end)
 
@@ -404,7 +404,7 @@ local success, err = pcall(function()
     end)
 
     -- =============================================================
-    -- 6. ЛОГИКА АИМБОТА И SILENT AIM
+    -- 6. БЕЗОПАСНАЯ ЛОГИКА АИМА (БЕЗ ВЫЛЕТОВ)
     -- =============================================================
     local function GetClosestTarget()
         local closest = nil
@@ -433,45 +433,27 @@ local success, err = pcall(function()
         return closest
     end
 
-    -- Цикл Aimbot & FOV Circle
+    -- Цикл обновления
     RunService.RenderStepped:Connect(function()
         local mousePos = UserInputService:GetMouseLocation()
         FOVCircle.Position = mousePos
         FOVCircle.Radius = Settings.FOV
         FOVCircle.Visible = Settings.ShowFOV
 
-        if Settings.Aimbot then
-            local target = GetClosestTarget()
-            if target then
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
-            end
+        local target = GetClosestTarget()
+
+        -- 1. Aimbot (Плавная наводка камеры)
+        if Settings.Aimbot and target then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+        end
+
+        -- 2. Silent Aim (Безопасный аим при прицеливании/стрельбе без изменения метатаблиц)
+        if Settings.SilentAim and target and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
         end
     end)
 
-    -- Silent Aim Hook через __namecall (перехват выстрелов)
-    local rawMeta = getrawmetatable(game)
-    local oldNamecall = rawMeta.__namecall
-    setreadonly(rawMeta, false)
-
-    rawMeta.__namecall = newcclosure(function(self, ...)
-        local method = getnamecallmethod()
-        local args = {...}
-
-        if Settings.SilentAim and (method == "FindPartOnRayWithIgnoreList" or method == "Raycast" or method == "FireServer") then
-            local target = GetClosestTarget()
-            if target then
-                -- Меняем траекторию/позицию клика под ближайшую цель
-                if method == "Raycast" and args[2] then
-                    args[2] = (target.Position - args[1]).Unit * 1000
-                end
-            end
-        end
-
-        return oldNamecall(self, unpack(args))
-    end)
-    setreadonly(rawMeta, true)
-
-    -- NLF Button Toggle
+    -- Переключение меню NLF
     local isOpen = true
     NLFButton.MouseButton1Click:Connect(function()
         isOpen = not isOpen
