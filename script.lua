@@ -1,17 +1,20 @@
+-- КОД ДЛЯ ВАШЕГО ГИТХАБА (NekoV Menu under loadstring)
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
 
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 10) 
-if not PlayerGui then return end
+-- Автоматическое удаление старой копии меню перед перезапуском
+if CoreGui:FindFirstChild("NekoVHubGui") then
+	CoreGui.NekoVHubGui:Destroy()
+end
 
--- 1. Создание ScreenGui
+-- 1. Создание ScreenGui напрямую в CoreGui (Защита от сброса при смерти/ресете в Каталоге)
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "NekoVHubGui"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = PlayerGui
+ScreenGui.Parent = CoreGui
 
 -- ПАЛИТРА ЦВЕТОВ (Стиль Pulse Hub)
 local MAIN_BG = Color3.fromRGB(15, 15, 20)
@@ -48,7 +51,7 @@ local MainMenu = Instance.new("Frame")
 MainMenu.Name = "MainMenu"
 MainMenu.Size = UDim2.new(0, 420, 0, 260)
 
--- Позиция по центру, но приподнята чуть выше
+-- Позиция: по центру, но приподнята чуть выше
 MainMenu.Position = UDim2.new(0.5, -210, 0.35, -130)
 
 MainMenu.BackgroundColor3 = MAIN_BG
@@ -86,7 +89,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -40, 1, 0)
 Title.Position = UDim2.new(0, 15, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "NekoV" -- ИЗМЕНЕНО НАЗВАНИЕ ТУТ
+Title.Text = "NekoV"
 Title.TextColor3 = TEXT_WHITE
 Title.TextSize = 16
 Title.Font = Enum.Font.GothamBold
@@ -95,7 +98,7 @@ Title.Parent = TopBar
 
 local TitleAccent = Instance.new("TextLabel")
 TitleAccent.Size = UDim2.new(1, 0, 1, 0)
-TitleAccent.Position = UDim2.new(0, 75, 0, 0) -- Немного подвинул ближе к новому слову
+TitleAccent.Position = UDim2.new(0, 75, 0, 0)
 TitleAccent.BackgroundTransparency = 1
 TitleAccent.Text = ".v1"
 TitleAccent.TextColor3 = PURPLE_NEON
@@ -128,7 +131,7 @@ TabPadding.PaddingLeft = UDim.new(0, 6)
 TabPadding.PaddingRight = UDim.new(0, 6)
 TabPadding.Parent = TabPanel
 
--- Разделитель
+-- Разделитель панелей
 local TabLine = Instance.new("Frame")
 TabLine.Size = UDim2.new(0, 1, 1, -40)
 TabLine.Position = UDim2.new(0, 110, 0, 40)
@@ -144,7 +147,7 @@ ContentPanel.Position = UDim2.new(0, 120, 0, 50)
 ContentPanel.BackgroundTransparency = 1
 ContentPanel.Parent = MainMenu
 
--- Функция Drag
+-- Функция Drag (Исправлена для мобильных и ПК под лоадеры)
 local function makeDraggable(guiElement, dragHandle)
 	local dragging, dragInput, dragStart, startPosition
 	local function update(input)
@@ -177,7 +180,7 @@ FloatingButton.MouseButton1Click:Connect(function()
 	MainMenu.Visible = not MainMenu.Visible
 end)
 
--- Система вкладок
+-- Исправленная система вкладок
 local tabs = {}
 local contents = {}
 local activeTab = nil
@@ -240,14 +243,14 @@ local visualText = Instance.new("TextLabel")
 visualText.Size = UDim2.new(1, 0, 0, 30)
 visualText.BackgroundTransparency = 1
 visualText.Text = "Visual Settings"
-visualText.TextColor3 = TEXT_DARK
+visualText.TextColor3 = TEXT_WHITE
 visualText.TextSize = 14
 visualText.Font = Enum.Font.GothamMedium
 visualText.TextXAlignment = Enum.TextXAlignment.Left
 visualText.Parent = visualContent
 
 ----------------------------------------------------
--- КНОПКА СМЕНЫ НЕБА ВО ВКАДКУ WORLD
+-- ФУНКЦИОНАЛ: КНОПКА СМЕНЫ НЕБА ВО ВКАДКУ WORLD
 ----------------------------------------------------
 local SkyButton = Instance.new("TextButton")
 SkyButton.Name = "CustomSkyButton"
@@ -296,5 +299,3 @@ SkyButton.MouseButton1Click:Connect(function()
 		SkyStroke.Color = Color3.fromRGB(45, 45, 60)
 		
 		if originalLightingSettings.Ambient then
-			Lighting.Ambient = originalLightingSettings.Ambient
-			Lighting.OutdoorAmbient = originalLightingSettings.OutdoorAmbient
