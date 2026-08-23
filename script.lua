@@ -1,19 +1,21 @@
--- Настройки интерфейса
-local Players = game:Service("Players")
+-- 1. Исправлено получение сервисов (GetService вместо Service)
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local UserInputService = game:Service("UserInputService")
-local TweenService = game:Service("TweenService")
+-- Защита от слишком быстрой загрузки скрипта (ждем загрузки интерфейса игрока)
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 10) 
 
--- 1. Создание ScreenGui
-local ScreenGui = script.Parent
-if not ScreenGui:IsA("ScreenGui") then
-	ScreenGui = Instance.new("ScreenGui")
-	ScreenGui.Parent = PlayerGui
-end
+if not PlayerGui then return end
+
+-- 2. Создание ScreenGui напрямую в PlayerGui (так надежнее для удаленных скриптов)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CustomMenuGui"
 ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = PlayerGui
 
--- 2. Создание Плавающей Кнопки (Floating Button)
+-- 3. Создание Плавающей Кнопки (Floating Button)
 local FloatingButton = Instance.new("TextButton")
 FloatingButton.Name = "FloatingButton"
 FloatingButton.Size = UDim2.new(0, 60, 0, 60)
@@ -26,10 +28,10 @@ FloatingButton.Font = Enum.Font.SourceSansBold
 FloatingButton.Parent = ScreenGui
 
 local ButtonCorner = Instance.new("UICorner")
-ButtonCorner.CornerRadius = UDim.new(1, 0) -- Делает кнопку круглой
+ButtonCorner.CornerRadius = UDim.new(1, 0)
 ButtonCorner.Parent = FloatingButton
 
--- 3. Создание Главного Меню (Main Menu Frame)
+-- 4. Создание Главного Меню (Main Menu Frame)
 local MainMenu = Instance.new("Frame")
 MainMenu.Name = "MainMenu"
 MainMenu.Size = UDim2.new(0, 400, 0, 250)
@@ -57,7 +59,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -40, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "Cheat Menu"
+Title.Text = "Menu"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 16
 Title.Font = Enum.Font.SourceSansBold
@@ -85,7 +87,7 @@ ContentPanel.Position = UDim2.new(0, 105, 0, 40)
 ContentPanel.BackgroundTransparency = 1
 ContentPanel.Parent = MainMenu
 
--- 4. Функция перетаскивания (Drag Function) для любого GUI элемента
+-- 5. Функция перетаскивания (Drag Function)
 local function makeDraggable(guiElement, dragHandle)
 	local dragging, dragInput, dragStart, startPosition
 
@@ -121,21 +123,19 @@ local function makeDraggable(guiElement, dragHandle)
 	end)
 end
 
--- Включаем перетаскивание для плавающей кнопки и для главного меню (за шапку)
 makeDraggable(FloatingButton, FloatingButton)
 makeDraggable(MainMenu, TopBar)
 
--- 5. Логика Открытия / Закрытия меню по нажатию на кнопку
+-- 6. Открытие / Закрытие меню
 FloatingButton.MouseButton1Click:Connect(function()
 	MainMenu.Visible = not MainMenu.Visible
 end)
 
--- 6. Создание системы вкладок (World и Visual)
+-- 7. Система вкладок (World и Visual)
 local tabs = {}
 local contents = {}
 
 local function createTab(tabName)
-	-- Кнопка вкладки
 	local tabBtn = Instance.new("TextButton")
 	tabBtn.Name = tabName .. "Tab"
 	tabBtn.Size = UDim2.new(1, 0, 0, 35)
@@ -147,7 +147,6 @@ local function createTab(tabName)
 	tabBtn.Font = Enum.Font.SourceSans
 	tabBtn.Parent = TabPanel
 	
-	-- Фрейм с контентом для этой вкладки
 	local contentFrame = Instance.new("Frame")
 	contentFrame.Name = tabName .. "Content"
 	contentFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -155,11 +154,10 @@ local function createTab(tabName)
 	contentFrame.Visible = false
 	contentFrame.Parent = ContentPanel
 	
-	-- Добавляем тестовый текст, чтобы видеть, что вкладка переключилась
 	local testText = Instance.new("TextLabel")
 	testText.Size = UDim2.new(1, 0, 0, 30)
 	testText.BackgroundTransparency = 1
-	testText.Text = "Это вкладка: " .. tabName
+	testText.Text = "Вкладка: " .. tabName
 	testText.TextColor3 = Color3.fromRGB(200, 200, 200)
 	testText.TextSize = 16
 	testText.Font = Enum.Font.SourceSans
@@ -168,26 +166,21 @@ local function createTab(tabName)
 	tabs[tabName] = tabBtn
 	contents[tabName] = contentFrame
 
-	-- Логика переключения
 	tabBtn.MouseButton1Click:Connect(function()
-		-- Сбрасываем все вкладки
 		for name, btn in pairs(tabs) do
 			btn.BackgroundTransparency = 1
 			btn.TextColor3 = Color3.fromRGB(150, 150, 150)
 			contents[name].Visible = false
 		end
-		-- Активируем выбранную
 		tabBtn.BackgroundTransparency = 0
 		tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 		contentFrame.Visible = true
 	end)
 end
 
--- Создаем вкладки "World" и "Visual"
 createTab("World")
 createTab("Visual")
 
--- Открываем первую вкладку по умолчанию
 if tabs["World"] then
 	tabs["World"].BackgroundTransparency = 0
 	tabs["World"].TextColor3 = Color3.fromRGB(255, 255, 255)
