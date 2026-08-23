@@ -1,90 +1,144 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 10) 
 if not PlayerGui then return end
 
--- Создание ScreenGui
+-- 1. Создание ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "CustomMenuGui"
+ScreenGui.Name = "PulseHubGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
 
--- Плавающая Кнопка
+-- ПАЛИЦА ЦВЕТОВ (Стиль Pulse Hub)
+local MAIN_BG = Color3.fromRGB(15, 15, 20)
+local TOPBAR_BG = Color3.fromRGB(20, 20, 28)
+local PANEL_BG = Color3.fromRGB(11, 11, 16)
+local PURPLE_NEON = Color3.fromRGB(140, 50, 255)
+local TEXT_WHITE = Color3.fromRGB(240, 240, 250)
+local TEXT_DARK = Color3.fromRGB(120, 120, 140)
+
+-- 2. Плавающая Кнопка открытия ("NV")
 local FloatingButton = Instance.new("TextButton")
 FloatingButton.Name = "FloatingButton"
-FloatingButton.Size = UDim2.new(0, 60, 0, 60)
+FloatingButton.Size = UDim2.new(0, 50, 0, 50)
 FloatingButton.Position = UDim2.new(0.05, 0, 0.4, 0)
-FloatingButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-FloatingButton.Text = "MENU"
-FloatingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-FloatingButton.TextSize = 14
-FloatingButton.Font = Enum.Font.SourceSansBold
+FloatingButton.BackgroundColor3 = MAIN_BG
+FloatingButton.Text = "NV"
+FloatingButton.TextColor3 = PURPLE_NEON
+FloatingButton.TextSize = 16
+FloatingButton.Font = Enum.Font.GothamBold
 FloatingButton.Parent = ScreenGui
 
 local ButtonCorner = Instance.new("UICorner")
 ButtonCorner.CornerRadius = UDim.new(1, 0)
 ButtonCorner.Parent = FloatingButton
 
--- Главное Меню
+local ButtonStroke = Instance.new("UIStroke")
+ButtonStroke.Color = PURPLE_NEON
+ButtonStroke.Thickness = 2
+ButtonStroke.Parent = FloatingButton
+
+-- 3. Главное Меню
 local MainMenu = Instance.new("Frame")
 MainMenu.Name = "MainMenu"
-MainMenu.Size = UDim2.new(0, 400, 0, 250)
-MainMenu.Position = UDim2.new(0.5, -200, 0.5, -125)
-MainMenu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainMenu.Size = UDim2.new(0, 420, 0, 260)
+MainMenu.Position = UDim2.new(0.5, -210, 0.5, -130)
+MainMenu.BackgroundColor3 = MAIN_BG
 MainMenu.Visible = false
 MainMenu.Parent = ScreenGui
 
 local MenuCorner = Instance.new("UICorner")
-MenuCorner.CornerRadius = UDim.new(0, 8)
+MenuCorner.CornerRadius = UDim.new(0, 10)
 MenuCorner.Parent = MainMenu
 
--- Шапка
+-- Фиолетовая обводка Pulse Hub
+local MenuStroke = Instance.new("UIStroke")
+MenuStroke.Color = PURPLE_NEON
+MenuStroke.Thickness = 1.5
+MenuStroke.Parent = MainMenu
+
+-- Шапка меню (TopBar)
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
-TopBar.Size = UDim2.new(1, 0, 0, 35)
-TopBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TopBar.Size = UDim2.new(1, 0, 0, 40)
+TopBar.BackgroundColor3 = TOPBAR_BG
 TopBar.Parent = MainMenu
 
 local TopBarCorner = Instance.new("UICorner")
-TopBarCorner.CornerRadius = UDim.new(0, 8)
+TopBarCorner.CornerRadius = UDim.new(0, 10)
 TopBarCorner.Parent = TopBar
+
+-- Линия под шапкой
+local TopBarLine = Instance.new("Frame")
+TopBarLine.Size = UDim2.new(1, 0, 0, 1)
+TopBarLine.Position = UDim2.new(0, 0, 1, -1)
+TopBarLine.BackgroundColor3 = PURPLE_NEON
+TopBarLine.BorderSizePixel = 0
+TopBarLine.Parent = TopBar
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -40, 1, 0)
-Title.Position = UDim2.new(0, 10, 0, 0)
+Title.Position = UDim2.new(0, 15, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "Menu"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Text = "PULSE HUB"
+Title.TextColor3 = TEXT_WHITE
 Title.TextSize = 16
-Title.Font = Enum.Font.SourceSansBold
+Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
--- Панель вкладок
+-- Разделитель в названии
+local TitleAccent = Instance.new("TextLabel")
+TitleAccent.Size = UDim2.new(1, 0, 1, 0)
+TitleAccent.Position = UDim2.new(0, 110, 0, 0)
+TitleAccent.BackgroundTransparency = 1
+TitleAccent.Text = ".v1"
+TitleAccent.TextColor3 = PURPLE_NEON
+TitleAccent.TextSize = 16
+TitleAccent.Font = Enum.Font.GothamBold
+TitleAccent.TextXAlignment = Enum.TextXAlignment.Left
+TitleAccent.Parent = TopBar
+
+-- Левая панель вкладок
 local TabPanel = Instance.new("Frame")
 TabPanel.Name = "TabPanel"
-TabPanel.Size = UDim2.new(0, 100, 1, -35)
-TabPanel.Position = UDim2.new(0, 0, 0, 35)
-TabPanel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TabPanel.Size = UDim2.new(0, 110, 1, -40)
+TabPanel.Position = UDim2.new(0, 0, 0, 40)
+TabPanel.BackgroundColor3 = PANEL_BG
 TabPanel.Parent = MainMenu
 
 local TabLayout = Instance.new("UIListLayout")
 TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-TabLayout.Padding = UDim.new(0, 5)
+TabLayout.Padding = UDim.new(0, 4)
 TabLayout.Parent = TabPanel
+
+local TabPadding = Instance.new("UIPadding")
+TabPadding.PaddingTop = UDim.new(0, 10)
+TabPadding.PaddingLeft = UDim.new(0, 5)
+TabPadding.PaddingRight = UDim.new(0, 5)
+TabPadding.Parent = TabPanel
+
+-- Линия-разделитель для табов
+local TabLine = Instance.new("Frame")
+TabLine.Size = UDim2.new(0, 1, 1, -40)
+TabLine.Position = UDim2.new(0, 110, 0, 40)
+TabLine.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+TabLine.BorderSizePixel = 0
+TabLine.Parent = MainMenu
 
 -- Контейнер контента
 local ContentPanel = Instance.new("Frame")
 ContentPanel.Name = "ContentPanel"
-ContentPanel.Size = UDim2.new(1, -110, 1, -45)
-ContentPanel.Position = UDim2.new(0, 105, 0, 40)
+ContentPanel.Size = UDim2.new(1, -125, 1, -55)
+ContentPanel.Position = UDim2.new(0, 120, 0, 50)
 ContentPanel.BackgroundTransparency = 1
 ContentPanel.Parent = MainMenu
 
--- Функция Drag
+-- Функция Drag (Перетаскивание)
 local function makeDraggable(guiElement, dragHandle)
 	local dragging, dragInput, dragStart, startPosition
 	local function update(input)
@@ -112,25 +166,30 @@ end
 makeDraggable(FloatingButton, FloatingButton)
 makeDraggable(MainMenu, TopBar)
 
+-- Открытие / Закрытие
 FloatingButton.MouseButton1Click:Connect(function()
 	MainMenu.Visible = not MainMenu.Visible
 end)
 
--- Переменные системы вкладок
+-- Кастомная система вкладок
 local tabs = {}
 local contents = {}
 
 local function createTab(tabName)
 	local tabBtn = Instance.new("TextButton")
 	tabBtn.Name = tabName .. "Tab"
-	tabBtn.Size = UDim2.new(1, 0, 0, 35)
-	tabBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+	tabBtn.Size = UDim2.new(1, 0, 0, 32)
+	tabBtn.BackgroundColor3 = PURPLE_NEON
 	tabBtn.BackgroundTransparency = 1
 	tabBtn.Text = tabName
-	tabBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
-	tabBtn.TextSize = 14
-	tabBtn.Font = Enum.Font.SourceSans
+	tabBtn.TextColor3 = TEXT_DARK
+	tabBtn.TextSize = 13
+	tabBtn.Font = Enum.Font.GothamMedium
 	tabBtn.Parent = TabPanel
+	
+	local btnCorner = Instance.new("UICorner")
+	btnCorner.CornerRadius = UDim.new(0, 6)
+	btnCorner.Parent = tabBtn
 	
 	local contentFrame = Instance.new("Frame")
 	contentFrame.Name = tabName .. "Content"
@@ -144,96 +203,86 @@ local function createTab(tabName)
 
 	tabBtn.MouseButton1Click:Connect(function()
 		for name, btn in pairs(tabs) do
-			btn.BackgroundTransparency = 1
-			btn.TextColor3 = Color3.fromRGB(150, 150, 150)
+			TweenService:Create(btn, Color3.fromRGB(15, 15, 20), {BackgroundTransparency = 1, TextColor3 = TEXT_DARK}):Play()
 			contents[name].Visible = false
 		end
-		tabBtn.BackgroundTransparency = 0
-		tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		TweenService:Create(tabBtn, Color3.fromRGB(15, 15, 20), {BackgroundTransparency = 0.8, TextColor3 = PURPLE_NEON}):Play()
 		contentFrame.Visible = true
 	end)
 	return contentFrame
 end
 
--- Инициализация вкладок
 local worldContent = createTab("World")
 local visualContent = createTab("Visual")
 
 ----------------------------------------------------
--- КНОПКА СМЕНЫ НЕБА ВО ВКЛАДКЕ WORLD
+-- КНОПКА СМЕНЫ НЕБА (ФИОЛЕТОВЫЙ PULSE СТИЛЬ)
 ----------------------------------------------------
 local SkyButton = Instance.new("TextButton")
-SkyButton.Name = "AnimeSkyButton"
-SkyButton.Size = UDim2.new(1, 0, 0, 40)
-SkyButton.Position = UDim2.new(0, 0, 0, 10)
-SkyButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-SkyButton.Text = "Anime Sky: OFF"
-SkyButton.TextColor3 = Color3.fromRGB(255, 100, 100)
-SkyButton.TextSize = 14
-SkyButton.Font = Enum.Font.SourceSansBold
+SkyButton.Name = "CustomSkyButton"
+SkyButton.Size = UDim2.new(1, 0, 0, 38)
+SkyButton.Position = UDim2.new(0, 0, 0, 5)
+SkyButton.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+SkyButton.Text = "Purple Sky: OFF"
+SkyButton.TextColor3 = Color3.fromRGB(230, 80, 80)
+SkyButton.TextSize = 13
+SkyButton.Font = Enum.Font.GothamBold
 SkyButton.Parent = worldContent
 
 local SkyCorner = Instance.new("UICorner")
 SkyCorner.CornerRadius = UDim.new(0, 6)
 SkyCorner.Parent = SkyButton
 
-local skyActive = false
-local originalSkies = {}
-local customSky = nil
+local SkyStroke = Instance.new("UIStroke")
+SkyStroke.Color = Color3.fromRGB(45, 45, 60)
+SkyStroke.Thickness = 1
+SkyStroke.Parent = SkyButton
 
--- ID аниме текстур для Skybox (вы можете вставить свои Asset ID, если загрузите свои кубмапы)
-local animeSkyId = "rbxassetid://2703273105" 
+local skyActive = false
+local originalLightingSettings = {}
 
 SkyButton.MouseButton1Click:Connect(function()
 	skyActive = not skyActive
 	
 	if skyActive then
-		SkyButton.Text = "Anime Sky: ON"
-		SkyButton.TextColor3 = Color3.fromRGB(100, 255, 100)
-		SkyButton.BackgroundColor3 = Color3.fromRGB(60, 80, 60)
+		-- Визуальное изменение кнопки
+		SkyButton.Text = "Purple Sky: ON"
+		SkyButton.TextColor3 = PURPLE_NEON
+		SkyStroke.Color = PURPLE_NEON
 		
-		-- Прячем стандартное небо игры во временную таблицу
-		for _, child in ipairs(Lighting:GetChildren()) do
-			if child:IsA("Sky") then
-				table.insert(originalSkies, child)
-				child.Parent = nil
-			end
-		end
-		
-		-- Создаем наше аниме-небо
-		customSky = Instance.new("Sky")
-		customSky.Name = "AnimeSkybox"
-		customSky.SkyboxBk = animeSkyId
-		customSky.SkyboxDn = animeSkyId
-		customSky.SkyboxFt = animeSkyId
-		customSky.SkyboxLf = animeSkyId
-		customSky.SkyboxRt = animeSkyId
-		customSky.SkyboxUp = animeSkyId
-		customSky.SunTextureId = "" -- убираем стандартное солнце, чтобы не портить арт
-		customSky.MoonTextureId = ""
-		customSky.Parent = Lighting
+		-- Сохраняем оригинальные настройки света игры
+		originalLightingSettings.Ambient = Lighting.Ambient
+		originalLightingSettings.OutdoorAmbient = Lighting.OutdoorAmbient
+		originalLightingSettings.ClockTime = Lighting.ClockTime
+		originalLightingSettings.FogColor = Lighting.FogColor
+		originalLightingSettings.FogEnd = Lighting.FogEnd
+
+		-- Применяем красивую неоновую фиолетовую атмосферу
+		Lighting.ClockTime = 0 -- Ночь
+		Lighting.Ambient = Color3.fromRGB(40, 20, 70)
+		Lighting.OutdoorAmbient = Color3.fromRGB(20, 10, 40)
+		Lighting.FogColor = Color3.fromRGB(15, 5, 25)
+		Lighting.FogEnd = 500
 	else
-		SkyButton.Text = "Anime Sky: OFF"
-		SkyButton.TextColor3 = Color3.fromRGB(255, 100, 100)
-		SkyButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+		-- Возвращаем кнопку в исходное состояние
+		SkyButton.Text = "Purple Sky: OFF"
+		SkyButton.TextColor3 = Color3.fromRGB(230, 80, 80)
+		SkyStroke.Color = Color3.fromRGB(45, 45, 60)
 		
-		-- Удаляем кастомное небо
-		if customSky then
-			customSky:Destroy()
-			customSky = nil
+		-- Восстанавливаем оригинальный свет игры
+		if originalLightingSettings.Ambient then
+			Lighting.Ambient = originalLightingSettings.Ambient
+			Lighting.OutdoorAmbient = originalLightingSettings.OutdoorAmbient
+			Lighting.ClockTime = originalLightingSettings.ClockTime
+			Lighting.FogColor = originalLightingSettings.FogColor
+			Lighting.FogEnd = originalLightingSettings.FogEnd
 		end
-		
-		-- Возвращаем старое небо игры назад
-		for _, sky in ipairs(originalSkies) do
-			sky.Parent = Lighting
-		end
-		originalSkies = {}
 	end
 end)
 
 -- Дефолтное открытие первой вкладки
 if tabs["World"] then
-	tabs["World"].BackgroundTransparency = 0
-	tabs["World"].TextColor3 = Color3.fromRGB(255, 255, 255)
+	tabs["World"].BackgroundTransparency = 0.8
+	tabs["World"].TextColor3 = PURPLE_NEON
 	contents["World"].Visible = true
 end
