@@ -1,21 +1,18 @@
--- 1. Исправлено получение сервисов (GetService вместо Service)
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
 
 local LocalPlayer = Players.LocalPlayer
--- Защита от слишком быстрой загрузки скрипта (ждем загрузки интерфейса игрока)
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 10) 
-
 if not PlayerGui then return end
 
--- 2. Создание ScreenGui напрямую в PlayerGui (так надежнее для удаленных скриптов)
+-- Создание ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "CustomMenuGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = PlayerGui
 
--- 3. Создание Плавающей Кнопки (Floating Button)
+-- Плавающая Кнопка
 local FloatingButton = Instance.new("TextButton")
 FloatingButton.Name = "FloatingButton"
 FloatingButton.Size = UDim2.new(0, 60, 0, 60)
@@ -31,7 +28,7 @@ local ButtonCorner = Instance.new("UICorner")
 ButtonCorner.CornerRadius = UDim.new(1, 0)
 ButtonCorner.Parent = FloatingButton
 
--- 4. Создание Главного Меню (Main Menu Frame)
+-- Главное Меню
 local MainMenu = Instance.new("Frame")
 MainMenu.Name = "MainMenu"
 MainMenu.Size = UDim2.new(0, 400, 0, 250)
@@ -44,7 +41,7 @@ local MenuCorner = Instance.new("UICorner")
 MenuCorner.CornerRadius = UDim.new(0, 8)
 MenuCorner.Parent = MainMenu
 
--- Шапка меню (За нее будем перетаскивать)
+-- Шапка
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
 TopBar.Size = UDim2.new(1, 0, 0, 35)
@@ -66,7 +63,7 @@ Title.Font = Enum.Font.SourceSansBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
--- Панель вкладок (Табы)
+-- Панель вкладок
 local TabPanel = Instance.new("Frame")
 TabPanel.Name = "TabPanel"
 TabPanel.Size = UDim2.new(0, 100, 1, -35)
@@ -79,7 +76,7 @@ TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TabLayout.Padding = UDim.new(0, 5)
 TabLayout.Parent = TabPanel
 
--- Контейнер для контента вкладок
+-- Контейнер контента
 local ContentPanel = Instance.new("Frame")
 ContentPanel.Name = "ContentPanel"
 ContentPanel.Size = UDim2.new(1, -110, 1, -45)
@@ -87,51 +84,39 @@ ContentPanel.Position = UDim2.new(0, 105, 0, 40)
 ContentPanel.BackgroundTransparency = 1
 ContentPanel.Parent = MainMenu
 
--- 5. Функция перетаскивания (Drag Function)
+-- Функция Drag
 local function makeDraggable(guiElement, dragHandle)
 	local dragging, dragInput, dragStart, startPosition
-
 	local function update(input)
 		local delta = input.Position - dragStart
 		guiElement.Position = UDim2.new(startPosition.X.Scale, startPosition.X.Offset + delta.X, startPosition.Y.Scale, startPosition.Y.Offset + delta.Y)
 	end
-
 	dragHandle.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
 			dragStart = input.Position
 			startPosition = guiElement.Position
-
 			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
-				end
+				if input.UserInputState == Enum.UserInputState.End then dragging = false end
 			end)
 		end
 	end)
-
 	dragHandle.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			dragInput = input
-		end
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
 	end)
-
 	UserInputService.InputChanged:Connect(function(input)
-		if input == dragInput and dragging then
-			update(input)
-		end
+		if input == dragInput and dragging then update(input) end
 	end)
 end
 
 makeDraggable(FloatingButton, FloatingButton)
 makeDraggable(MainMenu, TopBar)
 
--- 6. Открытие / Закрытие меню
 FloatingButton.MouseButton1Click:Connect(function()
 	MainMenu.Visible = not MainMenu.Visible
 end)
 
--- 7. Система вкладок (World и Visual)
+-- Переменные системы вкладок
 local tabs = {}
 local contents = {}
 
@@ -153,15 +138,6 @@ local function createTab(tabName)
 	contentFrame.BackgroundTransparency = 1
 	contentFrame.Visible = false
 	contentFrame.Parent = ContentPanel
-	
-	local testText = Instance.new("TextLabel")
-	testText.Size = UDim2.new(1, 0, 0, 30)
-	testText.BackgroundTransparency = 1
-	testText.Text = "Вкладка: " .. tabName
-	testText.TextColor3 = Color3.fromRGB(200, 200, 200)
-	testText.TextSize = 16
-	testText.Font = Enum.Font.SourceSans
-	testText.Parent = contentFrame
 
 	tabs[tabName] = tabBtn
 	contents[tabName] = contentFrame
@@ -176,11 +152,86 @@ local function createTab(tabName)
 		tabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 		contentFrame.Visible = true
 	end)
+	return contentFrame
 end
 
-createTab("World")
-createTab("Visual")
+-- Инициализация вкладок
+local worldContent = createTab("World")
+local visualContent = createTab("Visual")
 
+----------------------------------------------------
+-- КНОПКА СМЕНЫ НЕБА ВО ВКЛАДКЕ WORLD
+----------------------------------------------------
+local SkyButton = Instance.new("TextButton")
+SkyButton.Name = "AnimeSkyButton"
+SkyButton.Size = UDim2.new(1, 0, 0, 40)
+SkyButton.Position = UDim2.new(0, 0, 0, 10)
+SkyButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+SkyButton.Text = "Anime Sky: OFF"
+SkyButton.TextColor3 = Color3.fromRGB(255, 100, 100)
+SkyButton.TextSize = 14
+SkyButton.Font = Enum.Font.SourceSansBold
+SkyButton.Parent = worldContent
+
+local SkyCorner = Instance.new("UICorner")
+SkyCorner.CornerRadius = UDim.new(0, 6)
+SkyCorner.Parent = SkyButton
+
+local skyActive = false
+local originalSkies = {}
+local customSky = nil
+
+-- ID аниме текстур для Skybox (вы можете вставить свои Asset ID, если загрузите свои кубмапы)
+local animeSkyId = "rbxassetid://2703273105" 
+
+SkyButton.MouseButton1Click:Connect(function()
+	skyActive = not skyActive
+	
+	if skyActive then
+		SkyButton.Text = "Anime Sky: ON"
+		SkyButton.TextColor3 = Color3.fromRGB(100, 255, 100)
+		SkyButton.BackgroundColor3 = Color3.fromRGB(60, 80, 60)
+		
+		-- Прячем стандартное небо игры во временную таблицу
+		for _, child in ipairs(Lighting:GetChildren()) do
+			if child:IsA("Sky") then
+				table.insert(originalSkies, child)
+				child.Parent = nil
+			end
+		end
+		
+		-- Создаем наше аниме-небо
+		customSky = Instance.new("Sky")
+		customSky.Name = "AnimeSkybox"
+		customSky.SkyboxBk = animeSkyId
+		customSky.SkyboxDn = animeSkyId
+		customSky.SkyboxFt = animeSkyId
+		customSky.SkyboxLf = animeSkyId
+		customSky.SkyboxRt = animeSkyId
+		customSky.SkyboxUp = animeSkyId
+		customSky.SunTextureId = "" -- убираем стандартное солнце, чтобы не портить арт
+		customSky.MoonTextureId = ""
+		customSky.Parent = Lighting
+	else
+		SkyButton.Text = "Anime Sky: OFF"
+		SkyButton.TextColor3 = Color3.fromRGB(255, 100, 100)
+		SkyButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+		
+		-- Удаляем кастомное небо
+		if customSky then
+			customSky:Destroy()
+			customSky = nil
+		end
+		
+		-- Возвращаем старое небо игры назад
+		for _, sky in ipairs(originalSkies) do
+			sky.Parent = Lighting
+		end
+		originalSkies = {}
+	end
+end)
+
+-- Дефолтное открытие первой вкладки
 if tabs["World"] then
 	tabs["World"].BackgroundTransparency = 0
 	tabs["World"].TextColor3 = Color3.fromRGB(255, 255, 255)
