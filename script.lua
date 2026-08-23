@@ -2,7 +2,6 @@ local success, err = pcall(function()
     -- =============================================================
     -- 0. ОБХОД АНТИЧИТА И ПОДГОТОВКА СЕРВИСОВ
     -- =============================================================
-    -- Небольшая случайная задержка перед инициализацией, чтобы сбить алгоритмы детекта быстрых инжектов
     task.wait(math.random(1, 3) / 10)
 
     local UserInputService = game:GetService("UserInputService")
@@ -13,10 +12,9 @@ local success, err = pcall(function()
     local Camera = workspace.CurrentCamera
     local LocalPlayer = Players.LocalPlayer
 
-    -- Безопасный выбор контейнера GUI (защита от проверки CoreGui)
+    -- Безопасный выбор контейнера GUI
     local TargetParent = (gethui and gethui()) or LocalPlayer:WaitForChild("PlayerGui")
 
-    -- Скрытие от функций поиска элементов античитом
     if TargetParent:FindFirstChild("PulseHub_Flick") then
         TargetParent.PulseHub_Flick:Destroy()
     end
@@ -29,10 +27,13 @@ local success, err = pcall(function()
         ShowFOV = false,
         AimPart = "Head",
         TeamCheck = true,
-        Smoothness = 0.12 -- Безопасная плавная наводка (от 0.05 до 0.2)
+        VisibleCheck = true, -- Проверка видимости (Wall Check)
+        Smoothness = 20,     -- Сила наводки (от 1 до 50)
+        Hitchance = 100,     -- Шанс попадания (0% - 100%)
+        MaxDistance = 500    -- Максимальная дистанция (в студах)
     }
 
-    -- FOV Circle через Drawing (с безопасной оберткой)
+    -- FOV Circle через Drawing
     local FOVCircle = Drawing.new("Circle")
     FOVCircle.Thickness = 1.5
     FOVCircle.Color = Color3.fromRGB(160, 90, 255)
@@ -45,7 +46,6 @@ local success, err = pcall(function()
     ScreenGui.Name = "PulseHub_Flick"
     ScreenGui.ResetOnSpawn = false
     
-    -- Защита GUI от детектирования методом protectgui (если поддерживает инжектор)
     if syn and syn.protect_gui then
         syn.protect_gui(ScreenGui)
         ScreenGui.Parent = CoreGui
@@ -400,12 +400,16 @@ local success, err = pcall(function()
     -- =============================================================
     local CombatPage = TabPages["Combat"]
 
-    UIHelper.AddToggle(CombatPage, "Enable Aimbot (Smooth)", Settings.Aimbot, function(val)
+    UIHelper.AddToggle(CombatPage, "Enable Aimbot", Settings.Aimbot, function(val)
         Settings.Aimbot = val
     end)
 
-    UIHelper.AddToggle(CombatPage, "Enable Silent Assist", Settings.SilentAim, function(val)
+    UIHelper.AddToggle(CombatPage, "Enable Silent Aim", Settings.SilentAim, function(val)
         Settings.SilentAim = val
+    end)
+
+    UIHelper.AddToggle(CombatPage, "Wall Check (Visible Only)", Settings.VisibleCheck, function(val)
+        Settings.VisibleCheck = val
     end)
 
     UIHelper.AddToggle(CombatPage, "Show FOV Circle", Settings.ShowFOV, function(val)
@@ -418,13 +422,49 @@ local success, err = pcall(function()
         FOVCircle.Radius = val
     end)
 
+    UIHelper.AddSlider(CombatPage, "Aimbot Smoothness", 1, 50, Settings.Smoothness, function(val)
+        Settings.Smoothness = val
+    end)
+
+    UIHelper.AddSlider(CombatPage, "Silent Aim Hitchance %", 0, 100, Settings.Hitchance, function(val)
+        Settings.Hitchance = val
+    end)
+
+    UIHelper.AddSlider(CombatPage, "Max Distance", 100, 2000, Settings.MaxDistance, function(val)
+        Settings.MaxDistance = val
+    end)
+
     UIHelper.AddToggle(CombatPage, "Target Head Only", true, function(val)
         Settings.AimPart = val and "Head" or "HumanoidRootPart"
     end)
 
     -- =============================================================
-    -- 6. БЕЗОПАСНАЯ ЛОГИКА АИМА С ПЛАВНЫМ HASH/LERP
+    -- 6. ТОЧНАЯ И БЕЗОПАСНАЯ ЛОГИКА АИМА
     -- =============================================================
+    
+    -- Проверка видимости цели через Raycast (Wall Check)
+    local function IsVisible(targetPart)
+        if not Settings.VisibleCheck then return true end
+        local origin = Camera.CFrame.Position
+        local direction = targetPart.Position - origin
+        
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+        
+        local filterList = {Camera}
+        if LocalPlayer.Character then
+            table.insert(filterList, LocalPlayer.Character)
+        end
+        raycastParams.FilterDescendantsInstances = filterList
+
+        local result = workspace:Raycast(origin, direction, raycastParams)
+        if result then
+            return result.Instance:IsDescendantOf(targetPart.Parent)
+        end
+        return false
+    end
+
+    -- Поиск ближайшей цели в радиусе FOV
     local function GetClosestTarget()
         local closest = nil
         local maxDist = Settings.FOV
@@ -438,12 +478,20 @@ local success, err = pcall(function()
 
                 local targetPart = plr.Character:FindFirstChild(Settings.AimPart)
                 if targetPart then
+                    -- Проверка дистанции до игрока в игре
+                    local worldDist = (targetPart.Position - Camera.CFrame.Position).Magnitude
+                    if worldDist > Settings.MaxDistance then
+                        continue
+                    end
+
                     local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
                     if onScreen then
                         local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
                         if dist < maxDist then
-                            maxDist = dist
-                            closest = targetPart
+                            if IsVisible(targetPart) then
+                                maxDist = dist
+                                closest = targetPart
+                            end
                         end
                     end
                 end
@@ -452,7 +500,7 @@ local success, err = pcall(function()
         return closest
     end
 
-    -- Игровой цикл с задействованием безопасности
+    -- Главный цикл обновлений
     RunService.RenderStepped:Connect(function()
         local mousePos = UserInputService:GetMouseLocation()
         FOVCircle.Position = mousePos
@@ -461,12 +509,27 @@ local success, err = pcall(function()
 
         local target = GetClosestTarget()
 
-        -- Наводка работает плавно через CFrame:Lerp при нажатой ПКМ или ЛКМ
-        if (Settings.Aimbot or Settings.SilentAim) and target then
-            if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) or UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-                local targetCFrame = CFrame.new(Camera.CFrame.Position, target.Position)
-                -- Плавный переход предотвращает кик за резкий Snap
-                Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, Settings.Smoothness)
+        if target and (UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) or UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)) then
+            -- 1. Aimbot (Точная и плавная наводка камеры)
+            if Settings.Aimbot then
+                local currentCFrame = Camera.CFrame
+                local targetCFrame = CFrame.lookAt(currentCFrame.Position, target.Position)
+                
+                -- Вычисление плавности: чем выше Smoothness, тем более сглаженный довод
+                local alpha = math.clamp(1 / Settings.Smoothness, 0.01, 1)
+                Camera.CFrame = currentCFrame:Lerp(targetCFrame, alpha)
+            end
+
+            -- 2. Silent Aim (Доводка с учетом Hitchance)
+            if Settings.SilentAim then
+                local rand = math.random(1, 100)
+                if rand <= Settings.Hitchance then
+                    local currentCFrame = Camera.CFrame
+                    local targetCFrame = CFrame.lookAt(currentCFrame.Position, target.Position)
+                    
+                    -- Мгновенное бесшумное смещение взгляда строго в миг выстрела
+                    Camera.CFrame = currentCFrame:Lerp(targetCFrame, 0.85)
+                end
             end
         end
     end)
