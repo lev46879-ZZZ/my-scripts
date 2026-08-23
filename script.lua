@@ -1,27 +1,44 @@
 local success, err = pcall(function()
-    print("[Flick UI]: Полный запуск интерфейса и визуалов...")
+    print("[Flick UI]: Запуск UI с полным функционалом Combat и Visual...")
 
     local CoreGui = game:GetService("CoreGui")
     local TweenService = game:GetService("TweenService")
     local UserInputService = game:GetService("UserInputService")
     local RunService = game:GetService("RunService")
     local Players = game:GetService("Players")
+    local Workspace = game:GetService("Workspace")
     local LocalPlayer = Players.LocalPlayer
+    local Camera = Workspace.CurrentCamera
 
-    -- Удаление старой копии меню перед перезапуском
+    -- Удаление старой копии меню
     if CoreGui:FindFirstChild("FlickMenuGui") then
         CoreGui.FlickMenuGui:Destroy()
     end
 
-    -- Главный контейнер интерфейса
+    -- Главный контейнер
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "FlickMenuGui"
     ScreenGui.Parent = CoreGui or LocalPlayer:WaitForChild("PlayerGui")
     ScreenGui.ResetOnSpawn = false
 
-    -- Глобальные переменные для мгновенного включения функций
+    -- ГЛОБАЛЬНЫЕ НАСТРОЙКИ (КОМБАТ И ВИЗУАЛ)
+    _G.Aimbot_Enabled = false
+    _G.SilentAim_Enabled = false
+    _G.FOV_Enabled = false
+    _G.WallCheck_Enabled = false
+    _G.WallShot_Enabled = false
+    _G.FOV_Radius = 120
+
     _G.ESP_Boxes_Enabled = false
     _G.Chams_Enabled = false
+
+    -- Создание круга FOV (Drawing API)
+    local FOVCircle = Drawing.new("Circle")
+    FOVCircle.Thickness = 1.5
+    FOVCircle.Color = Color3.fromRGB(0, 150, 255)
+    FOVCircle.Filled = false
+    FOVCircle.Transparency = 0.8
+    FOVCircle.Visible = false
 
     -- ГЛАВНОЕ ОКНО МЕНЮ
     local MainFrame = Instance.new("Frame")
@@ -38,7 +55,7 @@ local success, err = pcall(function()
     MainCorner.CornerRadius = UDim.new(0, 12)
     MainCorner.Parent = MainFrame
 
-    -- Анимация плавного появления меню при запуске
+    -- Анимация появления меню
     MainFrame.Size = UDim2.new(0, 0, 0, 0)
     TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
         Size = UDim2.new(0, 520, 0, 340)
@@ -66,7 +83,7 @@ local success, err = pcall(function()
     ButtonStroke.Thickness = 1.5
     ButtonStroke.Parent = ToggleButton
 
-    -- Функция перетаскивания (Drag) для меню и плавающей кнопки
+    -- Функция перетаскивания (Drag)
     local function makeDraggable(frame)
         local dragging, dragInput, dragStart, startPos
         frame.InputBegan:Connect(function(input)
@@ -91,7 +108,7 @@ local success, err = pcall(function()
     makeDraggable(MainFrame)
     makeDraggable(ToggleButton)
 
-    -- Анимация физического отклика кнопки NLF при касании/клике
+    -- Анимация клика по плавающей кнопке
     local menuOpen = true
     ToggleButton.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -111,7 +128,7 @@ local success, err = pcall(function()
         end
     end)
 
-    -- Сворачивание и разворачивание меню при клике на NLF
+    -- Открытие/Закрытие меню
     ToggleButton.MouseButton1Click:Connect(function()
         menuOpen = not menuOpen
         local targetSize = menuOpen and UDim2.new(0, 520, 0, 340) or UDim2.new(0, 0, 0, 0)
@@ -122,7 +139,7 @@ local success, err = pcall(function()
         }):Play()
     end)
 
-    -- Верхняя панель (Таб-бар)
+    -- Верхняя панель вкладок
     local TopBar = Instance.new("Frame")
     TopBar.Size = UDim2.new(1, 0, 0, 55)
     TopBar.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
@@ -140,7 +157,7 @@ local success, err = pcall(function()
     TabsLayout.Padding = UDim.new(0, 8)
     TabsLayout.Parent = TopBar
 
-    -- Главный контейнер для страниц контента
+    -- Контейнер для страниц
     local Container = Instance.new("Frame")
     Container.Size = UDim2.new(1, 0, 1, -55)
     Container.Position = UDim2.new(0, 0, 0, 55)
@@ -150,7 +167,6 @@ local success, err = pcall(function()
     local Pages = {}
     local Buttons = {}
 
-    -- Функция автоматического создания разделов меню
     local function createTab(tabName)
         local tabBtn = Instance.new("TextButton")
         tabBtn.Size = UDim2.new(0, 110, 0, 34)
@@ -197,18 +213,16 @@ local success, err = pcall(function()
         return pageFrame
     end
 
-    -- Инициализация запрашиваемых разделов
     local pMain = createTab("Main")
     local pCombat = createTab("Combat")
     local pVisual = createTab("Visual")
     local pSettings = createTab("Settings")
 
-    -- Выбор вкладки Main по умолчанию при запуске
     Buttons["Main"].BackgroundColor3 = Color3.fromRGB(0, 150, 255)
     Buttons["Main"].TextColor3 = Color3.fromRGB(255, 255, 255)
     Pages["Main"].Visible = true
 
-    -- Функция добавления красивых переключателей (Toggle)
+    -- Функция добавления переключателей (Toggle)
     local function addToggle(page, text, callback)
         local toggleBtn = Instance.new("TextButton")
         toggleBtn.Size = UDim2.new(1, 0, 0, 40)
@@ -235,91 +249,61 @@ local success, err = pcall(function()
         iCorner.Parent = indicator
         
         local toggled = false
-        toggleBtn.MouseButton1Click:Connect(function()
-            toggled = not toggled
-            TweenService:Create(indicator, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+toggleBtn.MouseButton1Click:Connect(function()
+toggled = not toggled
+TweenService:Create(indicator, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 BackgroundColor3 = toggled and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(45, 45, 55)
 }):Play()
 callback(toggled)
 end)
 end
 
--- ПОСТОЯННЫЙ ЦИКЛ ОБНОВЛЕНИЯ ВИЗУАЛОВ (ESP И CHAMS) сквозь стены
-RunService.RenderStepped:Connect(function()
+-- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ COMBAT (AIMBOT / SILENT AIM)
+local function isVisible(targetPart, character)
+if not _G.WallCheck_Enabled then return true end
+if _G.WallShot_Enabled then return true end -- WallShot игнорирует стены
+
+local castPoints = {Camera.CFrame.Position, targetPart.Position}
+local ignoreList = {LocalPlayer.Character, character, Camera}
+local raycastParams = RaycastParams.new()
+raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+raycastParams.FilterDescendantsInstances = ignoreList
+raycastParams.IgnoreWater = true
+
+local direction = targetPart.Position - Camera.CFrame.Position
+local raycastResult = Workspace:Raycast(Camera.CFrame.Position, direction, raycastParams)
+
+return raycastResult == nil
+end
+
+local function getClosestPlayer()
+local closestPlayer = nil
+local shortestDistance = math.huge
+local mousePos = UserInputService:GetMouseLocation()
+
 for _, player in ipairs(Players:GetPlayers()) do
-if player ~= LocalPlayer and player.Character then
+if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
 local char = player.Character
-local root = char:FindFirstChild("HumanoidRootPart")
+local head = char:FindFirstChild("Head") or char.HumanoidRootPart
+local humanoid = char.Humanoid
 
-if root then
--- Создание изолированной папки внутри игрока для эффектов читов
-local visualFolder = root:FindFirstChild("NLF_Visuals")
-if not visualFolder then
-visualFolder = Instance.new("Folder")
-visualFolder.Name = "NLF_Visuals"
-visualFolder.Parent = root
-end
+if humanoid.Health > 0 then
+local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
 
--- 1. РАБОТА С ESP BOX
-local box = visualFolder:FindFirstChild("ESPBox")
-if _G.ESP_Boxes_Enabled then
-if not box then
-box = Instance.new("BillboardGui")
-box.Name = "ESPBox"
-box.AlwaysOnTop = true
-box.Size = UDim2.new(4.5, 0, 6, 0)
-box.ClipsDescendants = false
+if onScreen then
+local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
 
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(1, 0, 1, 0)
-frame.BackgroundTransparency = 1
-frame.Parent = box
-
-local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(255, 0, 50)
-stroke.Thickness = 2
-stroke.Parent = frame
-
-box.Parent = visualFolder
-end
-else
-if box then box:Destroy() end
-end
-
--- 2. РАБОТА С CHAMS (Силуэты сквозь стены)
-local highlight = visualFolder:FindFirstChild("ChamsEffect")
-if _G.Chams_Enabled then
-if not highlight then
-highlight = Instance.new("Highlight")
-highlight.Name = "ChamsEffect"
-highlight.FillColor = Color3.fromRGB(0, 255, 150)
-highlight.FillTransparency = 0.4
-highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-highlight.OutlineTransparency = 0
-highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-highlight.Adornee = char
-highlight.Parent = visualFolder
-end
-else
-if highlight then highlight:Destroy() end
+-- Проверка на нахождение в радиусе FOV
+if distance < _G.FOV_Radius and distance < shortestDistance then
+if isVisible(head, char) then
+shortestDistance = distance
+closestPlayer = char
 end
 end
 end
 end
-end)
-
--- Добавление кнопок управления функциями во вкладку Visual
-addToggle(pVisual, "Enable ESP Boxes", function(state)
-_G.ESP_Boxes_Enabled = state
-end)
-
-addToggle(pVisual, "Enable Chams", function(state)
-_G.Chams_Enabled = state
-end)
-
-print("[Flick UI]: Скрипт полностью готов к использованию в игре.")
-end)
-
-if not success then
-warn("[Flick UI Error]: Критическая ошибка выполнения: " .. tostring(err))
 end
+end
+return closestPlayer
+end
+
