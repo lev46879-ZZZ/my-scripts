@@ -4,11 +4,32 @@ local success, err = pcall(function()
     local TweenService = game:GetService("TweenService")
     local CoreGui = game:GetService("CoreGui")
     local Players = game:GetService("Players")
+    local RunService = game:GetService("RunService")
+    local Camera = workspace.CurrentCamera
+    local LocalPlayer = Players.LocalPlayer
 
     -- Очистка старого GUI
     if CoreGui:FindFirstChild("PulseHub_Flick") then
         CoreGui.PulseHub_Flick:Destroy()
     end
+
+    -- Настройки Combat
+    local Settings = {
+        Aimbot = false,
+        SilentAim = false,
+        FOV = 120,
+        ShowFOV = false,
+        AimPart = "Head", -- "Head" или "HumanoidRootPart"
+        TeamCheck = true
+    }
+
+    -- Visual FOV Circle
+    local FOVCircle = Drawing.new("Circle")
+    FOVCircle.Thickness = 1.5
+    FOVCircle.Color = Color3.fromRGB(160, 90, 255)
+    FOVCircle.Filled = false
+    FOVCircle.Transparency = 1
+    FOVCircle.Visible = false
 
     -- Создание главного ScreenGui
     local ScreenGui = Instance.new("ScreenGui")
@@ -101,7 +122,7 @@ local success, err = pcall(function()
     NLFButton.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
     NLFButton.Active = true
     NLFButton.Draggable = true
-    NLFButton.Visible = false -- Скрыта до окончания загрузки
+    NLFButton.Visible = false
 
     NLFCorner.CornerRadius = UDim.new(0, 16)
     NLFCorner.Parent = NLFButton
@@ -119,7 +140,7 @@ local success, err = pcall(function()
     NLFStroke.Parent = NLFButton
 
     -- =============================================================
-    -- 3. ГЛАВНОЕ ОКНО ПАНЕЛИ (Pulse Hub Style)
+    -- 3. ГЛАВНОЕ ОКНО ПАНЕЛИ
     -- =============================================================
     local MainFrame = Instance.new("Frame")
     local MainCorner = Instance.new("UICorner")
@@ -133,7 +154,7 @@ local success, err = pcall(function()
     MainFrame.ClipsDescendants = true
     MainFrame.Active = true
     MainFrame.Draggable = true
-    MainFrame.Visible = false -- Скрыто до окончания загрузки
+    MainFrame.Visible = false
 
     MainCorner.CornerRadius = UDim.new(0, 12)
     MainCorner.Parent = MainFrame
@@ -142,7 +163,6 @@ local success, err = pcall(function()
     MainStroke.Color = Color3.fromRGB(80, 50, 150)
     MainStroke.Parent = MainFrame
 
-    -- Шапка (Header)
     local Header = Instance.new("Frame")
     local Title = Instance.new("TextLabel")
     local SubTitle = Instance.new("TextLabel")
@@ -221,15 +241,11 @@ local success, err = pcall(function()
         Page.ScrollBarThickness = 3
         Page.ScrollBarImageColor3 = Color3.fromRGB(110, 50, 210)
         
-        local PageLabel = Instance.new("TextLabel")
-        PageLabel.Parent = Page
-        PageLabel.Size = UDim2.new(1, 0, 0, 30)
-        PageLabel.Text = tabName .. " Settings"
-        PageLabel.Font = Enum.Font.GothamBold
-        PageLabel.TextSize = 16
-        PageLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
-        PageLabel.BackgroundTransparency = 1
-        
+        local PageList = Instance.new("UIListLayout")
+        PageList.Parent = Page
+        PageList.SortOrder = Enum.SortOrder.LayoutOrder
+        PageList.Padding = UDim.new(0, 8)
+
         TabButtons[tabName] = TabBtn
         TabPages[tabName] = Page
         
@@ -252,7 +268,210 @@ local success, err = pcall(function()
         end)
     end
 
-    -- Логика кнопки NLF
+    -- Хелперы UI Элементов для быстрого создания интерфейсов
+    local UIHelper = {}
+    
+    function UIHelper.AddToggle(parent, text, default, callback)
+        local Frame = Instance.new("Frame")
+        Frame.Size = UDim2.new(0.95, 0, 0, 35)
+        Frame.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
+        Frame.Parent = parent
+
+        local Corner = Instance.new("UICorner")
+        Corner.CornerRadius = UDim.new(0, 6)
+        Corner.Parent = Frame
+
+        local Label = Instance.new("TextLabel")
+        Label.Size = UDim2.new(0.7, 0, 1, 0)
+        Label.Position = UDim2.new(0, 10, 0, 0)
+        Label.Text = text
+        Label.Font = Enum.Font.Gotham
+        Label.TextSize = 13
+        Label.TextColor3 = Color3.fromRGB(220, 220, 230)
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.BackgroundTransparency = 1
+        Label.Parent = Frame
+
+        local Btn = Instance.new("TextButton")
+        Btn.Size = UDim2.new(0, 40, 0, 20)
+        Btn.Position = UDim2.new(1, -50, 0.5, -10)
+        Btn.Text = ""
+        Btn.BackgroundColor3 = default and Color3.fromRGB(110, 50, 210) or Color3.fromRGB(40, 40, 50)
+        Btn.Parent = Frame
+
+        local BtnCorner = Instance.new("UICorner")
+        BtnCorner.CornerRadius = UDim.new(1, 0)
+        BtnCorner.Parent = Btn
+
+        local state = default
+        Btn.MouseButton1Click:Connect(function()
+            state = not state
+            TweenService:Create(Btn, TweenInfo.new(0.2), {
+                BackgroundColor3 = state and Color3.fromRGB(110, 50, 210) or Color3.fromRGB(40, 40, 50)
+            }):Play()
+            callback(state)
+        end)
+    end
+
+    function UIHelper.AddSlider(parent, text, min, max, default, callback)
+        local Frame = Instance.new("Frame")
+        Frame.Size = UDim2.new(0.95, 0, 0, 45)
+        Frame.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
+        Frame.Parent = parent
+
+        local Corner = Instance.new("UICorner")
+        Corner.CornerRadius = UDim.new(0, 6)
+        Corner.Parent = Frame
+
+        local Label = Instance.new("TextLabel")
+        Label.Size = UDim2.new(1, -20, 0, 20)
+        Label.Position = UDim2.new(0, 10, 0, 5)
+        Label.Text = text .. ": " .. tostring(default)
+        Label.Font = Enum.Font.Gotham
+        Label.TextSize = 12
+        Label.TextColor3 = Color3.fromRGB(220, 220, 230)
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.BackgroundTransparency = 1
+        Label.Parent = Frame
+
+        local SliderBar = Instance.new("TextButton")
+        SliderBar.Size = UDim2.new(0.9, 0, 0, 6)
+        SliderBar.Position = UDim2.new(0.05, 0, 0.7, 0)
+        SliderBar.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+        SliderBar.Text = ""
+        SliderBar.Parent = Frame
+
+        local Fill = Instance.new("Frame")
+        Fill.Size = UDim2.new((default - min)/(max - min), 0, 1, 0)
+        Fill.BackgroundColor3 = Color3.fromRGB(110, 50, 210)
+        Fill.BorderSizePixel = 0
+        Fill.Parent = SliderBar
+
+        local dragging = false
+        local function update(input)
+            local pos = math.clamp((input.Position.X - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1)
+            local val = math.floor(min + (max - min) * pos)
+            Fill.Size = UDim2.new(pos, 0, 1, 0)
+            Label.Text = text .. ": " .. tostring(val)
+            callback(val)
+        end
+
+        SliderBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                update(input)
+            end
+        end)
+
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                update(input)
+            end
+        end)
+    end
+
+    -- =============================================================
+    -- 5. НАПОЛНЕНИЕ ВКЛАДКИ COMBAT (Aimbot & Silent Aim)
+    -- =============================================================
+    local CombatPage = TabPages["Combat"]
+
+    UIHelper.AddToggle(CombatPage, "Enable Aimbot (Camera)", Settings.Aimbot, function(val)
+        Settings.Aimbot = val
+    end)
+
+    UIHelper.AddToggle(CombatPage, "Enable Silent Aim", Settings.SilentAim, function(val)
+        Settings.SilentAim = val
+    end)
+
+    UIHelper.AddToggle(CombatPage, "Show FOV Circle", Settings.ShowFOV, function(val)
+        Settings.ShowFOV = val
+        FOVCircle.Visible = val
+    end)
+
+    UIHelper.AddSlider(CombatPage, "FOV Radius", 30, 300, Settings.FOV, function(val)
+        Settings.FOV = val
+        FOVCircle.Radius = val
+    end)
+
+    UIHelper.AddToggle(CombatPage, "Target Head Only", true, function(val)
+        Settings.AimPart = val and "Head" or "HumanoidRootPart"
+    end)
+
+    -- =============================================================
+    -- 6. ЛОГИКА АИМБОТА И SILENT AIM
+    -- =============================================================
+    local function GetClosestTarget()
+        local closest = nil
+        local maxDist = Settings.FOV
+        local mousePos = UserInputService:GetMouseLocation()
+
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+                if Settings.TeamCheck and plr.Team == LocalPlayer.Team then
+                    continue
+                end
+
+                local targetPart = plr.Character:FindFirstChild(Settings.AimPart)
+                if targetPart then
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                        if dist < maxDist then
+                            maxDist = dist
+                            closest = targetPart
+                        end
+                    end
+                end
+            end
+        end
+        return closest
+    end
+
+    -- Цикл Aimbot & FOV Circle
+    RunService.RenderStepped:Connect(function()
+        local mousePos = UserInputService:GetMouseLocation()
+        FOVCircle.Position = mousePos
+        FOVCircle.Radius = Settings.FOV
+        FOVCircle.Visible = Settings.ShowFOV
+
+        if Settings.Aimbot then
+            local target = GetClosestTarget()
+            if target then
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+            end
+        end
+    end)
+
+    -- Silent Aim Hook через __namecall (перехват выстрелов)
+    local rawMeta = getrawmetatable(game)
+    local oldNamecall = rawMeta.__namecall
+    setreadonly(rawMeta, false)
+
+    rawMeta.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        local args = {...}
+
+        if Settings.SilentAim and (method == "FindPartOnRayWithIgnoreList" or method == "Raycast" or method == "FireServer") then
+            local target = GetClosestTarget()
+            if target then
+                -- Меняем траекторию/позицию клика под ближайшую цель
+                if method == "Raycast" and args[2] then
+                    args[2] = (target.Position - args[1]).Unit * 1000
+                end
+            end
+        end
+
+        return oldNamecall(self, unpack(args))
+    end)
+    setreadonly(rawMeta, true)
+
+    -- NLF Button Toggle
     local isOpen = true
     NLFButton.MouseButton1Click:Connect(function()
         isOpen = not isOpen
@@ -273,14 +492,14 @@ local success, err = pcall(function()
     end)
 
     -- =============================================================
-    -- 5. АНИМАЦИЯ И ЛОГИКА ЗАГРУЗКИ
+    -- 7. ЗАПУСК ЗАГРУЗЧИКА
     -- =============================================================
     task.spawn(function()
         LoaderStatus.Text = "Checking Game Compatibility..."
         TweenService:Create(BarFill, TweenInfo.new(0.6, Enum.EasingStyle.Quad), {Size = UDim2.new(0.3, 0, 1, 0)}):Play()
         task.wait(0.7)
 
-        LoaderStatus.Text = "Loading Modules..."
+        LoaderStatus.Text = "Loading Combat Modules..."
         TweenService:Create(BarFill, TweenInfo.new(0.8, Enum.EasingStyle.Quad), {Size = UDim2.new(0.7, 0, 1, 0)}):Play()
         task.wait(0.9)
 
@@ -288,7 +507,6 @@ local success, err = pcall(function()
         TweenService:Create(BarFill, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {Size = UDim2.new(1, 0, 1, 0)}):Play()
         task.wait(0.6)
 
-        -- Исчезновение загрузчика и появление интерфейса
         local fadeTween = TweenService:Create(LoaderFrame, TweenInfo.new(0.4), {BackgroundTransparency = 1})
         fadeTween:Play()
         
@@ -300,7 +518,6 @@ local success, err = pcall(function()
     end)
 end)
 
--- Проверка выполнения pcall
 if not success then
     warn("Pulse Hub Error: " .. tostring(err))
 end
