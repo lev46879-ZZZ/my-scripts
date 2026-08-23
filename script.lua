@@ -1,1 +1,1 @@
-
+print("NekoV script started")
