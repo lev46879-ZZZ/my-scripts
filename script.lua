@@ -21,18 +21,6 @@ local Settings = {
     TargetPart = "Head"
 }
 
--- ================= ОБХОД АНТИЧИТА (ANTI-KICK) =================
-pcall(function()
-    local oldNamecall
-    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        local method = getnamecallmethod()
-        if not checkcaller() and (string.lower(method) == "kick") then
-            return nil -- Перехватывает и отменяет попытки игры кикнуть клиент
-        end
-        return oldNamecall(self, ...)
-    end)
-end)
-
 -- FOV Круг для Aimbot (Красный)
 local AimCircle = Drawing.new("Circle")
 AimCircle.Thickness = 1.5
@@ -51,6 +39,7 @@ local function GetScreenCenter()
     return Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 end
 
+-- Проверка видимости (Wallcheck)
 local function IsVisible(targetHead)
     if not Settings.WallCheck then return true end
     local origin = Camera.CFrame.Position
@@ -71,6 +60,7 @@ local function IsVisible(targetHead)
     return false
 end
 
+-- Поиск ближайшей цели
 local function GetClosestTarget(maxRadius)
     local closestHead = nil
     local shortestDistance = maxRadius
@@ -98,25 +88,38 @@ local function GetClosestTarget(maxRadius)
     return closestHead
 end
 
--- Silent Aim Перехват
-pcall(function()
-    local oldIndex
-    oldIndex = hookmetamethod(game, "__index", function(self, key)
-        if not checkcaller() and Settings.SilentAimEnabled and (key == "Hit" or key == "Target") then
+-- Безопасный Silent Flick (Без использования hookmetamethod)
+local function TriggerSilentFlick(target)
+    if not target then return end
+    local oldCFrame = Camera.CFrame
+    Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+    if mouse1click then
+        mouse1click()
+    end
+    task.defer(function()
+        Camera.CFrame = oldCFrame
+    end)
+end
+
+-- Обработка нажатия ручной стрельбы для Silent Aim
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if Settings.SilentAimEnabled and not Settings.AutoShoot then
             local target = GetClosestTarget(Settings.SilentFOVRadius)
             if target then
-                return target.CFrame
+                TriggerSilentFlick(target)
             end
         end
-        return oldIndex(self, key)
-    end)
+    end
 end)
 
--- Главный Рендер
+-- Главный цикл
 local lastShootTime = 0
 RunService.RenderStepped:Connect(function()
     local centerPos = GetScreenCenter()
     
+    -- Видимость FOV
     AimCircle.Position = centerPos
     AimCircle.Radius = Settings.AimbotFOVRadius
     AimCircle.Visible = Settings.ShowAimbotFOV and Settings.AimbotEnabled
@@ -125,6 +128,7 @@ RunService.RenderStepped:Connect(function()
     SilentCircle.Radius = Settings.SilentFOVRadius
     SilentCircle.Visible = Settings.ShowSilentFOV and Settings.SilentAimEnabled
 
+    -- Классический Aimbot
     if Settings.AimbotEnabled then
         local targetHead = GetClosestTarget(Settings.AimbotFOVRadius)
         if targetHead then
@@ -132,18 +136,19 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- Silent Aim (Автострельба)
     if Settings.SilentAimEnabled and Settings.AutoShoot then
         local silentTarget = GetClosestTarget(Settings.SilentFOVRadius)
         if silentTarget and (tick() - lastShootTime) >= Settings.ShootDelay then
             lastShootTime = tick()
-            if mouse1click then mouse1click() end
+            TriggerSilentFlick(silentTarget)
         end
     end
 end)
 
 -- ================= GUI И ЛОЙДЕР =================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ApexF_MainGui"
+ScreenGui.Name = "ApexF_SafeGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
@@ -161,7 +166,7 @@ LoaderCorner.Parent = LoaderFrame
 local LoaderTitle = Instance.new("TextLabel")
 LoaderTitle.Size = UDim2.new(1, 0, 0, 40)
 LoaderTitle.BackgroundTransparency = 1
-LoaderTitle.Text = "ApexF | Bypassing Anticheat..."
+LoaderTitle.Text = "ApexF | Safe Initializing..."
 LoaderTitle.TextColor3 = Color3.fromRGB(0, 200, 255)
 LoaderTitle.Font = Enum.Font.SourceSansBold
 LoaderTitle.TextSize = 16
@@ -215,7 +220,7 @@ MainUICorner.Parent = MainFrame
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-Title.Text = "ApexF — Combat"
+Title.Text = "ApexF — Combat (Undetected)"
 Title.TextColor3 = Color3.fromRGB(0, 200, 255)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 18
@@ -266,10 +271,6 @@ local function CreateInput(labelText, defaultValue, callback)
     Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
     Frame.Parent = ScrollContainer
 
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 6)
-    Corner.Parent = Frame
-
     local Label = Instance.new("TextLabel")
     Label.Size = UDim2.new(0.65, 0, 1, 0)
     Label.BackgroundTransparency = 1
@@ -293,7 +294,7 @@ local function CreateInput(labelText, defaultValue, callback)
     Input.FocusLost:Connect(function() callback(Input) end)
 end
 
--- Переключатели в меню
+-- Переключатели
 CreateToggle("Aimbot (Instant Head)", Settings.AimbotEnabled, function(s) Settings.AimbotEnabled = s end)
 CreateInput("Aimbot FOV (10-300):", Settings.AimbotFOVRadius, function(i)
     local v = tonumber(i.Text)
@@ -301,7 +302,7 @@ CreateInput("Aimbot FOV (10-300):", Settings.AimbotFOVRadius, function(i)
 end)
 CreateToggle("Show Aimbot FOV", Settings.ShowAimbotFOV, function(s) Settings.ShowAimbotFOV = s end)
 
-CreateToggle("Silent Aim", Settings.SilentAimEnabled, function(s) Settings.SilentAimEnabled = s end)
+CreateToggle("Silent Aim (Micro-Flick)", Settings.SilentAimEnabled, function(s) Settings.SilentAimEnabled = s end)
 CreateInput("Silent FOV (10-300):", Settings.SilentFOVRadius, function(i)
     local v = tonumber(i.Text)
     if v then Settings.SilentFOVRadius = math.clamp(v, 10, 300) i.Text = tostring(Settings.SilentFOVRadius) end
@@ -316,14 +317,14 @@ end)
 
 CreateToggle("Wall Check", Settings.WallCheck, function(s) Settings.WallCheck = s end)
 
--- Анимация Лойдера и запуск
-local tweenInfo = TweenInfo.new(1.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+-- Анимация загрузки
+local tweenInfo = TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local tween = TweenService:Create(BarFill, tweenInfo, {Size = UDim2.new(1, 0, 1, 0)})
 tween:Play()
 
 tween.Completed:Connect(function()
-    LoaderTitle.Text = "Bypass Loaded!"
-    task.wait(0.4)
+    LoaderTitle.Text = "Loaded Successfully!"
+    task.wait(0.3)
     LoaderFrame:Destroy()
     ToggleButton.Visible = true
     MainFrame.Visible = true
