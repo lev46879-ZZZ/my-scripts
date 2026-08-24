@@ -15,7 +15,7 @@ local Settings = {
     FlickbotEnabled = false,
     FlickFOVRadius = 120,
     ShowFlickFOV = false,
-    PingMS = 0.1, -- Задержка в ms (0.1 - 100)
+    FlickDelayMS = 0.1, -- Задержка в ms (от 0.1 до 10)
 
     WallCheck = true,    -- Проверка видимости цели за стеной
     ChamsEnabled = false,
@@ -36,7 +36,6 @@ FlickCircle.Color = Color3.fromRGB(180, 50, 255)
 FlickCircle.Filled = false
 FlickCircle.Transparency = 1
 
--- Точный центр 3D-вьюпорта без лишних смещений
 local function GetScreenCenter()
     return Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 end
@@ -94,7 +93,7 @@ local function ApplyChams(player)
     end
 end
 
--- ПОИСК ЦЕЛИ В FOV ПРЯМО НА ГОЛОВУ
+-- ПОИСК ЦЕЛИ В FOV
 local function GetClosestTarget(maxRadius)
     local closestHead = nil
     local shortestDistance = maxRadius
@@ -120,7 +119,7 @@ local function GetClosestTarget(maxRadius)
     return closestHead
 end
 
--- ТОЧНЫЙ FLICKBOT (Срабатывает при нажатии InputBegan)
+-- ТОЧНЫЙ FLICKBOT С ЗАДЕРЖКОЙ (0.1 - 10 ms)
 local isFlicking = false
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
@@ -129,8 +128,8 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 or input.UserInputType == Enum.UserInputType.Touch then
         isFlicking = true
         task.spawn(function()
-            if Settings.PingMS > 0 then
-                task.wait(Settings.PingMS / 1000)
+            if Settings.FlickDelayMS > 0 then
+                task.wait(Settings.FlickDelayMS / 1000)
             end
 
             local targetHead = GetClosestTarget(Settings.FlickFOVRadius)
@@ -330,9 +329,9 @@ CreateInput("Flick FOV (10-800):", Settings.FlickFOVRadius, function(i)
     if v then Settings.FlickFOVRadius = math.clamp(v, 10, 800) i.Text = tostring(Settings.FlickFOVRadius) end
 end)
 CreateToggle("Show Flick FOV", Settings.ShowFlickFOV, function(s) Settings.ShowFlickFOV = s end)
-CreateInput("Flick Delay MS (0.1-100):", Settings.PingMS, function(i)
+CreateInput("Flick Delay MS (0.1-10):", Settings.FlickDelayMS, function(i)
     local v = tonumber(i.Text)
-    if v then Settings.PingMS = math.clamp(v, 0.1, 100) i.Text = tostring(Settings.PingMS) end
+    if v then Settings.FlickDelayMS = math.clamp(v, 0.1, 10) i.Text = tostring(Settings.FlickDelayMS) end
 end)
 
 CreateToggle("Red Chams (ESP)", Settings.ChamsEnabled, function(s) Settings.ChamsEnabled = s end)
