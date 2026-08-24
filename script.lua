@@ -1,6 +1,5 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -21,6 +20,11 @@ FOVCircle.Filled = false
 FOVCircle.Transparency = 1
 FOVCircle.Radius = Settings.FOVRadius
 FOVCircle.Visible = Settings.ShowFOV
+
+-- Расчет точного центра экрана
+local function GetScreenCenter()
+    return Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+end
 
 -- Проверка видимости (Wallcheck)
 local function IsVisible(targetHead)
@@ -43,11 +47,11 @@ local function IsVisible(targetHead)
     return false
 end
 
--- Поиск ближайшей цели в пределах FOV
+-- Поиск ближайшей цели относительно центра экрана
 local function GetClosestTarget()
     local closestHead = nil
     local shortestDistance = Settings.FOVRadius
-    local mousePos = UserInputService:GetMouseLocation()
+    local centerPos = GetScreenCenter()
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(Settings.TargetPart) then
@@ -57,7 +61,7 @@ local function GetClosestTarget()
                 local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
 
                 if onScreen then
-                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - centerPos).Magnitude
                     if dist <= shortestDistance then
                         if IsVisible(head) then
                             closestHead = head
@@ -73,8 +77,8 @@ end
 
 -- Главный цикл Aimbot и FOV
 RunService.RenderStepped:Connect(function()
-    local mousePos = UserInputService:GetMouseLocation()
-    FOVCircle.Position = mousePos
+    local centerPos = GetScreenCenter()
+    FOVCircle.Position = centerPos
     FOVCircle.Radius = Settings.FOVRadius
     FOVCircle.Visible = Settings.ShowFOV
 
@@ -139,12 +143,10 @@ local TitleCorner = Instance.new("UICorner")
 TitleCorner.CornerRadius = UDim.new(0, 10)
 TitleCorner.Parent = Title
 
--- Переключение видимости по кнопке
 ToggleButton.MouseButton1Click:Connect(function()
     MainFrame.Visible = not MainFrame.Visible
 end)
 
--- Контейнер для вкладок/элементов
 local Container = Instance.new("Frame")
 Container.Size = UDim2.new(1, -20, 1, -50)
 Container.Position = UDim2.new(0, 10, 0, 45)
@@ -156,7 +158,6 @@ UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 UIListLayout.Padding = UDim.new(0, 10)
 UIListLayout.Parent = Container
 
--- Вспомогательная функция для создания кнопок-переключателей
 local function CreateToggle(name, defaultState, callback)
     local Button = Instance.new("TextButton")
     Button.Size = UDim2.new(1, 0, 0, 40)
@@ -180,22 +181,18 @@ local function CreateToggle(name, defaultState, callback)
     end)
 end
 
--- Переключатель Aimbot
 CreateToggle("Aimbot (Instant Head)", Settings.AimbotEnabled, function(state)
     Settings.AimbotEnabled = state
 end)
 
--- Переключатель Wallcheck
 CreateToggle("Wall Check", Settings.WallCheck, function(state)
     Settings.WallCheck = state
 end)
 
--- Переключатель FOV Circle
 CreateToggle("Show FOV Circle", Settings.ShowFOV, function(state)
     Settings.ShowFOV = state
 end)
 
--- Слайдер / Поле ввода FOV (10 - 300)
 local FOVFrame = Instance.new("Frame")
 FOVFrame.Size = UDim2.new(1, 0, 0, 50)
 FOVFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
