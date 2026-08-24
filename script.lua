@@ -15,22 +15,22 @@ local Settings = {
     FlickbotEnabled = false,
     FlickFOVRadius = 120,
     ShowFlickFOV = false,
-    PingMS = 50, -- Задержка флика в ms (1 - 300)
+    PingMS = 50,
 
-    StandaloneWallbang = false, -- Автономный прострел сквозь стены (без аима)
-    ChamsEnabled = false,       -- Красные Chams
+    StandaloneWallbang = true, -- Wallshot (Сохранен без изменений)
+    ChamsEnabled = false,
     WallCheck = false,
     TargetPart = "Head"
 }
 
--- FOV Круг для Aimbot (Красный)
+-- FOV Круг для Aimbot
 local AimCircle = Drawing.new("Circle")
 AimCircle.Thickness = 1.5
 AimCircle.Color = Color3.fromRGB(255, 50, 50)
 AimCircle.Filled = false
 AimCircle.Transparency = 1
 
--- FOV Круг для Flickbot (Фиолетовый)
+-- FOV Круг для Flickbot
 local FlickCircle = Drawing.new("Circle")
 FlickCircle.Thickness = 1.5
 FlickCircle.Color = Color3.fromRGB(180, 50, 255)
@@ -41,7 +41,6 @@ local function GetScreenCenter()
     return Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 end
 
--- Проверка живого игрока
 local function IsAlive(player)
     if not player or player == LocalPlayer or not player.Character then return false end
     local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
@@ -50,7 +49,6 @@ local function IsAlive(player)
     return true
 end
 
--- Система Red Chams
 local function ApplyChams(player)
     if not IsAlive(player) then return end
     local char = player.Character
@@ -74,10 +72,8 @@ local function ApplyChams(player)
     end
 end
 
--- Проверка видимости
 local function IsVisible(targetHead)
     if not Settings.WallCheck then return true end
-    
     local origin = Camera.CFrame.Position
     local direction = (targetHead.Position - origin)
     local raycastParams = RaycastParams.new()
@@ -96,7 +92,6 @@ local function IsVisible(targetHead)
     return false
 end
 
--- Поиск цели в пределах FOV
 local function GetClosestTarget(maxRadius)
     local closestHead = nil
     local shortestDistance = maxRadius
@@ -121,16 +116,20 @@ local function GetClosestTarget(maxRadius)
     return closestHead
 end
 
--- АВТОНОМНЫЙ WALLBANG (Прострел сквозь стены без изменения направления прицела)
+-- ================= БЕСШУМНЫЙ ХУК RAYCAST (БЕЗ ЗАТРОНУТЫХ KICK-ФУНКЦИЙ) =================
 local oldNamecall
+local c_checkcaller = (clonefunction and clonefunction(checkcaller)) or checkcaller
+local c_getnamecallmethod = (clonefunction and clonefunction(getnamecallmethod)) or getnamecallmethod
+
 if hookmetamethod then
     oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        local method = getnamecallmethod()
-        if Settings.StandaloneWallbang and not checkcaller() and (method == "Raycast" or method == "raycast") then
+        local method = c_getnamecallmethod()
+
+        -- Точная оригинальная логика Wallshot
+        if Settings.StandaloneWallbang and not c_checkcaller() and (method == "Raycast" or method == "raycast") then
             local args = {...}
             local params = args[3] or RaycastParams.new()
 
-            -- Собираем всех живых врагов
             local targetCharacters = {}
             for _, player in ipairs(Players:GetPlayers()) do
                 if IsAlive(player) then
@@ -138,18 +137,18 @@ if hookmetamethod then
                 end
             end
 
-            -- Игнорируем карты и стены: луч реагирует исключительно на персонажей
             params.FilterType = Enum.RaycastFilterType.Include
             params.FilterDescendantsInstances = targetCharacters
             
             args[3] = params
             return oldNamecall(self, unpack(args))
         end
+
         return oldNamecall(self, ...)
     end)
 end
 
--- AimFlickBot при отпускании кнопки
+-- FlickBot
 local isFlicking = false
 UserInputService.InputEnded:Connect(function(input, gameProcessed)
     if gameProcessed then return end
@@ -171,7 +170,7 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
     end
 end)
 
--- Главный цикл
+-- Рендер
 RunService.RenderStepped:Connect(function()
     local centerPos = GetScreenCenter()
     
@@ -183,14 +182,12 @@ RunService.RenderStepped:Connect(function()
     FlickCircle.Radius = Settings.FlickFOVRadius
     FlickCircle.Visible = Settings.ShowFlickFOV and Settings.FlickbotEnabled
 
-    -- Обновление Chams
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             ApplyChams(player)
         end
     end
 
-    -- Обычный Aimbot
     if Settings.AimbotEnabled then
         local targetHead = GetClosestTarget(Settings.AimbotFOVRadius)
         if targetHead then
@@ -199,11 +196,13 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ================= GUI И ЛОЙДЕР =================
+-- GUI
+local ParentContainer = (gethui and gethui()) or game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
+
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ApexF_CleanGui"
+ScreenGui.Name = "ApexF_ProtectedContainer"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.Parent = ParentContainer
 
 local LoaderFrame = Instance.new("Frame")
 LoaderFrame.Size = UDim2.new(0, 260, 0, 100)
@@ -344,7 +343,6 @@ local function CreateInput(labelText, defaultValue, callback)
     Input.FocusLost:Connect(function() callback(Input) end)
 end
 
--- Элементы управления
 CreateToggle("Constant Aimbot", Settings.AimbotEnabled, function(s) Settings.AimbotEnabled = s end)
 CreateInput("Aimbot FOV (10-300):", Settings.AimbotFOVRadius, function(i)
     local v = tonumber(i.Text)
@@ -363,11 +361,10 @@ CreateInput("Flick Ping Delay (1-300ms):", Settings.PingMS, function(i)
     if v then Settings.PingMS = math.clamp(v, 1, 300) i.Text = tostring(Settings.PingMS) end
 end)
 
-CreateToggle("Wallbang (Shoot Through Walls)", Settings.StandaloneWallbang, function(s) Settings.StandaloneWallbang = s end)
+CreateToggle("Wallshot (Shoot Through Walls)", Settings.StandaloneWallbang, function(s) Settings.StandaloneWallbang = s end)
 CreateToggle("Red Chams (ESP)", Settings.ChamsEnabled, function(s) Settings.ChamsEnabled = s end)
 CreateToggle("Wall Check", Settings.WallCheck, function(s) Settings.WallCheck = s end)
 
--- Анимация Загрузки
 local tweenInfo = TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local tween = TweenService:Create(BarFill, tweenInfo, {Size = UDim2.new(1, 0, 1, 0)})
 tween:Play()
