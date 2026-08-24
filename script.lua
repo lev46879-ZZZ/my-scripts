@@ -4,33 +4,29 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Настройки ApexF
+-- Безопасные настройки ApexF
 local Settings = {
-    -- Aimbot
     AimbotEnabled = false,
-    AimbotFOVRadius = 100,
+    AimbotFOVRadius = 80,
     ShowAimbotFOV = true,
+    Smoothness = 0.2, -- Чем меньше число (0.05-0.3), тем плавнее и безопаснее наводка
 
-    -- Silent Aim
     SilentAimEnabled = false,
-    SilentFOVRadius = 120,
+    SilentFOVRadius = 60,
     ShowSilentFOV = true,
-    AutoShoot = false,      -- false = стреляешь сам, true = автовыстрел
-    ShootDelay = 0.1,       -- Задержка выстрела (0.1 - 1.0 сек)
+    AutoShoot = false,
+    ShootDelay = 0.25,
 
-    -- Общие
-    WallCheck = false,
+    WallCheck = true, -- Обязательно включено для защиты от стеновых киков
     TargetPart = "Head"
 }
 
--- FOV Круг для Aimbot (Красный)
 local AimCircle = Drawing.new("Circle")
 AimCircle.Thickness = 1.5
 AimCircle.Color = Color3.fromRGB(255, 50, 50)
 AimCircle.Filled = false
 AimCircle.Transparency = 1
 
--- FOV Круг для Silent Aim (Голубой)
 local SilentCircle = Drawing.new("Circle")
 SilentCircle.Thickness = 1.5
 SilentCircle.Color = Color3.fromRGB(0, 200, 255)
@@ -41,7 +37,6 @@ local function GetScreenCenter()
     return Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 end
 
--- Проверка препятствий (Wallcheck)
 local function IsVisible(targetHead)
     if not Settings.WallCheck then return true end
     local origin = Camera.CFrame.Position
@@ -62,7 +57,6 @@ local function IsVisible(targetHead)
     return false
 end
 
--- Поиск цели в пределах определенного FOV
 local function GetClosestTarget(maxRadius)
     local closestHead = nil
     local shortestDistance = maxRadius
@@ -90,24 +84,24 @@ local function GetClosestTarget(maxRadius)
     return closestHead
 end
 
--- Перехват прицела для Silent Aim (работает и при ручной стрельбе)
-local oldIndex
-oldIndex = hookmetamethod(game, "__index", function(self, key)
-    if not checkcaller() and Settings.SilentAimEnabled and key == "Hit" then
-        local target = GetClosestTarget(Settings.SilentFOVRadius)
-        if target then
-            return target.CFrame
+-- Безопасный Silent Aim (pcall от вылетов/киков)
+pcall(function()
+    local oldIndex
+    oldIndex = hookmetamethod(game, "__index", function(self, key)
+        if not checkcaller() and Settings.SilentAimEnabled and key == "Hit" then
+            local target = GetClosestTarget(Settings.SilentFOVRadius)
+            if target then
+                return target.CFrame
+            end
         end
-    end
-    return oldIndex(self, key)
+        return oldIndex(self, key)
+    end)
 end)
 
--- Основной цикл
 local lastShootTime = 0
 RunService.RenderStepped:Connect(function()
     local centerPos = GetScreenCenter()
     
-    -- Отрисовка FOV
     AimCircle.Position = centerPos
     AimCircle.Radius = Settings.AimbotFOVRadius
     AimCircle.Visible = Settings.ShowAimbotFOV and Settings.AimbotEnabled
@@ -116,35 +110,31 @@ RunService.RenderStepped:Connect(function()
     SilentCircle.Radius = Settings.SilentFOVRadius
     SilentCircle.Visible = Settings.ShowSilentFOV and Settings.SilentAimEnabled
 
-    -- Классический Aimbot (наводка камеры)
+    -- Плавный Aimbot без телепортации камеры
     if Settings.AimbotEnabled then
         local targetHead = GetClosestTarget(Settings.AimbotFOVRadius)
         if targetHead then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
+            local targetCFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
+            Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, Settings.Smoothness)
         end
     end
 
-    -- Автовыстрел для Silent Aim (если включен)
     if Settings.SilentAimEnabled and Settings.AutoShoot then
         local silentTarget = GetClosestTarget(Settings.SilentFOVRadius)
         if silentTarget and (tick() - lastShootTime) >= Settings.ShootDelay then
             lastShootTime = tick()
-            if mouse1click then
-                mouse1click()
-            end
+            if mouse1click then mouse1click() end
         end
     end
 end)
 
--- GUI Интерфейс ApexF
+-- GUI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "ApexF_GUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Кнопка открытия/закрытия
 local ToggleButton = Instance.new("TextButton")
-ToggleButton.Name = "OpenMenuButton"
 ToggleButton.Size = UDim2.new(0, 50, 0, 50)
 ToggleButton.Position = UDim2.new(0.02, 0, 0.2, 0)
 ToggleButton.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
@@ -156,13 +146,7 @@ ToggleButton.Active = true
 ToggleButton.Draggable = true
 ToggleButton.Parent = ScreenGui
 
-local OpenUICorner = Instance.new("UICorner")
-OpenUICorner.CornerRadius = UDim.new(0, 8)
-OpenUICorner.Parent = ToggleButton
-
--- Главная рамка
 local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 320, 0, 380)
 MainFrame.Position = UDim2.new(0.35, 0, 0.2, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
@@ -170,39 +154,27 @@ MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
-local MainUICorner = Instance.new("UICorner")
-MainUICorner.CornerRadius = UDim.new(0, 10)
-MainUICorner.Parent = MainFrame
-
--- Шапка Меню
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-Title.Text = "ApexF — Combat Menu"
+Title.Text = "ApexF — Safe Combat"
 Title.TextColor3 = Color3.fromRGB(0, 200, 255)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 18
 Title.Parent = MainFrame
 
-local TitleCorner = Instance.new("UICorner")
-TitleCorner.CornerRadius = UDim.new(0, 10)
-TitleCorner.Parent = Title
-
 ToggleButton.MouseButton1Click:Connect(function()
     MainFrame.Visible = not MainFrame.Visible
 end)
 
--- Скролл-контейнер для элементов
 local ScrollContainer = Instance.new("ScrollingFrame")
 ScrollContainer.Size = UDim2.new(1, -20, 1, -50)
 ScrollContainer.Position = UDim2.new(0, 10, 0, 45)
 ScrollContainer.BackgroundTransparency = 1
-ScrollContainer.ScrollBarThickness = 4
-ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 520)
+ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 550)
 ScrollContainer.Parent = MainFrame
 
 local UIListLayout = Instance.new("UIListLayout")
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 UIListLayout.Padding = UDim.new(0, 8)
 UIListLayout.Parent = ScrollContainer
 
@@ -215,10 +187,6 @@ local function CreateToggle(name, defaultState, callback)
     Button.Font = Enum.Font.SourceSans
     Button.TextSize = 15
     Button.Parent = ScrollContainer
-
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 6)
-    Corner.Parent = Button
 
     local state = defaultState
     Button.MouseButton1Click:Connect(function()
@@ -234,10 +202,6 @@ local function CreateInput(labelText, defaultValue, callback)
     Frame.Size = UDim2.new(1, -5, 0, 40)
     Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
     Frame.Parent = ScrollContainer
-
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 6)
-    Corner.Parent = Frame
 
     local Label = Instance.new("TextLabel")
     Label.Size = UDim2.new(0.65, 0, 1, 0)
@@ -259,69 +223,28 @@ local function CreateInput(labelText, defaultValue, callback)
     Input.TextSize = 14
     Input.Parent = Frame
 
-    local InputCorner = Instance.new("UICorner")
-    InputCorner.CornerRadius = UDim.new(0, 4)
-    InputCorner.Parent = Input
-
-    Input.FocusLost:Connect(function()
-        callback(Input)
-    end)
+    Input.FocusLost:Connect(function() callback(Input) end)
 end
 
--- Элементы управления
-CreateToggle("Aimbot (Instant Head)", Settings.AimbotEnabled, function(state)
-    Settings.AimbotEnabled = state
+CreateToggle("Aimbot", Settings.AimbotEnabled, function(s) Settings.AimbotEnabled = s end)
+CreateInput("Smoothness (0.05-0.5):", Settings.Smoothness, function(i) 
+    local v = tonumber(i.Text)
+    if v then Settings.Smoothness = math.clamp(v, 0.05, 0.5) i.Text = tostring(Settings.Smoothness) end
 end)
+CreateInput("Aimbot FOV:", Settings.AimbotFOVRadius, function(i) 
+    local v = tonumber(i.Text)
+    if v then Settings.AimbotFOVRadius = math.clamp(v, 10, 300) i.Text = tostring(Settings.AimbotFOVRadius) end
+end)
+CreateToggle("Show Aim FOV", Settings.ShowAimbotFOV, function(s) Settings.ShowAimbotFOV = s end)
 
-CreateInput("Aimbot FOV (10-300):", Settings.AimbotFOVRadius, function(input)
-    local val = tonumber(input.Text)
-    if val then
-        val = math.clamp(val, 10, 300)
-        Settings.AimbotFOVRadius = val
-        input.Text = tostring(val)
-    else
-        input.Text = tostring(Settings.AimbotFOVRadius)
-    end
+CreateToggle("Silent Aim (Выключи если кикает)", Settings.SilentAimEnabled, function(s) Settings.SilentAimEnabled = s end)
+CreateInput("Silent FOV:", Settings.SilentFOVRadius, function(i) 
+    local v = tonumber(i.Text)
+    if v then Settings.SilentFOVRadius = math.clamp(v, 10, 300) i.Text = tostring(Settings.SilentFOVRadius) end
 end)
-
-CreateToggle("Show Aimbot FOV", Settings.ShowAimbotFOV, function(state)
-    Settings.ShowAimbotFOV = state
+CreateToggle("Silent Auto Shoot", Settings.AutoShoot, function(s) Settings.AutoShoot = s end)
+CreateInput("Shoot Delay (sec):", Settings.ShootDelay, function(i) 
+    local v = tonumber(i.Text)
+    if v then Settings.ShootDelay = math.clamp(v, 0.1, 1.0) i.Text = tostring(Settings.ShootDelay) end
 end)
-
-CreateToggle("Silent Aim", Settings.SilentAimEnabled, function(state)
-    Settings.SilentAimEnabled = state
-end)
-
-CreateInput("Silent FOV (10-300):", Settings.SilentFOVRadius, function(input)
-    local val = tonumber(input.Text)
-    if val then
-        val = math.clamp(val, 10, 300)
-        Settings.SilentFOVRadius = val
-        input.Text = tostring(val)
-    else
-        input.Text = tostring(Settings.SilentFOVRadius)
-    end
-end)
-
-CreateToggle("Show Silent FOV", Settings.ShowSilentFOV, function(state)
-    Settings.ShowSilentFOV = state
-end)
-
-CreateToggle("Silent Auto Shoot", Settings.AutoShoot, function(state)
-    Settings.AutoShoot = state
-end)
-
-CreateInput("Silent Delay sec (0.1-1.0):", Settings.ShootDelay, function(input)
-    local val = tonumber(input.Text)
-    if val then
-        val = math.clamp(val, 0.1, 1.0)
-        Settings.ShootDelay = val
-        input.Text = tostring(val)
-    else
-        input.Text = tostring(Settings.ShootDelay)
-    end
-end)
-
-CreateToggle("Wall Check", Settings.WallCheck, function(state)
-    Settings.WallCheck = state
-end)
+CreateToggle("Wall Check (Обязательно)", Settings.WallCheck, function(s) Settings.WallCheck = s end)
