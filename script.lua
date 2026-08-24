@@ -1,92 +1,143 @@
--- Проверяем, загружена ли игра
-if not game:IsLoaded() then game.Loaded:Wait() end
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local localPlayer = Players.LocalPlayer
-
--- Настройки внешнего вида крыльев
-local WING_COLOR = Color3.fromRGB(0, 255, 255) -- Бирюзовый неон (можно изменить)
-local WING_MATERIAL = Enum.Material.Neon
-local WING_SIZE = Vector3.new(0.2, 5, 2)       -- Размер одного крыла
-
--- Очистка старых крыльев, если скрипт запущен повторно
-if _G.WingsConnection then _G.WingsConnection:Disconnect() end
-if localPlayer.Character and localPlayer.Character:FindFirstChild("LocalWingsFolder") then
-    localPlayer.Character.LocalWingsFolder:Destroy()
+-- Проверка на повторный запуск (удаляем старое меню, если есть)
+if game.CoreGui:FindFirstChild("DeltaFlickGUI") then
+    game.CoreGui.DeltaFlickGUI:Destroy()
 end
 
-local function createLocalWings(character)
-    local humanoid = character:WaitForChild("Humanoid", 5)
-    local root = character:WaitForChild("HumanoidRootPart", 5)
-    if not humanoid or not root then return end
+-- Создание главного контейнера
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DeltaFlickGUI"
+ScreenGui.Parent = game.CoreGui
 
-    -- Создаем локальную папку для крыльев (все внутри нее будет невидимо для сервера)
-    local folder = Instance.new("Folder")
-    folder.Name = "LocalWingsFolder"
-    folder.Parent = character
+-- Кнопка для открытия/закрытия меню
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0, 50, 0, 50)
+ToggleButton.Position = UDim2.new(0, 20, 0, 20)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+ToggleButton.TextColor3 = Color3.fromRGB(0, 255, 128)
+ToggleButton.Text = "DF"
+ToggleButton.TextSize = 20
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.Parent = ScreenGui
 
-    -- Функция создания одного крыла
-    local function makeWing(side)
-        local wing = Instance.new("Part")
-        wing.Name = side .. "Wing"
-        wing.Size = WING_SIZE
-        wing.Color = WING_COLOR
-        wing.Material = WING_MATERIAL
-        wing.CanCollide = false
-        wing.Massless = true
-        wing.Parent = folder
+local UICornerBtn = Instance.new("UICorner")
+UICornerBtn.CornerRadius = UDim.new(0, 12)
+UICornerBtn.Parent = ToggleButton
 
-        local motor = Instance.new("Motor6D")
-        motor.Name = side .. "Motor"
-        motor.Part0 = root
-        motor.Part1 = wing
-        motor.Parent = root
+-- Главное окно меню
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 400, 0, 300)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.Visible = false
+MainFrame.Parent = ScreenGui
 
-        return motor
+local UICornerMain = Instance.new("UICorner")
+UICornerMain.CornerRadius = UDim.new(0, 8)
+UICornerMain.Parent = MainFrame
+
+-- Заголовок меню
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Text = " Delta Flick | Combat"
+Title.TextSize = 16
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = MainFrame
+
+-- Контейнер для вкладки Combat
+local CombatTab = Instance.new("ScrollingFrame")
+CombatTab.Size = UDim2.new(1, -20, 1, -60)
+CombatTab.Position = UDim2.new(0, 10, 0, 50)
+CombatTab.BackgroundTransparency = 1
+CombatTab.CanvasSize = UDim2.new(0, 0, 0, 250)
+CombatTab.Parent = MainFrame
+
+-- Переключатель Aimbot (Toggle)
+local AimbotToggle = Instance.new("TextButton")
+AimbotToggle.Size = UDim2.new(1, 0, 0, 35)
+AimbotToggle.Position = UDim2.new(0, 0, 0, 10)
+AimbotToggle.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+AimbotToggle.TextColor3 = Color3.fromRGB(255, 50, 50)
+AimbotToggle.Text = "Aimbot: OFF"
+AimbotToggle.TextSize = 14
+AimbotToggle.Font = Enum.Font.Gotham
+AimbotToggle.Parent = CombatTab
+
+local UICornerAim = Instance.new("UICorner")
+UICornerAim.CornerRadius = UDim.new(0, 6)
+UICornerAim.Parent = AimbotToggle
+
+-- Настройка скорости прицеливания (Smooth)
+local SpeedLabel = Instance.new("TextLabel")
+SpeedLabel.Size = UDim2.new(1, 0, 0, 25)
+SpeedLabel.Position = UDim2.new(0, 0, 0, 55)
+SpeedLabel.BackgroundTransparency = 1
+SpeedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+SpeedLabel.Text = "Скорость (Smoothness): 5"
+SpeedLabel.TextSize = 13
+SpeedLabel.Font = Enum.Font.Gotham
+SpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
+SpeedLabel.Parent = CombatTab
+
+local SpeedBox = Instance.new("TextBox")
+SpeedBox.Size = UDim2.new(1, 0, 0, 30)
+SpeedBox.Position = UDim2.new(0, 0, 0, 80)
+SpeedBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+SpeedBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedBox.Text = "5"
+SpeedBox.TextSize = 14
+SpeedBox.Font = Enum.Font.Gotham
+SpeedBox.Parent = CombatTab
+
+-- Настройка FOV (Radius)
+local FovLabel = Instance.new("TextLabel")
+FovLabel.Size = UDim2.new(1, 0, 0, 25)
+FovLabel.Position = UDim2.new(0, 0, 0, 120)
+FovLabel.BackgroundTransparency = 1
+FovLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+FovLabel.Text = "Радиус FOV: 100"
+FovLabel.TextSize = 13
+FovLabel.Font = Enum.Font.Gotham
+FovLabel.TextXAlignment = Enum.TextXAlignment.Left
+FovLabel.Parent = CombatTab
+
+local FovBox = Instance.new("TextBox")
+FovBox.Size = UDim2.new(1, 0, 0, 30)
+FovBox.Position = UDim2.new(0, 0, 0, 145)
+FovBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+FovBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+FovBox.Text = "100"
+FovBox.TextSize = 14
+FovBox.Font = Enum.Font.Gotham
+FovBox.Parent = CombatTab
+
+-- Логика кнопки открытия/закрытия
+ToggleButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+-- Логика включения/выключения Aimbot
+local aimbotEnabled = false
+AimbotToggle.MouseButton1Click:Connect(function()
+    aimbotEnabled = not aimbotEnabled
+    if aimbotEnabled then
+        AimbotToggle.Text = "Aimbot: ON"
+        AimbotToggle.TextColor3 = Color3.fromRGB(50, 255, 50)
+    else
+        AimbotToggle.Text = "Aimbot: OFF"
+        AimbotToggle.TextColor3 = Color3.fromRGB(255, 50, 50)
     end
+end)
 
-    local leftMotor = makeWing("Left")
-    local rightMotor = makeWing("Right")
+-- Обновление значений настроек
+SpeedBox.FocusLost:Connect(function()
+    local val = tonumber(SpeedBox.Text)
+    if val then SpeedLabel.Text = "Скорость (Smoothness): " .. val end
+end)
 
-    -- Переменная для анимации махов
-    local counter = 0
-
-    -- Плавная анимация на стороне клиента
-    local connection
-    connection = RunService.RenderStepped:Connect(function(dt)
-        -- Проверка, жив ли персонаж и существуют ли крылья
-        if not character or not character:Parent() or not folder or not folder:Parent() then
-            connection:Disconnect()
-            return
-        end
-
-        counter = counter + (dt * 4) -- Скорость махов крыльев
-
-        -- Базовое смещение крыльев за спину
-        local baseLeftC0 = CFrame.new(-0.8, 1, 0.6) * CFrame.Angles(0, math.rad(-20), math.rad(-15))
-        local baseRightC0 = CFrame.new(0.8, 1, 0.6) * CFrame.Angles(0, math.rad(20), math.rad(15))
-
-        -- Математический просчет махов (синусоида)
-        local swing = math.sin(counter) * 0.3
-
-        leftMotor.C0 = baseLeftC0 * CFrame.Angles(0, swing, 0)
-        rightMotor.C0 = baseRightC0 * CFrame.Angles(0, -swing, 0)
-    end)
-
-    _G.WingsConnection = connection
-
-    -- Автоочистка при смерти
-    humanoid.Died:Connect(function()
-        if connection then connection:Disconnect() end
-        folder:Destroy()
-    end)
-end
-
--- Запуск при выполнении скрипта
-if localPlayer.Character then
-    createLocalWings(localPlayer.Character)
-end
-
--- Перезапуск при респавне персонажа
-localPlayer.CharacterAdded:Connect(createLocalWings)
+FovBox.FocusLost:Connect(function()
+    local val = tonumber(FovBox.Text)
+    if val then FovLabel.Text = "Радиус FOV: " .. val end
+end)
