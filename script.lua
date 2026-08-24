@@ -2,7 +2,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local VIM = game:GetService("VirtualInputManager")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -15,7 +14,7 @@ local Settings = {
     FlickFOVRadius = 120,
     ShowFlickFOV = false,
     RagebotEnabled = false,
-    ReloadMultiplier = 1, -- Чем меньше, тем быстрее (0.1 - 1)
+    ReloadMultiplier = 1, -- 1 = дефолт, 0 = моментально
     WallCheck = true,
     ChamsEnabled = false,
     TargetPart = "Head"
@@ -122,16 +121,21 @@ local function GetAnyVisibleTarget()
     return closestHead
 end
 
+-- Обход блокировки ходьбы через прямую симуляцию InputBegan
 local isShooting = false
 local function SafeMobileShoot()
     if isShooting then return end
     isShooting = true
     task.spawn(function()
-        local center = GetScreenCenter()
-        VIM:SendMouseButtonEvent(center.X, center.Y, 0, true, game, 1)
-        task.wait(0.01)
-        VIM:SendMouseButtonEvent(center.X, center.Y, 0, false, game, 1)
-        task.wait(0.1)
+        local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        if tool then
+            -- Симулируем нажатие для оружия без блокировки тачскрина игрока
+            local input = Instance.new("InputObject")
+            input.UserInputType = Enum.UserInputType.MouseButton1
+            input.UserInputState = Enum.UserInputState.Begin
+            tool:Activate()
+        end
+        task.wait(0.05) -- Небольшая задержка между выстрелами
         isShooting = false
     end)
 end
@@ -146,8 +150,9 @@ local function AdjustReloadSpeed()
             for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
                 local name = string.lower(track.Animation.Name or "")
                 if string.find(name, "reload") then
-                    -- Перевернутая логика скорости: 1 / 0.1 дает х10 скорость
-                    local targetSpeed = 1 / math.max(Settings.ReloadMultiplier, 0.05)
+                    -- Новая формула: 1 / 0.01 дает х100 скорость (моментально)
+                    local safeValue = math.clamp(Settings.ReloadMultiplier, 0.01, 1)
+                    local targetSpeed = 1 / safeValue
                     track:AdjustSpeed(targetSpeed)
                 end
             end
@@ -286,7 +291,7 @@ Title.TextSize = 18
 Title.Parent = MainFrame
 
 ToggleButton.MouseButton1Click:Connect(function()
-    MainFrame.Visible = not MainFrame.Visible
+MainFrame.Visible = not MainFrame.Visible
 end)
 
 local ScrollContainer = Instance.new("ScrollingFrame")
@@ -375,11 +380,11 @@ end
 end)
 CreateToggle("Show Flick FOV", Settings.ShowFlickFOV, function(s) Settings.ShowFlickFOV = s end)
 
-CreateToggle("Ragebot (Auto Shoot V2)", Settings.RagebotEnabled, function(s) Settings.RagebotEnabled = s end)
-CreateInput("Reload Speed (0.1 - 1):", Settings.ReloadMultiplier, function(i)
+CreateToggle("Ragebot (Auto Shoot V3)", Settings.RagebotEnabled, function(s) Settings.RagebotEnabled = s end)
+CreateInput("Reload Speed (0.01 - 1):", Settings.ReloadMultiplier, function(i)
 local v = tonumber(i.Text)
 if v then
-Settings.ReloadMultiplier = math.clamp(v, 0.1, 1)
+Settings.ReloadMultiplier = math.clamp(v, 0.01, 1)
 i.Text = tostring(Settings.ReloadMultiplier)
 end
 end)
@@ -398,4 +403,3 @@ LoaderFrame:Destroy()
 ToggleButton.Visible = true
 MainFrame.Visible = true
 end)
-
