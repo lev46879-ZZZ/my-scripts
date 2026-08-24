@@ -1,7 +1,5 @@
---// APEX HUB - VISUAL ONLY
---// LocalScript
---// Все элементы внутри меню декоративные.
---// Игровых функций ESP / Fly / Teleport / AutoFarm и т.д. НЕТ.
+--// ApexVHub
+--// VISUAL UI ONLY
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -11,18 +9,27 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 --==================================================
--- SETTINGS
+-- CONFIG
 --==================================================
 
-local MENU_SIZE = UDim2.fromOffset(650, 440)
+local MENU_WIDTH = 760
+local MENU_HEIGHT = 470
 
-local TWEEN_FAST = TweenInfo.new(
-	0.16,
+local DARK = Color3.fromRGB(14, 14, 15)
+local DARKER = Color3.fromRGB(10, 10, 11)
+local SIDEBAR = Color3.fromRGB(13, 13, 14)
+local BUTTON = Color3.fromRGB(25, 25, 27)
+local BUTTON_HOVER = Color3.fromRGB(31, 31, 34)
+local TEXT = Color3.fromRGB(225, 225, 228)
+local SUBTEXT = Color3.fromRGB(115, 115, 120)
+
+local FAST = TweenInfo.new(
+	0.15,
 	Enum.EasingStyle.Quart,
 	Enum.EasingDirection.Out
 )
 
-local TWEEN_MENU = TweenInfo.new(
+local MENU_TWEEN = TweenInfo.new(
 	0.28,
 	Enum.EasingStyle.Quart,
 	Enum.EasingDirection.Out
@@ -32,115 +39,129 @@ local TWEEN_MENU = TweenInfo.new(
 -- SCREEN GUI
 --==================================================
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ApexHub"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.IgnoreGuiInset = true
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = playerGui
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "ApexVHub"
+Gui.ResetOnSpawn = false
+Gui.IgnoreGuiInset = true
+Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+Gui.Parent = playerGui
 
 --==================================================
--- GUI OPEN BUTTON
+-- FLOATING GUI BUTTON
 --==================================================
 
-local OpenButton = Instance.new("TextButton")
-OpenButton.Name = "ApexHubButton"
-OpenButton.Size = UDim2.fromOffset(54, 54)
+local HubButton = Instance.new("TextButton")
+HubButton.Name = "ApexVHubButton"
+HubButton.Size = UDim2.fromOffset(62, 62)
 
--- немного выше центра экрана
-OpenButton.Position = UDim2.new(0.5, -27, 0.5, -95)
+-- Изначально немного выше центра экрана
+HubButton.Position = UDim2.new(0.5, -31, 0.5, -125)
 
-OpenButton.BackgroundColor3 = Color3.fromRGB(18, 18, 20)
-OpenButton.BackgroundTransparency = 0.05
-OpenButton.BorderSizePixel = 0
-OpenButton.Text = "A"
-OpenButton.TextColor3 = Color3.fromRGB(235, 235, 235)
-OpenButton.TextSize = 20
-OpenButton.Font = Enum.Font.GothamBold
-OpenButton.AutoButtonColor = false
-OpenButton.Parent = ScreenGui
+HubButton.BackgroundColor3 = DARK
+HubButton.BorderSizePixel = 0
+HubButton.Text = "ApexVHub"
+HubButton.TextColor3 = TEXT
+HubButton.TextSize = 10
+HubButton.Font = Enum.Font.GothamMedium
+HubButton.AutoButtonColor = false
+HubButton.ZIndex = 100
+HubButton.Parent = Gui
 
-local ButtonCorner = Instance.new("UICorner")
-ButtonCorner.CornerRadius = UDim.new(0, 13)
-ButtonCorner.Parent = OpenButton
+local HubCorner = Instance.new("UICorner")
+HubCorner.CornerRadius = UDim.new(0, 14)
+HubCorner.Parent = HubButton
 
-local ButtonStroke = Instance.new("UIStroke")
-ButtonStroke.Color = Color3.fromRGB(70, 70, 75)
-ButtonStroke.Thickness = 1
-ButtonStroke.Transparency = 0.25
-ButtonStroke.Parent = OpenButton
+local HubStroke = Instance.new("UIStroke")
+HubStroke.Color = Color3.fromRGB(70, 70, 75)
+HubStroke.Thickness = 1
+HubStroke.Transparency = 0.25
+HubStroke.Parent = HubButton
 
-local ButtonScale = Instance.new("UIScale")
-ButtonScale.Scale = 0.75
-ButtonScale.Parent = OpenButton
+local HubScale = Instance.new("UIScale")
+HubScale.Scale = 0.75
+HubScale.Parent = HubButton
 
--- Плавное появление кнопки
+-- Появление кнопки
 TweenService:Create(
-	ButtonScale,
-	TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+	HubScale,
+	TweenInfo.new(
+		0.45,
+		Enum.EasingStyle.Back,
+		Enum.EasingDirection.Out
+	),
 	{Scale = 1}
 ):Play()
 
 --==================================================
--- BUTTON HOVER ANIMATION
+-- BUTTON HOVER
 --==================================================
 
-OpenButton.MouseEnter:Connect(function()
+HubButton.MouseEnter:Connect(function()
+
 	TweenService:Create(
-		ButtonScale,
-		TWEEN_FAST,
+		HubScale,
+		FAST,
 		{Scale = 1.08}
 	):Play()
 
 	TweenService:Create(
-		ButtonStroke,
-		TWEEN_FAST,
+		HubStroke,
+		FAST,
 		{
 			Transparency = 0,
 			Thickness = 1.5
 		}
 	):Play()
+
 end)
 
-OpenButton.MouseLeave:Connect(function()
+HubButton.MouseLeave:Connect(function()
+
 	TweenService:Create(
-		ButtonScale,
-		TWEEN_FAST,
+		HubScale,
+		FAST,
 		{Scale = 1}
 	):Play()
 
 	TweenService:Create(
-		ButtonStroke,
-		TWEEN_FAST,
+		HubStroke,
+		FAST,
 		{
 			Transparency = 0.25,
 			Thickness = 1
 		}
 	):Play()
+
 end)
 
 --==================================================
--- MAIN WINDOW
+-- MAIN MENU
 --==================================================
 
 local Main = Instance.new("Frame")
 Main.Name = "Main"
-Main.Size = MENU_SIZE
-Main.Position = UDim2.new(0.5, -325, 0.5, -220)
-Main.BackgroundColor3 = Color3.fromRGB(15, 15, 16)
-Main.BackgroundTransparency = 0.02
+Main.Size = UDim2.fromOffset(MENU_WIDTH, MENU_HEIGHT)
+Main.Position = UDim2.new(
+	0.5,
+	-MENU_WIDTH / 2,
+	0.5,
+	-MENU_HEIGHT / 2
+)
+
+Main.BackgroundColor3 = DARK
 Main.BorderSizePixel = 0
 Main.Visible = false
-Main.Parent = ScreenGui
+Main.ZIndex = 10
+Main.Parent = Gui
 
 local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 12)
+MainCorner.CornerRadius = UDim.new(0, 13)
 MainCorner.Parent = Main
 
 local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = Color3.fromRGB(45, 45, 48)
-MainStroke.Transparency = 0.35
+MainStroke.Color = Color3.fromRGB(47, 47, 50)
 MainStroke.Thickness = 1
+MainStroke.Transparency = 0.35
 MainStroke.Parent = Main
 
 local MainScale = Instance.new("UIScale")
@@ -151,358 +172,364 @@ MainScale.Parent = Main
 -- HEADER
 --==================================================
 
+local Logo = Instance.new("Frame")
+Logo.Size = UDim2.fromOffset(34, 34)
+Logo.Position = UDim2.fromOffset(18, 17)
+Logo.BackgroundColor3 = Color3.fromRGB(24, 31, 43)
+Logo.BorderSizePixel = 0
+Logo.Parent = Main
+
+local LogoCorner = Instance.new("UICorner")
+LogoCorner.CornerRadius = UDim.new(0, 9)
+LogoCorner.Parent = Logo
+
+local LogoText = Instance.new("TextLabel")
+LogoText.Size = UDim2.fromScale(1, 1)
+LogoText.BackgroundTransparency = 1
+LogoText.Text = "A"
+LogoText.TextColor3 = Color3.fromRGB(135, 150, 255)
+LogoText.TextSize = 18
+LogoText.Font = Enum.Font.GothamBold
+LogoText.Parent = Logo
+
 local Title = Instance.new("TextLabel")
+Title.Size = UDim2.fromOffset(300, 27)
+Title.Position = UDim2.fromOffset(62, 14)
 Title.BackgroundTransparency = 1
-Title.Position = UDim2.fromOffset(52, 14)
-Title.Size = UDim2.fromOffset(250, 28)
-Title.Text = "Apex Hub"
-Title.TextColor3 = Color3.fromRGB(230, 230, 230)
-Title.TextSize = 17
+Title.Text = "ApexVHub"
+Title.TextColor3 = TEXT
+Title.TextSize = 18
 Title.Font = Enum.Font.GothamMedium
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = Main
 
 local Subtitle = Instance.new("TextLabel")
+Subtitle.Size = UDim2.fromOffset(300, 22)
+Subtitle.Position = UDim2.fromOffset(63, 37)
 Subtitle.BackgroundTransparency = 1
-Subtitle.Position = UDim2.fromOffset(53, 38)
-Subtitle.Size = UDim2.fromOffset(250, 22)
 Subtitle.Text = "Murder Mystery 2"
-Subtitle.TextColor3 = Color3.fromRGB(105, 105, 108)
+Subtitle.TextColor3 = SUBTEXT
 Subtitle.TextSize = 11
 Subtitle.Font = Enum.Font.Gotham
 Subtitle.TextXAlignment = Enum.TextXAlignment.Left
 Subtitle.Parent = Main
-
--- маленький декоративный логотип
-local Logo = Instance.new("Frame")
-Logo.Size = UDim2.fromOffset(30, 30)
-Logo.Position = UDim2.fromOffset(17, 17)
-Logo.BackgroundColor3 = Color3.fromRGB(22, 35, 48)
-Logo.BorderSizePixel = 0
-Logo.Parent = Main
-
-local LogoCorner = Instance.new("UICorner")
-LogoCorner.CornerRadius = UDim.new(0, 8)
-LogoCorner.Parent = Logo
-
-local LogoText = Instance.new("TextLabel")
-LogoText.BackgroundTransparency = 1
-LogoText.Size = UDim2.fromScale(1, 1)
-LogoText.Text = "A"
-LogoText.TextColor3 = Color3.fromRGB(90, 150, 220)
-LogoText.TextSize = 15
-LogoText.Font = Enum.Font.GothamBold
-LogoText.Parent = Logo
-
---==================================================
--- SEARCH
---==================================================
-
-local Search = Instance.new("TextBox")
-Search.Size = UDim2.fromOffset(165, 34)
-Search.Position = UDim2.new(1, -214, 0, 16)
-Search.BackgroundColor3 = Color3.fromRGB(9, 9, 10)
-Search.BorderSizePixel = 0
-Search.Text = ""
-Search.PlaceholderText = "Search..."
-Search.PlaceholderColor3 = Color3.fromRGB(90, 90, 93)
-Search.TextColor3 = Color3.fromRGB(210, 210, 210)
-Search.TextSize = 12
-Search.Font = Enum.Font.Gotham
-Search.Parent = Main
-
-local SearchCorner = Instance.new("UICorner")
-SearchCorner.CornerRadius = UDim.new(0, 8)
-SearchCorner.Parent = Search
 
 --==================================================
 -- CLOSE BUTTON
 --==================================================
 
 local Close = Instance.new("TextButton")
-Close.Size = UDim2.fromOffset(34, 34)
-Close.Position = UDim2.new(1, -45, 0, 16)
-Close.BackgroundColor3 = Color3.fromRGB(25, 25, 27)
+Close.Size = UDim2.fromOffset(38, 38)
+Close.Position = UDim2.new(1, -54, 0, 16)
+Close.BackgroundColor3 = BUTTON
 Close.BorderSizePixel = 0
 Close.Text = "X"
-Close.TextColor3 = Color3.fromRGB(180, 180, 183)
-Close.TextSize = 13
+Close.TextColor3 = Color3.fromRGB(190, 190, 194)
+Close.TextSize = 14
 Close.Font = Enum.Font.GothamMedium
 Close.AutoButtonColor = false
 Close.Parent = Main
 
 local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(0, 8)
+CloseCorner.CornerRadius = UDim.new(0, 9)
 CloseCorner.Parent = Close
 
+Close.MouseEnter:Connect(function()
+
+	TweenService:Create(
+		Close,
+		FAST,
+		{
+			BackgroundColor3 = BUTTON_HOVER,
+			TextColor3 = Color3.fromRGB(245, 245, 245)
+		}
+	):Play()
+
+end)
+
+Close.MouseLeave:Connect(function()
+
+	TweenService:Create(
+		Close,
+		FAST,
+		{
+			BackgroundColor3 = BUTTON,
+			TextColor3 = Color3.fromRGB(190, 190, 194)
+		}
+	):Play()
+
+end)
+
 --==================================================
--- PANELS
+-- CONTENT BACKGROUND
 --==================================================
 
-local function createPanel(name, position)
-	local panel = Instance.new("Frame")
-	panel.Name = name
-	panel.Size = UDim2.fromOffset(305, 345)
-	panel.Position = position
-	panel.BackgroundColor3 = Color3.fromRGB(10, 10, 11)
-	panel.BorderSizePixel = 0
-	panel.Parent = Main
+local ContentBackground = Instance.new("Frame")
+ContentBackground.Name = "ContentBackground"
+ContentBackground.Size = UDim2.new(1, -36, 1, -93)
+ContentBackground.Position = UDim2.fromOffset(18, 76)
+ContentBackground.BackgroundTransparency = 1
+ContentBackground.Parent = Main
 
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = panel
+--==================================================
+-- LEFT SIDEBAR
+--==================================================
 
-	return panel
+local Sidebar = Instance.new("Frame")
+Sidebar.Name = "Sidebar"
+Sidebar.Size = UDim2.fromOffset(178, 375)
+Sidebar.Position = UDim2.fromOffset(0, 0)
+Sidebar.BackgroundColor3 = SIDEBAR
+Sidebar.BorderSizePixel = 0
+Sidebar.Parent = ContentBackground
+
+local SidebarCorner = Instance.new("UICorner")
+SidebarCorner.CornerRadius = UDim.new(0, 9)
+SidebarCorner.Parent = Sidebar
+
+local SidebarPadding = Instance.new("UIPadding")
+SidebarPadding.PaddingTop = UDim.new(0, 10)
+SidebarPadding.PaddingLeft = UDim.new(0, 9)
+SidebarPadding.PaddingRight = UDim.new(0, 9)
+SidebarPadding.Parent = Sidebar
+
+local TabLayout = Instance.new("UIListLayout")
+TabLayout.Padding = UDim.new(0, 7)
+TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+TabLayout.Parent = Sidebar
+
+--==================================================
+-- EMPTY TABS
+--==================================================
+
+local function createEmptyTab(name, order, selected)
+
+	local Tab = Instance.new("TextButton")
+	Tab.Name = name
+	Tab.Size = UDim2.new(1, 0, 0, 36)
+	Tab.LayoutOrder = order
+	Tab.BackgroundColor3 = selected
+		and Color3.fromRGB(29, 29, 31)
+		or Color3.fromRGB(18, 18, 19)
+
+	Tab.BorderSizePixel = 0
+
+	-- Вкладки пустые: никаких функций внутри
+	Tab.Text = ""
+	Tab.AutoButtonColor = false
+
+	Tab.Parent = Sidebar
+
+	local TabCorner = Instance.new("UICorner")
+	TabCorner.CornerRadius = UDim.new(0, 7)
+	TabCorner.Parent = Tab
+
+	-- Левая полоска активной вкладки
+	if selected then
+
+		local Accent = Instance.new("Frame")
+		Accent.Size = UDim2.fromOffset(3, 28)
+		Accent.Position = UDim2.fromOffset(0, 4)
+		Accent.BackgroundColor3 = Color3.fromRGB(225, 225, 225)
+		Accent.BorderSizePixel = 0
+		Accent.Parent = Tab
+
+		local AccentCorner = Instance.new("UICorner")
+		AccentCorner.CornerRadius = UDim.new(1, 0)
+		AccentCorner.Parent = Accent
+
+	end
+
+	-- Только визуальная hover-анимация
+	Tab.MouseEnter:Connect(function()
+
+		if not selected then
+
+			TweenService:Create(
+				Tab,
+				FAST,
+				{
+					BackgroundColor3 = Color3.fromRGB(23, 23, 25)
+				}
+			):Play()
+
+		end
+
+	end)
+
+	Tab.MouseLeave:Connect(function()
+
+		if not selected then
+
+			TweenService:Create(
+				Tab,
+				FAST,
+				{
+					BackgroundColor3 = Color3.fromRGB(18, 18, 19)
+				}
+			):Play()
+
+		end
+
+	end)
+
+	return Tab
 end
 
-local ESPPanel = createPanel(
-	"ESPPanel",
-	UDim2.fromOffset(18, 79)
+-- Пустые вкладки
+createEmptyTab("Tab1", 1, true)
+createEmptyTab("Tab2", 2, false)
+createEmptyTab("Tab3", 3, false)
+createEmptyTab("Tab4", 4, false)
+createEmptyTab("Tab5", 5, false)
+createEmptyTab("Tab6", 6, false)
+createEmptyTab("Tab7", 7, false)
+createEmptyTab("Tab8", 8, false)
+createEmptyTab("Tab9", 9, false)
+
+--==================================================
+-- EMPTY MAIN CONTENT
+--==================================================
+
+local EmptyContent = Instance.new("Frame")
+EmptyContent.Name = "EmptyContent"
+EmptyContent.Size = UDim2.new(
+	1,
+	-193,
+	1,
+	0
 )
 
-local MovementPanel = createPanel(
-	"MovementPanel",
-	UDim2.fromOffset(327, 79)
-)
+EmptyContent.Position = UDim2.fromOffset(193, 0)
+
+EmptyContent.BackgroundColor3 = DARKER
+EmptyContent.BorderSizePixel = 0
+EmptyContent.Parent = ContentBackground
+
+local EmptyCorner = Instance.new("UICorner")
+EmptyCorner.CornerRadius = UDim.new(0, 9)
+EmptyCorner.Parent = EmptyContent
+
+-- Никаких кнопок, ESP, переключателей,
+-- настроек или функций внутри.
+-- Область намеренно полностью пустая.
 
 --==================================================
--- PANEL HEADERS
+-- MENU OPEN / CLOSE
 --==================================================
 
-local function panelHeader(panel, text)
-	local accent = Instance.new("Frame")
-	accent.Size = UDim2.fromOffset(3, 17)
-	accent.Position = UDim2.fromOffset(13, 12)
-	accent.BackgroundColor3 = Color3.fromRGB(220, 220, 220)
-	accent.BorderSizePixel = 0
-	accent.Parent = panel
+local MenuOpen = false
 
-	local accentCorner = Instance.new("UICorner")
-	accentCorner.CornerRadius = UDim.new(1, 0)
-	accentCorner.Parent = accent
+local function OpenMenu()
 
-	local label = Instance.new("TextLabel")
-	label.BackgroundTransparency = 1
-	label.Position = UDim2.fromOffset(24, 7)
-	label.Size = UDim2.fromOffset(220, 28)
-	label.Text = text
-	label.TextColor3 = Color3.fromRGB(215, 215, 215)
-	label.TextSize = 13
-	label.Font = Enum.Font.Gotham
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.Parent = panel
-
-	local arrow = Instance.new("TextLabel")
-	arrow.BackgroundTransparency = 1
-	arrow.Position = UDim2.new(1, -31, 0, 9)
-	arrow.Size = UDim2.fromOffset(20, 25)
-	arrow.Text = "⌄"
-	arrow.TextColor3 = Color3.fromRGB(100, 100, 103)
-	arrow.TextSize = 15
-	arrow.Font = Enum.Font.Gotham
-	arrow.Parent = panel
-
-	local line = Instance.new("Frame")
-	line.Size = UDim2.new(1, -28, 0, 1)
-	line.Position = UDim2.fromOffset(14, 36)
-	line.BackgroundColor3 = Color3.fromRGB(40, 40, 42)
-	line.BorderSizePixel = 0
-	line.Parent = panel
-end
-
-panelHeader(ESPPanel, "ESP")
-panelHeader(MovementPanel, "Movement")
-
---==================================================
--- DECORATIVE TOGGLE
---==================================================
-
-local function addVisualToggle(panel, text, y)
-	local label = Instance.new("TextLabel")
-	label.BackgroundTransparency = 1
-	label.Position = UDim2.fromOffset(15, y)
-	label.Size = UDim2.fromOffset(190, 34)
-	label.Text = text
-	label.TextColor3 = Color3.fromRGB(190, 190, 192)
-	label.TextSize = 12
-	label.Font = Enum.Font.Gotham
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.Parent = panel
-
-	local toggle = Instance.new("Frame")
-	toggle.Size = UDim2.fromOffset(45, 24)
-	toggle.Position = UDim2.new(1, -57, 0, y + 4)
-	toggle.BackgroundColor3 = Color3.fromRGB(85, 85, 92)
-	toggle.BorderSizePixel = 0
-	toggle.Parent = panel
-
-	local tc = Instance.new("UICorner")
-	tc.CornerRadius = UDim.new(1, 0)
-	tc.Parent = toggle
-
-	local circle = Instance.new("Frame")
-	circle.Size = UDim2.fromOffset(18, 18)
-	circle.Position = UDim2.fromOffset(3, 3)
-	circle.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
-	circle.BorderSizePixel = 0
-	circle.Parent = toggle
-
-	local cc = Instance.new("UICorner")
-	cc.CornerRadius = UDim.new(1, 0)
-	cc.Parent = circle
-
-	-- намеренно НЕТ MouseButton1Click:
-	-- переключатель полностью декоративный
-end
-
--- Left panel
-addVisualToggle(ESPPanel, "Role ESP", 50)
-addVisualToggle(ESPPanel, "Enable Role ESP", 84)
-addVisualToggle(ESPPanel, "Gun ESP", 118)
-addVisualToggle(ESPPanel, "Tracers", 178)
-addVisualToggle(ESPPanel, "Box ESP", 238)
-
--- Right panel
-addVisualToggle(MovementPanel, "No Clip", 50)
-addVisualToggle(MovementPanel, "Infinite Jumps", 88)
-addVisualToggle(MovementPanel, "Anti-Fling", 126)
-addVisualToggle(MovementPanel, "Bomb Jump", 164)
-addVisualToggle(MovementPanel, "Fly", 224)
-addVisualToggle(MovementPanel, "Fly Animation", 284)
-
---==================================================
--- DECORATIVE DROPDOWN
---==================================================
-
-local function addDropdown(panel, text, value, y)
-	local label = Instance.new("TextLabel")
-	label.BackgroundTransparency = 1
-	label.Position = UDim2.fromOffset(15, y)
-	label.Size = UDim2.fromOffset(150, 30)
-	label.Text = text
-	label.TextColor3 = Color3.fromRGB(175, 175, 178)
-	label.TextSize = 12
-	label.Font = Enum.Font.Gotham
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.Parent = panel
-
-	local valueLabel = Instance.new("TextLabel")
-	valueLabel.BackgroundTransparency = 1
-	valueLabel.Position = UDim2.new(1, -105, 0, y)
-	valueLabel.Size = UDim2.fromOffset(75, 30)
-	valueLabel.Text = value
-	valueLabel.TextColor3 = Color3.fromRGB(165, 165, 168)
-	valueLabel.TextSize = 11
-	valueLabel.Font = Enum.Font.Gotham
-	valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-	valueLabel.Parent = panel
-end
-
-addDropdown(ESPPanel, "Role ESP Style", "Default", 145)
-addDropdown(ESPPanel, "Origin", "Bottom", 205)
-addDropdown(ESPPanel, "Style", "Full", 265)
-
-addDropdown(MovementPanel, "Auto Bomb Jump", "None", 202)
-addDropdown(MovementPanel, "Fly Speed", "60", 260)
-
---==================================================
--- MENU ANIMATION
---==================================================
-
-local menuOpen = false
-
-local function openMenu()
-	if menuOpen then
+	if MenuOpen then
 		return
 	end
 
-	menuOpen = true
+	MenuOpen = true
+
 	Main.Visible = true
 	MainScale.Scale = 0.94
-	Main.BackgroundTransparency = 0.3
+	Main.BackgroundTransparency = 0.2
+
+	-- Кнопка находится поверх меню
+	HubButton.ZIndex = 100
 
 	TweenService:Create(
 		MainScale,
-		TWEEN_MENU,
+		MENU_TWEEN,
 		{Scale = 1}
 	):Play()
 
 	TweenService:Create(
 		Main,
-		TWEEN_MENU,
-		{BackgroundTransparency = 0.02}
+		MENU_TWEEN,
+		{BackgroundTransparency = 0}
 	):Play()
+
 end
 
-local function closeMenu()
-	if not menuOpen then
+local function CloseMenu()
+
+	if not MenuOpen then
 		return
 	end
 
-	menuOpen = false
+	MenuOpen = false
 
-	local scaleTween = TweenService:Create(
+	TweenService:Create(
 		MainScale,
-		TWEEN_MENU,
+		MENU_TWEEN,
 		{Scale = 0.94}
-	)
+	):Play()
 
-	local fadeTween = TweenService:Create(
+	local fade = TweenService:Create(
 		Main,
-		TWEEN_MENU,
-		{BackgroundTransparency = 0.3}
+		MENU_TWEEN,
+		{BackgroundTransparency = 0.25}
 	)
 
-	scaleTween:Play()
-	fadeTween:Play()
+	fade:Play()
 
-	scaleTween.Completed:Once(function()
-		if not menuOpen then
+	fade.Completed:Once(function()
+
+		if not MenuOpen then
 			Main.Visible = false
 		end
+
 	end)
+
 end
 
-OpenButton.MouseButton1Click:Connect(function()
-	if menuOpen then
-		closeMenu()
+HubButton.MouseButton1Click:Connect(function()
+
+	if MenuOpen then
+		CloseMenu()
 	else
-		openMenu()
+		OpenMenu()
 	end
+
 end)
 
 Close.MouseButton1Click:Connect(function()
-	closeMenu()
+	CloseMenu()
 end)
 
 --==================================================
--- DRAGGABLE GUI BUTTON
+-- DRAG GUI BUTTON
 --==================================================
 
-local dragging = false
-local dragStart
-local startPosition
+local ButtonDragging = false
+local ButtonDragStart
+local ButtonStartPosition
 
-OpenButton.InputBegan:Connect(function(input)
+HubButton.InputBegan:Connect(function(input)
+
 	if input.UserInputType == Enum.UserInputType.MouseButton1
 		or input.UserInputType == Enum.UserInputType.Touch then
 
-		dragging = true
-		dragStart = input.Position
-		startPosition = OpenButton.Position
+		ButtonDragging = true
+		ButtonDragStart = input.Position
+		ButtonStartPosition = HubButton.Position
+
 	end
+
 end)
 
-OpenButton.InputEnded:Connect(function(input)
+HubButton.InputEnded:Connect(function(input)
+
 	if input.UserInputType == Enum.UserInputType.MouseButton1
 		or input.UserInputType == Enum.UserInputType.Touch then
 
-		dragging = false
+		ButtonDragging = false
+
 	end
+
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-	if not dragging then
+
+	if not ButtonDragging then
 		return
 	end
 
@@ -511,44 +538,48 @@ UserInputService.InputChanged:Connect(function(input)
 		return
 	end
 
-	local delta = input.Position - dragStart
+	local Delta = input.Position - ButtonDragStart
 
-	OpenButton.Position = UDim2.new(
-		startPosition.X.Scale,
-		startPosition.X.Offset + delta.X,
-		startPosition.Y.Scale,
-		startPosition.Y.Offset + delta.Y
+	HubButton.Position = UDim2.new(
+		ButtonStartPosition.X.Scale,
+		ButtonStartPosition.X.Offset + Delta.X,
+		ButtonStartPosition.Y.Scale,
+		ButtonStartPosition.Y.Offset + Delta.Y
 	)
+
 end)
 
 --==================================================
--- DRAGGABLE MAIN WINDOW
+-- DRAG MAIN MENU
 --==================================================
 
-local windowDragging = false
-local windowDragStart
-local windowStartPosition
-
-local function startWindowDrag(input)
-	windowDragging = true
-	windowDragStart = input.Position
-	windowStartPosition = Main.Position
-end
+local MenuDragging = false
+local MenuDragStart
+local MenuStartPosition
 
 Main.InputBegan:Connect(function(input)
+
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		startWindowDrag(input)
+
+		MenuDragging = true
+		MenuDragStart = input.Position
+		MenuStartPosition = Main.Position
+
 	end
+
 end)
 
 Main.InputEnded:Connect(function(input)
+
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		windowDragging = false
+		MenuDragging = false
 	end
+
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-	if not windowDragging then
+
+	if not MenuDragging then
 		return
 	end
 
@@ -556,12 +587,13 @@ UserInputService.InputChanged:Connect(function(input)
 		return
 	end
 
-	local delta = input.Position - windowDragStart
+	local Delta = input.Position - MenuDragStart
 
 	Main.Position = UDim2.new(
-		windowStartPosition.X.Scale,
-		windowStartPosition.X.Offset + delta.X,
-		windowStartPosition.Y.Scale,
-		windowStartPosition.Y.Offset + delta.Y
+		MenuStartPosition.X.Scale,
+		MenuStartPosition.X.Offset + Delta.X,
+		MenuStartPosition.Y.Scale,
+		MenuStartPosition.Y.Offset + Delta.Y
 	)
+
 end)
