@@ -21,10 +21,6 @@ local Settings = {
     TargetPart = "Head"
 }
 
--- Переменная для удержания цели Flickbot
-local FlickTarget = nil
-local IsTrackingFlick = false
-
 -- FOV Круг для Aimbot
 local AimCircle = Drawing.new("Circle")
 AimCircle.Thickness = 1.5
@@ -122,29 +118,23 @@ local function GetClosestTarget(maxRadius)
     return closestHead
 end
 
--- МГНОВЕННЫЙ ФЛИК ПРИ НАЖАТИИ (МЫШЬ + ТАЧСКРИН)
+-- МГНОВЕННЫЙ ОДИНОЧНЫЙ ФЛИК ПРИ НАЖАТИИ НА КНОПКУ ВЫСТРЕЛА / МЫШЬ
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
     if not Settings.FlickbotEnabled then return end
 
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        IsTrackingFlick = true
-        FlickTarget = GetClosestTarget(Settings.FlickFOVRadius)
-        if FlickTarget then
-            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, FlickTarget.Position)
+    -- Проверяем: клик мыши ИЛИ нажатие на игровую кнопку (gameProcessed = true для мобильных UI кнопок игры)
+    local isMouseClick = (input.UserInputType == Enum.UserInputType.MouseButton1 and not gameProcessed)
+    local isMobileShoot = (input.UserInputType == Enum.UserInputType.Touch and gameProcessed)
+
+    if isMouseClick or isMobileShoot then
+        local targetHead = GetClosestTarget(Settings.FlickFOVRadius)
+        if targetHead then
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetHead.Position)
         end
     end
 end)
 
--- ОТПУСКАНИЕ КНОПКИ / СБРОС ТРЕКИНГА
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        IsTrackingFlick = false
-        FlickTarget = nil
-    end
-end)
-
--- РЕНДЕР И АИМБОТ
+-- РЕНДЕР И ОБЫЧНЫЙ АИМБОТ
 RunService.RenderStepped:Connect(function()
     local centerPos = GetScreenCenter()
     
@@ -162,15 +152,8 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Логика удержания Flickbot при зажатии
-    if Settings.FlickbotEnabled and IsTrackingFlick and FlickTarget then
-        if FlickTarget.Parent and FlickTarget.Parent:FindFirstChildOfClass("Humanoid") and FlickTarget.Parent:FindFirstChildOfClass("Humanoid").Health > 0 then
-            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, FlickTarget.Position)
-        else
-            FlickTarget = nil -- Сброс, если цель погибла
-        end
-    -- Логика обычного Constant Aimbot
-    elseif Settings.AimbotEnabled then
+    -- Постоянный аимбот (если включен) работает независимо
+    if Settings.AimbotEnabled then
         local targetHead = GetClosestTarget(Settings.AimbotFOVRadius)
         if targetHead then
             Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetHead.Position)
@@ -287,22 +270,22 @@ local function CreateToggle(name, defaultState, callback)
     Corner.CornerRadius = UDim.new(0, 6)
     Corner.Parent = Button
 
-local state = defaultState
-Button.MouseButton1Click:Connect(function()
-state = not state
-Button.BackgroundColor3 = state and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(40, 40, 50)
-Button.Text = name .. ": " .. (state and "ON" or "OFF")
-callback(state)
-end)
+    local state = defaultState
+    Button.MouseButton1Click:Connect(function()
+        state = not state
+        Button.BackgroundColor3 = state and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(40, 40, 50)
+        Button.Text = name .. ": " .. (state and "ON" or "OFF")
+        callback(state)
+    end)
 end
 
 local function CreateInput(labelText, defaultValue, callback)
-local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(1, -5, 0, 40)
-Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-Frame.Parent = ScrollContainer
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(1, -5, 0, 40)
+    Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    Frame.Parent = ScrollContainer
 
-local Label = Instance.new("TextLabel")
+    local Label = Instance.new("TextLabel")
 Label.Size = UDim2.new(0.65, 0, 1, 0)
 Label.BackgroundTransparency = 1
 Label.Text = " " .. labelText
