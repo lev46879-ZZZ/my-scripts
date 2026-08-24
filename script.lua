@@ -6,30 +6,26 @@ local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- НАСТРОЙКИ
 local Settings = {
     AimbotEnabled = false,
     AimbotFOVRadius = 100,
     ShowAimbotFOV = false,
-
     FlickbotEnabled = false,
     FlickFOVRadius = 120,
     ShowFlickFOV = false,
-
-    RagebotEnabled = false, -- Стреляет по всей карте (без FOV) с возвратом камеры
-    WallCheck = true,       -- Проверка видимости цели за стеной
+    RagebotEnabled = false,
+    ReloadMultiplier = 1, -- Множитель скорости перезарядки
+    WallCheck = true,
     ChamsEnabled = false,
     TargetPart = "Head"
 }
 
--- FOV Круг для Aimbot
 local AimCircle = Drawing.new("Circle")
 AimCircle.Thickness = 1.5
 AimCircle.Color = Color3.fromRGB(255, 50, 50)
 AimCircle.Filled = false
 AimCircle.Transparency = 1
 
--- FOV Круг для Flickbot
 local FlickCircle = Drawing.new("Circle")
 FlickCircle.Thickness = 1.5
 FlickCircle.Color = Color3.fromRGB(180, 50, 255)
@@ -40,15 +36,13 @@ local function GetScreenCenter()
     return Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 end
 
-local function IsAlive(player)
-    if not player or player == LocalPlayer or not player.Character then return false end
-    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-    if not humanoid or humanoid.Health <= 0 then return false end
-    if humanoid:GetState() == Enum.HumanoidStateType.Dead then return false end
-    return true
+local function IsAlive(p)
+    if not p or p == LocalPlayer or not p.Character then return false end
+    local hum = p.Character:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return false end
+    return hum:GetState() ~= Enum.HumanoidStateType.Dead
 end
 
--- ПРОВЕРКА ВИДИМОСТИ ЦЕЛИ
 local function IsVisible(targetHead)
     if not Settings.WallCheck then return true end
     local origin = Camera.CFrame.Position
@@ -69,10 +63,9 @@ local function IsVisible(targetHead)
     return false
 end
 
--- RED CHAMS (ESP)
-local function ApplyChams(player)
-    if not IsAlive(player) then return end
-    local char = player.Character
+local function ApplyChams(p)
+    if not IsAlive(p) then return end
+    local char = p.Character
     local highlight = char:FindFirstChild("Apex_RedChams")
 
     if Settings.ChamsEnabled then
@@ -87,51 +80,24 @@ local function ApplyChams(player)
             highlight.Parent = char
         end
     else
-        if highlight then
-            highlight:Destroy()
-        end
+        if highlight then highlight:Destroy() end
     end
 end
 
--- ПОИСК ЦЕЛИ ДЛЯ AIM И FLICK (Внутри FOV)
 local function GetClosestTargetInFOV(maxRadius)
     local closestHead = nil
     local shortestDistance = maxRadius
     local centerPos = GetScreenCenter()
 
-    for _, player in ipairs(Players:GetPlayers()) do
-        if IsAlive(player) and player.Character:FindFirstChild(Settings.TargetPart) then
-            local head = player.Character[Settings.TargetPart]
+    for _, p in ipairs(Players:GetPlayers()) do
+        if IsAlive(p) and p.Character:FindFirstChild(Settings.TargetPart) then
+            local head = p.Character[Settings.TargetPart]
             local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
 
             if onScreen then
                 local headPos2D = Vector2.new(screenPos.X, screenPos.Y)
                 local dist = (headPos2D - centerPos).Magnitude
-                if dist <= shortestDistance then
-                    if IsVisible(head) then
-                        closestHead = head
-                        shortestDistance = dist
-                    end
-                end
-            end
-        end
-    end
-    return closestHead
-end
-
--- ПОИСК ЛЮБОЙ ВИДИМОЙ ЦЕЛИ НА КАРТЕ ДЛЯ RAGEBOT (Без учета FOV и экрана)
-local function GetAnyVisibleTarget()
-    local closestHead = nil
-    local shortestDistance = math.huge
-    local myPosition = Camera.CFrame.Position
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if IsAlive(player) and player.Character:FindFirstChild(Settings.TargetPart) then
-            local head = player.Character[Settings.TargetPart]
-            local dist = (head.Position - myPosition).Magnitude
-            
-            if dist < shortestDistance then
-                if IsVisible(head) then
+                if dist <= shortestDistance and IsVisible(head) then
                     closestHead = head
                     shortestDistance = dist
                 end
@@ -141,12 +107,60 @@ local function GetAnyVisibleTarget()
     return closestHead
 end
 
--- МГНОВЕННЫЙ ФЛИК ПРИ НАЖАТИИ ЭКРАНА ИЛИ МЫШИ (AimFlickBot)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if not Settings.FlickbotEnabled then return end
+local function GetAnyVisibleTarget()
+    local closestHead = nil
+    local shortestDistance = math.huge
+    local myPosition = Camera.CFrame.Position
 
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+    for _, p in ipairs(Players:GetPlayers()) do
+        if IsAlive(p) and p.Character:FindFirstChild(Settings.TargetPart) then
+            local head = p.Character[Settings.TargetPart]
+            local dist = (head.Position - myPosition).Magnitude
+            
+            if dist < shortestDistance and IsVisible(head) then
+                closestHead = head
+                shortestDistance = dist
+            end
+        end
+    end
+    return closestHead
+end
+
+-- Стрельба без блокировки тачскрина
+local function ForceToolShoot()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then
+        tool:Activate()
+    end
+end
+
+-- Логика ускорения анимации перезарядки
+local function AdjustReloadSpeed()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        local animator = hum:FindFirstChildOfClass("Animator")
+        if animator then
+            for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                local name = string.lower(track.Animation.Name or "")
+                if string.find(name, "reload") or string.find(name, "reload") then
+                    track:AdjustSpeed(Settings.ReloadMultiplier)
+                end
+            end
+        end
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed or not Settings.FlickbotEnabled then return end
+    local inputType = input.UserInputType
+    local isClick = (inputType == Enum.UserInputType.MouseButton1)
+    local isTouch = (inputType == Enum.UserInputType.Touch)
+
+    if isClick or isTouch then
         local targetHead = GetClosestTargetInFOV(Settings.FlickFOVRadius)
         if targetHead then
             Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetHead.Position)
@@ -154,7 +168,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- РЕНДЕР-ЦИКЛ (ОБЫЧНЫЙ АИМ И МИКРО-ФЛИК RAGEBOT)
 RunService.RenderStepped:Connect(function()
     local centerPos = GetScreenCenter()
     
@@ -166,31 +179,23 @@ RunService.RenderStepped:Connect(function()
     FlickCircle.Radius = Settings.FlickFOVRadius
     FlickCircle.Visible = Settings.ShowFlickFOV and Settings.FlickbotEnabled
 
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            ApplyChams(player)
-        end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then ApplyChams(p) end
     end
 
-    -- ЛОГИКА RAGEBOT С МИКРО-ФЛИКОМ И ВОЗВРАТОМ
+    if Settings.ReloadMultiplier > 1 then
+        AdjustReloadSpeed()
+    end
+
     if Settings.RagebotEnabled then
-        local rageTarget = GetAnyVisibleTarget() -- Ищет везде без FOV
+        local rageTarget = GetAnyVisibleTarget()
         if rageTarget then
-            -- 1. Сохраняем исходный ракурс камеры игрока
             local originalCFrame = Camera.CFrame
-            
-            -- 2. Делаем мгновенный микро-флик на цель
             Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, rageTarget.Position)
-            
-            -- 3. Выстрел
-            mouse1press()
+            ForceToolShoot()
             task.wait()
-            mouse1release()
-            
-            -- 4. Моментально возвращаем камеру в исходное положение
             Camera.CFrame = originalCFrame
         end
-    -- ЛОГИКА ОБЫЧНОГО АИМБОТА (Если отключен Рейдж)
     elseif Settings.AimbotEnabled then
         local targetHead = GetClosestTargetInFOV(Settings.AimbotFOVRadius)
         if targetHead then
@@ -199,8 +204,9 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- GUI ИНТЕРФЕЙС
-local ParentContainer = (gethui and gethui()) or game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
+local ParentContainer = (gethui and gethui()) 
+    or game:GetService("CoreGui") 
+    or LocalPlayer:WaitForChild("PlayerGui")
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "ApexF_CleanGui"
@@ -257,7 +263,7 @@ OpenUICorner.Parent = ToggleButton
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 360)
+MainFrame.Size = UDim2.new(0, 320, 0, 390)
 MainFrame.Position = UDim2.new(0.35, 0, 0.2, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.Visible = false
@@ -272,7 +278,7 @@ MainUICorner.Parent = MainFrame
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-Title.Text = "ApexF — Micro Flick Update"
+Title.Text = "ApexF — Touch Fix Update"
 Title.TextColor3 = Color3.fromRGB(0, 200, 255)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 18
@@ -286,9 +292,8 @@ local ScrollContainer = Instance.new("ScrollingFrame")
 ScrollContainer.Size = UDim2.new(1, -20, 1, -50)
 ScrollContainer.Position = UDim2.new(0, 10, 0, 45)
 ScrollContainer.BackgroundTransparency = 1
-ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 460)
+ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 510)
 ScrollContainer.Parent = MainFrame
-
 local UIListLayout = Instance.new("UIListLayout")
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 UIListLayout.Padding = UDim.new(0, 8)
@@ -297,7 +302,9 @@ UIListLayout.Parent = ScrollContainer
 local function CreateToggle(name, defaultState, callback)
 local Button = Instance.new("TextButton")
 Button.Size = UDim2.new(1, -5, 0, 36)
-Button.BackgroundColor3 = defaultState and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(40, 40, 50)
+local activeColor = Color3.fromRGB(40, 160, 80)
+local inactiveColor = Color3.fromRGB(40, 40, 50)
+Button.BackgroundColor3 = defaultState and activeColor or inactiveColor
 Button.Text = name .. ": " .. (defaultState and "ON" or "OFF")
 Button.TextColor3 = Color3.fromRGB(255, 255, 255)
 Button.Font = Enum.Font.SourceSans
@@ -311,7 +318,7 @@ Corner.Parent = Button
 local state = defaultState
 Button.MouseButton1Click:Connect(function()
 state = not state
-Button.BackgroundColor3 = state and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(40, 40, 50)
+Button.BackgroundColor3 = state and activeColor or inactiveColor
 Button.Text = name .. ": " .. (state and "ON" or "OFF")
 callback(state)
 end)
@@ -346,23 +353,34 @@ Input.Parent = Frame
 Input.FocusLost:Connect(function() callback(Input) end)
 end
 
--- ЭЛЕМЕНТЫ МЕНЮ
 CreateToggle("Constant Aimbot", Settings.AimbotEnabled, function(s) Settings.AimbotEnabled = s end)
 CreateInput("Aimbot FOV (10-800):", Settings.AimbotFOVRadius, function(i)
 local v = tonumber(i.Text)
-if v then Settings.AimbotFOVRadius = math.clamp(v, 10, 800) i.Text = tostring(Settings.AimbotFOVRadius) end
+if v then
+Settings.AimbotFOVRadius = math.clamp(v, 10, 800)
+i.Text = tostring(Settings.AimbotFOVRadius)
+end
 end)
 CreateToggle("Show Aimbot FOV", Settings.ShowAimbotFOV, function(s) Settings.ShowAimbotFOV = s end)
 
 CreateToggle("AimFlickBot (Touch/Click)", Settings.FlickbotEnabled, function(s) Settings.FlickbotEnabled = s end)
 CreateInput("Flick FOV (10-800):", Settings.FlickFOVRadius, function(i)
 local v = tonumber(i.Text)
-if v then Settings.FlickFOVRadius = math.clamp(v, 10, 800) i.Text = tostring(Settings.FlickFOVRadius) end
+if v then
+Settings.FlickFOVRadius = math.clamp(v, 10, 800)
+i.Text = tostring(Settings.FlickFOVRadius)
+end
 end)
 CreateToggle("Show Flick FOV", Settings.ShowFlickFOV, function(s) Settings.ShowFlickFOV = s end)
 
--- Настройка Рейджбота без FOV
-CreateToggle("Ragebot (360 Silent Shot)", Settings.RagebotEnabled, function(s) Settings.RagebotEnabled = s end)
+CreateToggle("Ragebot (No Mouse Block)", Settings.RagebotEnabled, function(s) Settings.RagebotEnabled = s end)
+CreateInput("Reload Speed Mult (1-10):", Settings.ReloadMultiplier, function(i)
+local v = tonumber(i.Text)
+if v then
+Settings.ReloadMultiplier = math.clamp(v, 1, 10)
+i.Text = tostring(Settings.ReloadMultiplier)
+end
+end)
 
 CreateToggle("Wall Check (Global)", Settings.WallCheck, function(s) Settings.WallCheck = s end)
 CreateToggle("Red Chams (ESP)", Settings.ChamsEnabled, function(s) Settings.ChamsEnabled = s end)
@@ -378,4 +396,3 @@ LoaderFrame:Destroy()
 ToggleButton.Visible = true
 MainFrame.Visible = true
 end)
-
