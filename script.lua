@@ -21,6 +21,10 @@ local Settings = {
     TargetPart = "Head"
 }
 
+-- Переменная для удержания цели Flickbot
+local FlickTarget = nil
+local IsTrackingFlick = false
+
 -- FOV Круг для Aimbot
 local AimCircle = Drawing.new("Circle")
 AimCircle.Thickness = 1.5
@@ -118,16 +122,25 @@ local function GetClosestTarget(maxRadius)
     return closestHead
 end
 
--- МОМЕНТАЛЬНЫЙ FLICKBOT ПРИ ВЫСТРЕЛЕ (СИНХРОННЫЙ)
+-- МГНОВЕННЫЙ ФЛИК ПРИ НАЖАТИИ (МЫШЬ + ТАЧСКРИН)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if not Settings.FlickbotEnabled then return end
 
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        local targetHead = GetClosestTarget(Settings.FlickFOVRadius)
-        if targetHead then
-            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetHead.Position)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        IsTrackingFlick = true
+        FlickTarget = GetClosestTarget(Settings.FlickFOVRadius)
+        if FlickTarget then
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, FlickTarget.Position)
         end
+    end
+end)
+
+-- ОТПУСКАНИЕ КНОПКИ / СБРОС ТРЕКИНГА
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        IsTrackingFlick = false
+        FlickTarget = nil
     end
 end)
 
@@ -149,7 +162,15 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    if Settings.AimbotEnabled then
+    -- Логика удержания Flickbot при зажатии
+    if Settings.FlickbotEnabled and IsTrackingFlick and FlickTarget then
+        if FlickTarget.Parent and FlickTarget.Parent:FindFirstChildOfClass("Humanoid") and FlickTarget.Parent:FindFirstChildOfClass("Humanoid").Health > 0 then
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, FlickTarget.Position)
+        else
+            FlickTarget = nil -- Сброс, если цель погибла
+        end
+    -- Логика обычного Constant Aimbot
+    elseif Settings.AimbotEnabled then
         local targetHead = GetClosestTarget(Settings.AimbotFOVRadius)
         if targetHead then
             Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetHead.Position)
@@ -266,56 +287,56 @@ local function CreateToggle(name, defaultState, callback)
     Corner.CornerRadius = UDim.new(0, 6)
     Corner.Parent = Button
 
-    local state = defaultState
-    Button.MouseButton1Click:Connect(function()
-        state = not state
-        Button.BackgroundColor3 = state and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(40, 40, 50)
-        Button.Text = name .. ": " .. (state and "ON" or "OFF")
-        callback(state)
-    end)
+local state = defaultState
+Button.MouseButton1Click:Connect(function()
+state = not state
+Button.BackgroundColor3 = state and Color3.fromRGB(40, 160, 80) or Color3.fromRGB(40, 40, 50)
+Button.Text = name .. ": " .. (state and "ON" or "OFF")
+callback(state)
+end)
 end
 
 local function CreateInput(labelText, defaultValue, callback)
-    local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, -5, 0, 40)
-    Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-    Frame.Parent = ScrollContainer
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(1, -5, 0, 40)
+Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+Frame.Parent = ScrollContainer
 
-    local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(0.65, 0, 1, 0)
-    Label.BackgroundTransparency = 1
-    Label.Text = " " .. labelText
-    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.Font = Enum.Font.SourceSans
-    Label.TextSize = 14
-    Label.Parent = Frame
+local Label = Instance.new("TextLabel")
+Label.Size = UDim2.new(0.65, 0, 1, 0)
+Label.BackgroundTransparency = 1
+Label.Text = " " .. labelText
+Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+Label.TextXAlignment = Enum.TextXAlignment.Left
+Label.Font = Enum.Font.SourceSans
+Label.TextSize = 14
+Label.Parent = Frame
 
-    local Input = Instance.new("TextBox")
-    Input.Size = UDim2.new(0.3, 0, 0.7, 0)
-    Input.Position = UDim2.new(0.67, 0, 0.15, 0)
-    Input.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    Input.Text = tostring(defaultValue)
-    Input.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Input.Font = Enum.Font.SourceSansBold
-    Input.TextSize = 14
-    Input.Parent = Frame
+local Input = Instance.new("TextBox")
+Input.Size = UDim2.new(0.3, 0, 0.7, 0)
+Input.Position = UDim2.new(0.67, 0, 0.15, 0)
+Input.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+Input.Text = tostring(defaultValue)
+Input.TextColor3 = Color3.fromRGB(255, 255, 255)
+Input.Font = Enum.Font.SourceSansBold
+Input.TextSize = 14
+Input.Parent = Frame
 
-    Input.FocusLost:Connect(function() callback(Input) end)
+Input.FocusLost:Connect(function() callback(Input) end)
 end
 
 CreateToggle("Constant Aimbot", Settings.AimbotEnabled, function(s) Settings.AimbotEnabled = s end)
 CreateInput("Aimbot FOV (10-800):", Settings.AimbotFOVRadius, function(i)
-    local v = tonumber(i.Text)
-    if v then Settings.AimbotFOVRadius = math.clamp(v, 10, 800) i.Text = tostring(Settings.AimbotFOVRadius) end
+local v = tonumber(i.Text)
+if v then Settings.AimbotFOVRadius = math.clamp(v, 10, 800) i.Text = tostring(Settings.AimbotFOVRadius) end
 end)
 CreateToggle("Show Aimbot FOV", Settings.ShowAimbotFOV, function(s) Settings.ShowAimbotFOV = s end)
 CreateToggle("Wall Check (Visible Only)", Settings.WallCheck, function(s) Settings.WallCheck = s end)
 
 CreateToggle("AimFlickBot (On Press)", Settings.FlickbotEnabled, function(s) Settings.FlickbotEnabled = s end)
 CreateInput("Flick FOV (10-800):", Settings.FlickFOVRadius, function(i)
-    local v = tonumber(i.Text)
-    if v then Settings.FlickFOVRadius = math.clamp(v, 10, 800) i.Text = tostring(Settings.FlickFOVRadius) end
+local v = tonumber(i.Text)
+if v then Settings.FlickFOVRadius = math.clamp(v, 10, 800) i.Text = tostring(Settings.FlickFOVRadius) end
 end)
 CreateToggle("Show Flick FOV", Settings.ShowFlickFOV, function(s) Settings.ShowFlickFOV = s end)
 
@@ -326,9 +347,9 @@ local tween = TweenService:Create(BarFill, tweenInfo, {Size = UDim2.new(1, 0, 1,
 tween:Play()
 
 tween.Completed:Connect(function()
-    LoaderTitle.Text = "Loaded!"
-    task.wait(0.2)
-    LoaderFrame:Destroy()
-    ToggleButton.Visible = true
-    MainFrame.Visible = true
+LoaderTitle.Text = "Loaded!"
+task.wait(0.2)
+LoaderFrame:Destroy()
+ToggleButton.Visible = true
+MainFrame.Visible = true
 end)
