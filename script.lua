@@ -1,32 +1,46 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Безопасные настройки ApexF
+-- ВСЕ НАСТРОЙКИ ОТКЛЮЧЕНЫ ПО УМОЛЧАНИЮ
 local Settings = {
     AimbotEnabled = false,
-    AimbotFOVRadius = 80,
-    ShowAimbotFOV = true,
-    Smoothness = 0.2, -- Чем меньше число (0.05-0.3), тем плавнее и безопаснее наводка
+    AimbotFOVRadius = 100,
+    ShowAimbotFOV = false,
 
     SilentAimEnabled = false,
-    SilentFOVRadius = 60,
-    ShowSilentFOV = true,
+    SilentFOVRadius = 100,
+    ShowSilentFOV = false,
     AutoShoot = false,
-    ShootDelay = 0.25,
+    ShootDelay = 0.2,
 
-    WallCheck = true, -- Обязательно включено для защиты от стеновых киков
+    WallCheck = false,
     TargetPart = "Head"
 }
 
+-- ================= ОБХОД АНТИЧИТА (ANTI-KICK) =================
+pcall(function()
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local method = getnamecallmethod()
+        if not checkcaller() and (string.lower(method) == "kick") then
+            return nil -- Перехватывает и отменяет попытки игры кикнуть клиент
+        end
+        return oldNamecall(self, ...)
+    end)
+end)
+
+-- FOV Круг для Aimbot (Красный)
 local AimCircle = Drawing.new("Circle")
 AimCircle.Thickness = 1.5
 AimCircle.Color = Color3.fromRGB(255, 50, 50)
 AimCircle.Filled = false
 AimCircle.Transparency = 1
 
+-- FOV Круг для Silent Aim (Голубой)
 local SilentCircle = Drawing.new("Circle")
 SilentCircle.Thickness = 1.5
 SilentCircle.Color = Color3.fromRGB(0, 200, 255)
@@ -84,11 +98,11 @@ local function GetClosestTarget(maxRadius)
     return closestHead
 end
 
--- Безопасный Silent Aim (pcall от вылетов/киков)
+-- Silent Aim Перехват
 pcall(function()
     local oldIndex
     oldIndex = hookmetamethod(game, "__index", function(self, key)
-        if not checkcaller() and Settings.SilentAimEnabled and key == "Hit" then
+        if not checkcaller() and Settings.SilentAimEnabled and (key == "Hit" or key == "Target") then
             local target = GetClosestTarget(Settings.SilentFOVRadius)
             if target then
                 return target.CFrame
@@ -98,6 +112,7 @@ pcall(function()
     end)
 end)
 
+-- Главный Рендер
 local lastShootTime = 0
 RunService.RenderStepped:Connect(function()
     local centerPos = GetScreenCenter()
@@ -110,12 +125,10 @@ RunService.RenderStepped:Connect(function()
     SilentCircle.Radius = Settings.SilentFOVRadius
     SilentCircle.Visible = Settings.ShowSilentFOV and Settings.SilentAimEnabled
 
-    -- Плавный Aimbot без телепортации камеры
     if Settings.AimbotEnabled then
         local targetHead = GetClosestTarget(Settings.AimbotFOVRadius)
         if targetHead then
-            local targetCFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
-            Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, Settings.Smoothness)
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
         end
     end
 
@@ -128,13 +141,46 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- GUI
+-- ================= GUI И ЛОЙДЕР =================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ApexF_GUI"
+ScreenGui.Name = "ApexF_MainGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
+-- Окно Лойдера
+local LoaderFrame = Instance.new("Frame")
+LoaderFrame.Size = UDim2.new(0, 260, 0, 100)
+LoaderFrame.Position = UDim2.new(0.5, -130, 0.4, 0)
+LoaderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+LoaderFrame.Parent = ScreenGui
+
+local LoaderCorner = Instance.new("UICorner")
+LoaderCorner.CornerRadius = UDim.new(0, 8)
+LoaderCorner.Parent = LoaderFrame
+
+local LoaderTitle = Instance.new("TextLabel")
+LoaderTitle.Size = UDim2.new(1, 0, 0, 40)
+LoaderTitle.BackgroundTransparency = 1
+LoaderTitle.Text = "ApexF | Bypassing Anticheat..."
+LoaderTitle.TextColor3 = Color3.fromRGB(0, 200, 255)
+LoaderTitle.Font = Enum.Font.SourceSansBold
+LoaderTitle.TextSize = 16
+LoaderTitle.Parent = LoaderFrame
+
+local BarBackground = Instance.new("Frame")
+BarBackground.Size = UDim2.new(0.85, 0, 0, 10)
+BarBackground.Position = UDim2.new(0.075, 0, 0.6, 0)
+BarBackground.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+BarBackground.Parent = LoaderFrame
+
+local BarFill = Instance.new("Frame")
+BarFill.Size = UDim2.new(0, 0, 1, 0)
+BarFill.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+BarFill.Parent = BarBackground
+
+-- Кнопка Открытия
 local ToggleButton = Instance.new("TextButton")
+ToggleButton.Name = "OpenMenuButton"
 ToggleButton.Size = UDim2.new(0, 50, 0, 50)
 ToggleButton.Position = UDim2.new(0.02, 0, 0.2, 0)
 ToggleButton.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
@@ -142,22 +188,34 @@ ToggleButton.TextColor3 = Color3.fromRGB(0, 200, 255)
 ToggleButton.Text = "ApexF"
 ToggleButton.Font = Enum.Font.SourceSansBold
 ToggleButton.TextSize = 14
+ToggleButton.Visible = false
 ToggleButton.Active = true
 ToggleButton.Draggable = true
 ToggleButton.Parent = ScreenGui
 
+local OpenUICorner = Instance.new("UICorner")
+OpenUICorner.CornerRadius = UDim.new(0, 8)
+OpenUICorner.Parent = ToggleButton
+
+-- Главное Меню
 local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 320, 0, 380)
 MainFrame.Position = UDim2.new(0.35, 0, 0.2, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.Visible = false
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
+local MainUICorner = Instance.new("UICorner")
+MainUICorner.CornerRadius = UDim.new(0, 10)
+MainUICorner.Parent = MainFrame
+
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-Title.Text = "ApexF — Safe Combat"
+Title.Text = "ApexF — Combat"
 Title.TextColor3 = Color3.fromRGB(0, 200, 255)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 18
@@ -171,10 +229,11 @@ local ScrollContainer = Instance.new("ScrollingFrame")
 ScrollContainer.Size = UDim2.new(1, -20, 1, -50)
 ScrollContainer.Position = UDim2.new(0, 10, 0, 45)
 ScrollContainer.BackgroundTransparency = 1
-ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 550)
+ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 520)
 ScrollContainer.Parent = MainFrame
 
 local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 UIListLayout.Padding = UDim.new(0, 8)
 UIListLayout.Parent = ScrollContainer
 
@@ -187,6 +246,10 @@ local function CreateToggle(name, defaultState, callback)
     Button.Font = Enum.Font.SourceSans
     Button.TextSize = 15
     Button.Parent = ScrollContainer
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = Button
 
     local state = defaultState
     Button.MouseButton1Click:Connect(function()
@@ -202,6 +265,10 @@ local function CreateInput(labelText, defaultValue, callback)
     Frame.Size = UDim2.new(1, -5, 0, 40)
     Frame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
     Frame.Parent = ScrollContainer
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = Frame
 
     local Label = Instance.new("TextLabel")
     Label.Size = UDim2.new(0.65, 0, 1, 0)
@@ -226,25 +293,38 @@ local function CreateInput(labelText, defaultValue, callback)
     Input.FocusLost:Connect(function() callback(Input) end)
 end
 
-CreateToggle("Aimbot", Settings.AimbotEnabled, function(s) Settings.AimbotEnabled = s end)
-CreateInput("Smoothness (0.05-0.5):", Settings.Smoothness, function(i) 
-    local v = tonumber(i.Text)
-    if v then Settings.Smoothness = math.clamp(v, 0.05, 0.5) i.Text = tostring(Settings.Smoothness) end
-end)
-CreateInput("Aimbot FOV:", Settings.AimbotFOVRadius, function(i) 
+-- Переключатели в меню
+CreateToggle("Aimbot (Instant Head)", Settings.AimbotEnabled, function(s) Settings.AimbotEnabled = s end)
+CreateInput("Aimbot FOV (10-300):", Settings.AimbotFOVRadius, function(i)
     local v = tonumber(i.Text)
     if v then Settings.AimbotFOVRadius = math.clamp(v, 10, 300) i.Text = tostring(Settings.AimbotFOVRadius) end
 end)
-CreateToggle("Show Aim FOV", Settings.ShowAimbotFOV, function(s) Settings.ShowAimbotFOV = s end)
+CreateToggle("Show Aimbot FOV", Settings.ShowAimbotFOV, function(s) Settings.ShowAimbotFOV = s end)
 
-CreateToggle("Silent Aim (Выключи если кикает)", Settings.SilentAimEnabled, function(s) Settings.SilentAimEnabled = s end)
-CreateInput("Silent FOV:", Settings.SilentFOVRadius, function(i) 
+CreateToggle("Silent Aim", Settings.SilentAimEnabled, function(s) Settings.SilentAimEnabled = s end)
+CreateInput("Silent FOV (10-300):", Settings.SilentFOVRadius, function(i)
     local v = tonumber(i.Text)
     if v then Settings.SilentFOVRadius = math.clamp(v, 10, 300) i.Text = tostring(Settings.SilentFOVRadius) end
 end)
+CreateToggle("Show Silent FOV", Settings.ShowSilentFOV, function(s) Settings.ShowSilentFOV = s end)
+
 CreateToggle("Silent Auto Shoot", Settings.AutoShoot, function(s) Settings.AutoShoot = s end)
-CreateInput("Shoot Delay (sec):", Settings.ShootDelay, function(i) 
+CreateInput("Silent Delay (0.1-1.0):", Settings.ShootDelay, function(i)
     local v = tonumber(i.Text)
     if v then Settings.ShootDelay = math.clamp(v, 0.1, 1.0) i.Text = tostring(Settings.ShootDelay) end
 end)
-CreateToggle("Wall Check (Обязательно)", Settings.WallCheck, function(s) Settings.WallCheck = s end)
+
+CreateToggle("Wall Check", Settings.WallCheck, function(s) Settings.WallCheck = s end)
+
+-- Анимация Лойдера и запуск
+local tweenInfo = TweenInfo.new(1.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local tween = TweenService:Create(BarFill, tweenInfo, {Size = UDim2.new(1, 0, 1, 0)})
+tween:Play()
+
+tween.Completed:Connect(function()
+    LoaderTitle.Text = "Bypass Loaded!"
+    task.wait(0.4)
+    LoaderFrame:Destroy()
+    ToggleButton.Visible = true
+    MainFrame.Visible = true
+end)
