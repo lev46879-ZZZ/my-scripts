@@ -1,3 +1,5 @@
+task.wait(4)
+
 local Fluent = loadstring(game:HttpGet("https://github.com"))()
 local SaveManager = loadstring(game:HttpGet("https://githubusercontent.com"))()
 local InterfaceManager = loadstring(game:HttpGet("https://githubusercontent.com"))()
@@ -389,7 +391,7 @@ end)
 
 Fluent:Notify({
 Title = "Система",
-Content = "Мобильное меню загружено. Кнопку 'D' можно перетаскивать пальцем.",
+Content = "Скрипт успешно загружен после 4-секундного ожидания.",
 Duration = 5
 })
 
