@@ -2,36 +2,44 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- НАСТРОЙКИ (ОТКЛЮЧЕНЫ ПО УМОЛЧАНИЮ)
+-- НАСТРОЙКИ
 local Settings = {
     AimbotEnabled = false,
     AimbotFOVRadius = 100,
     ShowAimbotFOV = false,
 
-    TriggerbotEnabled = false,
-    TriggerbotDelay = 0.1,
+    FlickbotEnabled = false,
+    FlickFOVRadius = 120,
+    ShowFlickFOV = false,
+    FlickDelay = 0.1, -- Задержка между фликами (0.1 - 1.0 сек)
 
     WallCheck = false,
     TargetPart = "Head"
 }
 
--- FOV Круг
+-- FOV Круг для Aimbot (Красный)
 local AimCircle = Drawing.new("Circle")
 AimCircle.Thickness = 1.5
 AimCircle.Color = Color3.fromRGB(255, 50, 50)
 AimCircle.Filled = false
 AimCircle.Transparency = 1
 
+-- FOV Круг для Flickbot (Фиолетовый)
+local FlickCircle = Drawing.new("Circle")
+FlickCircle.Thickness = 1.5
+FlickCircle.Color = Color3.fromRGB(180, 50, 255)
+FlickCircle.Filled = false
+FlickCircle.Transparency = 1
+
 local function GetScreenCenter()
     return Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 end
 
--- Проверка живого персонажа
+-- Проверка живого игрока
 local function IsAlive(player)
     if not player or player == LocalPlayer or not player.Character then return false end
     local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
@@ -40,7 +48,7 @@ local function IsAlive(player)
     return true
 end
 
--- Проверка видимости для Aimbot
+-- Проверка видимости (WallCheck)
 local function IsVisible(targetHead)
     if not Settings.WallCheck then return true end
     
@@ -62,7 +70,7 @@ local function IsVisible(targetHead)
     return false
 end
 
--- Поиск цели для Aimbot
+-- Поиск ближайшей цели в пределах FOV
 local function GetClosestTarget(maxRadius)
     local closestHead = nil
     local shortestDistance = maxRadius
@@ -87,68 +95,46 @@ local function GetClosestTarget(maxRadius)
     return closestHead
 end
 
--- Безопасная проверка прицела для Triggerbot
-local function CheckTriggerbot()
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-    local ignoreList = {Camera}
-    if LocalPlayer.Character then
-        table.insert(ignoreList, LocalPlayer.Character)
-    end
-    raycastParams.FilterDescendantsInstances = ignoreList
+-- Логика AimFlickBot (срабатывает при выстреле/клике)
+local isFlicking = false
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if not Settings.FlickbotEnabled or isFlicking then return end
 
-    local centerRay = Camera:ViewportPointToRay(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    local result = workspace:Raycast(centerRay.Origin, centerRay.Direction * 1000, raycastParams)
-
-    if result and result.Instance then
-        local hitModel = result.Instance:FindFirstAncestorOfClass("Model")
-        if hitModel then
-            local player = Players:GetPlayerFromCharacter(hitModel)
-            if IsAlive(player) then
-                return true
-            end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        local targetHead = GetClosestTarget(Settings.FlickFOVRadius)
+        if targetHead then
+            isFlicking = true
+            task.spawn(function()
+                -- Мгновенный флик на голову
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
+                
+                -- Выдержка задержки кулдауна
+                task.wait(math.clamp(Settings.FlickDelay, 0.1, 1.0))
+                isFlicking = false
+            end)
         end
     end
-    return false
-end
+end)
 
--- Безопасный выстрел через VirtualInputManager (без зависания управления)
-local isShooting = false
-local function SafeClick()
-    if isShooting then return end
-    isShooting = true
-    
-    task.spawn(function()
-        pcall(function()
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-            task.wait(0.01)
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-        end)
-        task.wait(math.max(Settings.TriggerbotDelay, 0.05))
-        isShooting = false
-    end)
-end
-
--- Главный цикл
+-- Главный цикл отрисовки и постоянного аимбота
 RunService.RenderStepped:Connect(function()
     local centerPos = GetScreenCenter()
     
+    -- Отрисовка FOV
     AimCircle.Position = centerPos
     AimCircle.Radius = Settings.AimbotFOVRadius
     AimCircle.Visible = Settings.ShowAimbotFOV and Settings.AimbotEnabled
 
-    -- Aimbot
+    FlickCircle.Position = centerPos
+    FlickCircle.Radius = Settings.FlickFOVRadius
+    FlickCircle.Visible = Settings.ShowFlickFOV and Settings.FlickbotEnabled
+
+    -- Обычный постоянный Aimbot
     if Settings.AimbotEnabled then
         local targetHead = GetClosestTarget(Settings.AimbotFOVRadius)
         if targetHead then
             Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
-        end
-    end
-
-    -- Triggerbot
-    if Settings.TriggerbotEnabled then
-        if CheckTriggerbot() then
-            SafeClick()
         end
     end
 end)
@@ -209,7 +195,7 @@ OpenUICorner.Parent = ToggleButton
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 280)
+MainFrame.Size = UDim2.new(0, 320, 0, 340)
 MainFrame.Position = UDim2.new(0.35, 0, 0.2, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.Visible = false
@@ -224,7 +210,7 @@ MainUICorner.Parent = MainFrame
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-Title.Text = "ApexF — Combat"
+Title.Text = "ApexF — Combat (AimFlick)"
 Title.TextColor3 = Color3.fromRGB(0, 200, 255)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 18
@@ -238,7 +224,7 @@ local ScrollContainer = Instance.new("ScrollingFrame")
 ScrollContainer.Size = UDim2.new(1, -20, 1, -50)
 ScrollContainer.Position = UDim2.new(0, 10, 0, 45)
 ScrollContainer.BackgroundTransparency = 1
-ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 310)
+ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 440)
 ScrollContainer.Parent = MainFrame
 
 local UIListLayout = Instance.new("UIListLayout")
@@ -299,22 +285,27 @@ local function CreateInput(labelText, defaultValue, callback)
 end
 
 -- Элементы управления
-CreateToggle("Aimbot (Instant Head)", Settings.AimbotEnabled, function(s) Settings.AimbotEnabled = s end)
+CreateToggle("Constant Aimbot", Settings.AimbotEnabled, function(s) Settings.AimbotEnabled = s end)
 CreateInput("Aimbot FOV (10-300):", Settings.AimbotFOVRadius, function(i)
     local v = tonumber(i.Text)
     if v then Settings.AimbotFOVRadius = math.clamp(v, 10, 300) i.Text = tostring(Settings.AimbotFOVRadius) end
 end)
 CreateToggle("Show Aimbot FOV", Settings.ShowAimbotFOV, function(s) Settings.ShowAimbotFOV = s end)
 
-CreateToggle("Triggerbot", Settings.TriggerbotEnabled, function(s) Settings.TriggerbotEnabled = s end)
-CreateInput("Trigger Delay (sec):", Settings.TriggerbotDelay, function(i)
+CreateToggle("AimFlickBot (On Click)", Settings.FlickbotEnabled, function(s) Settings.FlickbotEnabled = s end)
+CreateInput("Flick FOV (10-300):", Settings.FlickFOVRadius, function(i)
     local v = tonumber(i.Text)
-    if v then Settings.TriggerbotDelay = math.clamp(v, 0.05, 1.0) i.Text = tostring(Settings.TriggerbotDelay) end
+    if v then Settings.FlickFOVRadius = math.clamp(v, 10, 300) i.Text = tostring(Settings.FlickFOVRadius) end
+end)
+CreateToggle("Show Flick FOV", Settings.ShowFlickFOV, function(s) Settings.ShowFlickFOV = s end)
+CreateInput("Flick Delay (0.1-1.0s):", Settings.FlickDelay, function(i)
+    local v = tonumber(i.Text)
+    if v then Settings.FlickDelay = math.clamp(v, 0.1, 1.0) i.Text = tostring(Settings.FlickDelay) end
 end)
 
 CreateToggle("Wall Check", Settings.WallCheck, function(s) Settings.WallCheck = s end)
 
--- Анимация Лойдера
+-- Анимация Загрузки
 local tweenInfo = TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local tween = TweenService:Create(BarFill, tweenInfo, {Size = UDim2.new(1, 0, 1, 0)})
 tween:Play()
