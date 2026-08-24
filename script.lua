@@ -10,11 +10,16 @@ local Settings = {
     AimbotEnabled = false,
     AimbotFOVRadius = 100,
     ShowAimbotFOV = false,
+    
     FlickbotEnabled = false,
     FlickFOVRadius = 120,
     ShowFlickFOV = false,
-    RagebotEnabled = false,
-    ReloadMultiplier = 1, -- 1 = дефолт, 0 = моментально
+    
+    SilentAimEnabled = false,
+    SilentFOVRadius = 150,
+    ShowSilentFOV = false,
+    
+    ReloadMultiplier = 1, 
     WallCheck = true,
     ChamsEnabled = false,
     TargetPart = "Head"
@@ -31,6 +36,12 @@ FlickCircle.Thickness = 1.5
 FlickCircle.Color = Color3.fromRGB(180, 50, 255)
 FlickCircle.Filled = false
 FlickCircle.Transparency = 1
+
+local SilentCircle = Drawing.new("Circle")
+SilentCircle.Thickness = 1.5
+SilentCircle.Color = Color3.fromRGB(0, 255, 200)
+SilentCircle.Filled = false
+SilentCircle.Transparency = 1
 
 local function GetScreenCenter()
     return Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -102,63 +113,61 @@ local function GetClosestTargetInFOV(maxRadius)
     return closestHead
 end
 
-local function GetAnyVisibleTarget()
-    local closestHead = nil
-    local shortestDistance = math.huge
-    local myPosition = Camera.CFrame.Position
-
-    for _, p in ipairs(Players:GetPlayers()) do
-        if IsAlive(p) and p.Character:FindFirstChild(Settings.TargetPart) then
-            local head = p.Character[Settings.TargetPart]
-            local dist = (head.Position - myPosition).Magnitude
-            
-            if dist < shortestDistance and IsVisible(head) then
-                closestHead = head
-                shortestDistance = dist
-            end
+local oldWait
+oldWait = hookfunction(task.wait, function(delayTime)
+    if Settings.ReloadMultiplier < 1 and delayTime and delayTime > 0.1 then
+        local char = LocalPlayer.Character
+        local tool = char and char:FindFirstChildOfClass("Tool")
+        if tool then
+            return oldWait(delayTime * Settings.ReloadMultiplier)
         end
     end
-    return closestHead
-end
+    return oldWait(delayTime)
+end)
 
--- Обход блокировки ходьбы через прямую симуляцию InputBegan
-local isShooting = false
-local function SafeMobileShoot()
-    if isShooting then return end
-    isShooting = true
-    task.spawn(function()
-        local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-        if tool then
-            -- Симулируем нажатие для оружия без блокировки тачскрина игрока
-            local input = Instance.new("InputObject")
-            input.UserInputType = Enum.UserInputType.MouseButton1
-            input.UserInputState = Enum.UserInputState.Begin
-            tool:Activate()
-        end
-        task.wait(0.05) -- Небольшая задержка между выстрелами
-        isShooting = false
-    end)
-end
-
-local function AdjustReloadSpeed()
+local function HardFixReload()
     local char = LocalPlayer.Character
     if not char then return end
+    local tool = char:FindFirstChildOfClass("Tool")
+    
     local hum = char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        local animator = hum:FindFirstChildOfClass("Animator")
-        if animator then
-            for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-                local name = string.lower(track.Animation.Name or "")
-                if string.find(name, "reload") then
-                    -- Новая формула: 1 / 0.01 дает х100 скорость (моментально)
-                    local safeValue = math.clamp(Settings.ReloadMultiplier, 0.01, 1)
-                    local targetSpeed = 1 / safeValue
-                    track:AdjustSpeed(targetSpeed)
-                end
+    local animator = hum and hum:FindFirstChildOfClass("Animator")
+    if animator then
+        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+            local name = string.lower(track.Animation.Name or "")
+            if string.find(name, "reload") then
+                track:AdjustSpeed(1 / math.max(Settings.ReloadMultiplier, 0.01))
             end
         end
     end
+
+    if tool and Settings.ReloadMultiplier < 0.2 then
+        local ammo = tool:FindFirstChild("Ammo") or tool:FindFirstChild("Clip")
+        if ammo and ammo:IsA("ValueBase") and ammo.Value < 1 then
+            ammo.Value = 5
+        end
+    end
 end
+
+-- Хук выстрела использует свой независимый радиус SilentFOVRadius
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if Settings.SilentAimEnabled and (method == "FireServer" or method == "InvokeServer") then
+        local targetHead = GetClosestTargetInFOV(Settings.SilentFOVRadius)
+        if targetHead then
+            for i, arg in ipairs(args) do
+                if typeof(arg) == "Vector3" then
+                    args[i] = targetHead.Position
+                end
+            end
+            return oldNamecall(self, unpack(args))
+        end
+    end
+    return oldNamecall(self, ...)
+end)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed or not Settings.FlickbotEnabled then return end
@@ -185,24 +194,19 @@ RunService.RenderStepped:Connect(function()
     FlickCircle.Radius = Settings.FlickFOVRadius
     FlickCircle.Visible = Settings.ShowFlickFOV and Settings.FlickbotEnabled
 
+    SilentCircle.Position = centerPos
+    SilentCircle.Radius = Settings.SilentFOVRadius
+    SilentCircle.Visible = Settings.ShowSilentFOV and Settings.SilentAimEnabled
+
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer then ApplyChams(p) end
     end
 
     if Settings.ReloadMultiplier < 1 then
-        AdjustReloadSpeed()
+        HardFixReload()
     end
 
-    if Settings.RagebotEnabled then
-        local rageTarget = GetAnyVisibleTarget()
-        if rageTarget then
-            local originalCFrame = Camera.CFrame
-            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, rageTarget.Position)
-            SafeMobileShoot()
-            RunService.Heartbeat:Wait()
-            Camera.CFrame = originalCFrame
-        end
-    elseif Settings.AimbotEnabled then
+    if Settings.AimbotEnabled then
         local targetHead = GetClosestTargetInFOV(Settings.AimbotFOVRadius)
         if targetHead then
             Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetHead.Position)
@@ -269,7 +273,7 @@ OpenUICorner.Parent = ToggleButton
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 390)
+MainFrame.Size = UDim2.new(0, 320, 0, 450)
 MainFrame.Position = UDim2.new(0.35, 0, 0.2, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.Visible = false
@@ -284,21 +288,21 @@ MainUICorner.Parent = MainFrame
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-Title.Text = "ApexF — Flick FPS Fix"
+Title.Text = "ApexF — Splitted FOV"
 Title.TextColor3 = Color3.fromRGB(0, 200, 255)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 18
 Title.Parent = MainFrame
 
 ToggleButton.MouseButton1Click:Connect(function()
-MainFrame.Visible = not MainFrame.Visible
+    MainFrame.Visible = not MainFrame.Visible
 end)
 
 local ScrollContainer = Instance.new("ScrollingFrame")
 ScrollContainer.Size = UDim2.new(1, -20, 1, -50)
 ScrollContainer.Position = UDim2.new(0, 10, 0, 45)
 ScrollContainer.BackgroundTransparency = 1
-ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 510)
+ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 620)
 ScrollContainer.Parent = MainFrame
 
 local UIListLayout = Instance.new("UIListLayout")
@@ -361,32 +365,29 @@ Input.FocusLost:Connect(function() callback(Input) end)
 end
 
 CreateToggle("Constant Aimbot", Settings.AimbotEnabled, function(s) Settings.AimbotEnabled = s end)
-CreateInput("Aimbot FOV (10-800):", Settings.AimbotFOVRadius, function(i)
+CreateInput("Aimbot FOV:", Settings.AimbotFOVRadius, function(i)
 local v = tonumber(i.Text)
-if v then
-Settings.AimbotFOVRadius = math.clamp(v, 10, 800)
-i.Text = tostring(Settings.AimbotFOVRadius)
-end
+if v then Settings.AimbotFOVRadius = math.clamp(v, 10, 800) i.Text = tostring(Settings.AimbotFOVRadius) end
 end)
 CreateToggle("Show Aimbot FOV", Settings.ShowAimbotFOV, function(s) Settings.ShowAimbotFOV = s end)
 
-CreateToggle("AimFlickBot (Touch/Click)", Settings.FlickbotEnabled, function(s) Settings.FlickbotEnabled = s end)
-CreateInput("Flick FOV (10-800):", Settings.FlickFOVRadius, function(i)
+CreateToggle("AimFlickBot (On Touch)", Settings.FlickbotEnabled, function(s) Settings.FlickbotEnabled = s end)
+CreateInput("Flick FOV:", Settings.FlickFOVRadius, function(i)
 local v = tonumber(i.Text)
-if v then
-Settings.FlickFOVRadius = math.clamp(v, 10, 800)
-i.Text = tostring(Settings.FlickFOVRadius)
-end
+if v then Settings.FlickFOVRadius = math.clamp(v, 10, 800) i.Text = tostring(Settings.FlickFOVRadius) end
 end)
 CreateToggle("Show Flick FOV", Settings.ShowFlickFOV, function(s) Settings.ShowFlickFOV = s end)
 
-CreateToggle("Ragebot (Auto Shoot V3)", Settings.RagebotEnabled, function(s) Settings.RagebotEnabled = s end)
-CreateInput("Reload Speed (0.01 - 1):", Settings.ReloadMultiplier, function(i)
+CreateToggle("Silent Aim (No Flick)", Settings.SilentAimEnabled, function(s) Settings.SilentAimEnabled = s end)
+CreateInput("Silent FOV:", Settings.SilentFOVRadius, function(i)
 local v = tonumber(i.Text)
-if v then
-Settings.ReloadMultiplier = math.clamp(v, 0.01, 1)
-i.Text = tostring(Settings.ReloadMultiplier)
-end
+if v then Settings.SilentFOVRadius = math.clamp(v, 10, 800) i.Text = tostring(Settings.SilentFOVRadius) end
+end)
+CreateToggle("Show Silent FOV", Settings.ShowSilentFOV, function(s) Settings.ShowSilentFOV = s end)
+
+CreateInput("Reload Delay (0.01 - 1):", Settings.ReloadMultiplier, function(i)
+local v = tonumber(i.Text)
+if v then Settings.ReloadMultiplier = math.clamp(v, 0.01, 1) i.Text = tostring(Settings.ReloadMultiplier) end
 end)
 
 CreateToggle("Wall Check (Global)", Settings.WallCheck, function(s) Settings.WallCheck = s end)
