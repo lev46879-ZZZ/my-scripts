@@ -17,9 +17,8 @@ local Settings = {
     ShowFlickFOV = false,
     PingMS = 50,
 
-    StandaloneWallbang = true, -- Wallshot (Сохранен без изменений)
+    MapWallbang = true, -- Прострел сквозь стены
     ChamsEnabled = false,
-    WallCheck = false,
     TargetPart = "Head"
 }
 
@@ -49,6 +48,69 @@ local function IsAlive(player)
     return true
 end
 
+-- ОПРЕДЕЛЕНИЕ ПОЛА И ЗЕМЛИ
+local function IsFloor(part)
+    if not part:IsA("BasePart") or part:IsA("Terrain") then return true end
+    
+    local name = part.Name:lower()
+    if name:find("floor") or name:find("ground") or name:find("baseplate") or name:find("spawn") or name:find("land") or name:find("bottom") then
+        return true
+    end
+
+    local size = part.Size
+    local isHorizontal = math.abs(part.CFrame.UpVector.Y) > 0.75
+    if isHorizontal and (size.X > 10 or size.Z > 10) and size.Y <= 3 then
+        return true
+    end
+
+    return false
+end
+
+-- СИСТЕМА ПРОСТРЕЛА (CanCollide = true, CanQuery = false)
+local originalProperties = {}
+
+local function ProcessPart(part)
+    if part:IsA("BasePart") and not part:IsDescendantOf(workspace.CurrentCamera) then
+        -- Не трогаем персонажей игроков
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player.Character and part:IsDescendantOf(player.Character) then
+                return
+            end
+        end
+
+        if not IsFloor(part) then
+            if not originalProperties[part] then
+                originalProperties[part] = {
+                    CanCollide = part.CanCollide,
+                    CanQuery = part.CanQuery
+                }
+            end
+
+            if Settings.MapWallbang then
+                part.CanCollide = true  -- Игроки НЕ ходят сквозь стены
+                part.CanQuery = false   -- Пули и рейкасты пролетают сквозь стены
+            else
+                part.CanCollide = originalProperties[part].CanCollide
+                part.CanQuery = originalProperties[part].CanQuery
+            end
+        end
+    end
+end
+
+local function ApplyMapWallbang()
+    for _, part in ipairs(workspace:GetDescendants()) do
+        ProcessPart(part)
+    end
+end
+
+workspace.DescendantAdded:Connect(function(part)
+    if Settings.MapWallbang then
+        task.wait(0.1)
+        ProcessPart(part)
+    end
+end)
+
+-- Red Chams
 local function ApplyChams(player)
     if not IsAlive(player) then return end
     local char = player.Character
@@ -72,26 +134,7 @@ local function ApplyChams(player)
     end
 end
 
-local function IsVisible(targetHead)
-    if not Settings.WallCheck then return true end
-    local origin = Camera.CFrame.Position
-    local direction = (targetHead.Position - origin)
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-    
-    local ignoreList = {Camera}
-    if LocalPlayer.Character then
-        table.insert(ignoreList, LocalPlayer.Character)
-    end
-    raycastParams.FilterDescendantsInstances = ignoreList
-
-    local result = workspace:Raycast(origin, direction, raycastParams)
-    if result then
-        return result.Instance:IsDescendantOf(targetHead.Parent)
-    end
-    return false
-end
-
+-- Поиск цели в FOV
 local function GetClosestTarget(maxRadius)
     local closestHead = nil
     local shortestDistance = maxRadius
@@ -105,47 +148,13 @@ local function GetClosestTarget(maxRadius)
             if onScreen then
                 local dist = (Vector2.new(screenPos.X, screenPos.Y) - centerPos).Magnitude
                 if dist <= shortestDistance then
-                    if IsVisible(head) then
-                        closestHead = head
-                        shortestDistance = dist
-                    end
+                    closestHead = head
+                    shortestDistance = dist
                 end
             end
         end
     end
     return closestHead
-end
-
--- ================= БЕСШУМНЫЙ ХУК RAYCAST (БЕЗ ЗАТРОНУТЫХ KICK-ФУНКЦИЙ) =================
-local oldNamecall
-local c_checkcaller = (clonefunction and clonefunction(checkcaller)) or checkcaller
-local c_getnamecallmethod = (clonefunction and clonefunction(getnamecallmethod)) or getnamecallmethod
-
-if hookmetamethod then
-    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        local method = c_getnamecallmethod()
-
-        -- Точная оригинальная логика Wallshot
-        if Settings.StandaloneWallbang and not c_checkcaller() and (method == "Raycast" or method == "raycast") then
-            local args = {...}
-            local params = args[3] or RaycastParams.new()
-
-            local targetCharacters = {}
-            for _, player in ipairs(Players:GetPlayers()) do
-                if IsAlive(player) then
-                    table.insert(targetCharacters, player.Character)
-                end
-            end
-
-            params.FilterType = Enum.RaycastFilterType.Include
-            params.FilterDescendantsInstances = targetCharacters
-            
-            args[3] = params
-            return oldNamecall(self, unpack(args))
-        end
-
-        return oldNamecall(self, ...)
-    end)
 end
 
 -- FlickBot
@@ -196,11 +205,13 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+ApplyMapWallbang()
+
 -- GUI
 local ParentContainer = (gethui and gethui()) or game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ApexF_ProtectedContainer"
+ScreenGui.Name = "ApexF_RaycastOnlyGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = ParentContainer
 
@@ -361,9 +372,11 @@ CreateInput("Flick Ping Delay (1-300ms):", Settings.PingMS, function(i)
     if v then Settings.PingMS = math.clamp(v, 1, 300) i.Text = tostring(Settings.PingMS) end
 end)
 
-CreateToggle("Wallshot (Shoot Through Walls)", Settings.StandaloneWallbang, function(s) Settings.StandaloneWallbang = s end)
+CreateToggle("Wallbang (Solid Walls)", Settings.MapWallbang, function(s) 
+    Settings.MapWallbang = s 
+    ApplyMapWallbang()
+end)
 CreateToggle("Red Chams (ESP)", Settings.ChamsEnabled, function(s) Settings.ChamsEnabled = s end)
-CreateToggle("Wall Check", Settings.WallCheck, function(s) Settings.WallCheck = s end)
 
 local tweenInfo = TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local tween = TweenService:Create(BarFill, tweenInfo, {Size = UDim2.new(1, 0, 1, 0)})
