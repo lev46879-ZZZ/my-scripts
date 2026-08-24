@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local VIM = game:GetService("VirtualInputManager")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -14,7 +15,7 @@ local Settings = {
     FlickFOVRadius = 120,
     ShowFlickFOV = false,
     RagebotEnabled = false,
-    ReloadMultiplier = 1, -- Множитель скорости перезарядки
+    ReloadMultiplier = 1, -- Чем меньше, тем быстрее (0.1 - 1)
     WallCheck = true,
     ChamsEnabled = false,
     TargetPart = "Head"
@@ -72,11 +73,6 @@ local function ApplyChams(p)
         if not highlight then
             highlight = Instance.new("Highlight")
             highlight.Name = "Apex_RedChams"
-            highlight.FillColor = Color3.fromRGB(255, 0, 0)
-            highlight.FillTransparency = 0.5
-            highlight.OutlineColor = Color3.fromRGB(255, 50, 50)
-            highlight.OutlineTransparency = 0
-            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
             highlight.Parent = char
         end
     else
@@ -126,17 +122,20 @@ local function GetAnyVisibleTarget()
     return closestHead
 end
 
--- Стрельба без блокировки тачскрина
-local function ForceToolShoot()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool then
-        tool:Activate()
-    end
+local isShooting = false
+local function SafeMobileShoot()
+    if isShooting then return end
+    isShooting = true
+    task.spawn(function()
+        local center = GetScreenCenter()
+        VIM:SendMouseButtonEvent(center.X, center.Y, 0, true, game, 1)
+        task.wait(0.01)
+        VIM:SendMouseButtonEvent(center.X, center.Y, 0, false, game, 1)
+        task.wait(0.1)
+        isShooting = false
+    end)
 end
 
--- Логика ускорения анимации перезарядки
 local function AdjustReloadSpeed()
     local char = LocalPlayer.Character
     if not char then return end
@@ -146,8 +145,10 @@ local function AdjustReloadSpeed()
         if animator then
             for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
                 local name = string.lower(track.Animation.Name or "")
-                if string.find(name, "reload") or string.find(name, "reload") then
-                    track:AdjustSpeed(Settings.ReloadMultiplier)
+                if string.find(name, "reload") then
+                    -- Перевернутая логика скорости: 1 / 0.1 дает х10 скорость
+                    local targetSpeed = 1 / math.max(Settings.ReloadMultiplier, 0.05)
+                    track:AdjustSpeed(targetSpeed)
                 end
             end
         end
@@ -183,7 +184,7 @@ RunService.RenderStepped:Connect(function()
         if p ~= LocalPlayer then ApplyChams(p) end
     end
 
-    if Settings.ReloadMultiplier > 1 then
+    if Settings.ReloadMultiplier < 1 then
         AdjustReloadSpeed()
     end
 
@@ -192,8 +193,8 @@ RunService.RenderStepped:Connect(function()
         if rageTarget then
             local originalCFrame = Camera.CFrame
             Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, rageTarget.Position)
-            ForceToolShoot()
-            task.wait()
+            SafeMobileShoot()
+            RunService.Heartbeat:Wait()
             Camera.CFrame = originalCFrame
         end
     elseif Settings.AimbotEnabled then
@@ -278,7 +279,7 @@ MainUICorner.Parent = MainFrame
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-Title.Text = "ApexF — Touch Fix Update"
+Title.Text = "ApexF — Flick FPS Fix"
 Title.TextColor3 = Color3.fromRGB(0, 200, 255)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 18
@@ -294,6 +295,7 @@ ScrollContainer.Position = UDim2.new(0, 10, 0, 45)
 ScrollContainer.BackgroundTransparency = 1
 ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 510)
 ScrollContainer.Parent = MainFrame
+
 local UIListLayout = Instance.new("UIListLayout")
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 UIListLayout.Padding = UDim.new(0, 8)
@@ -373,11 +375,11 @@ end
 end)
 CreateToggle("Show Flick FOV", Settings.ShowFlickFOV, function(s) Settings.ShowFlickFOV = s end)
 
-CreateToggle("Ragebot (No Mouse Block)", Settings.RagebotEnabled, function(s) Settings.RagebotEnabled = s end)
-CreateInput("Reload Speed Mult (1-10):", Settings.ReloadMultiplier, function(i)
+CreateToggle("Ragebot (Auto Shoot V2)", Settings.RagebotEnabled, function(s) Settings.RagebotEnabled = s end)
+CreateInput("Reload Speed (0.1 - 1):", Settings.ReloadMultiplier, function(i)
 local v = tonumber(i.Text)
 if v then
-Settings.ReloadMultiplier = math.clamp(v, 1, 10)
+Settings.ReloadMultiplier = math.clamp(v, 0.1, 1)
 i.Text = tostring(Settings.ReloadMultiplier)
 end
 end)
@@ -396,3 +398,4 @@ LoaderFrame:Destroy()
 ToggleButton.Visible = true
 MainFrame.Visible = true
 end)
+
