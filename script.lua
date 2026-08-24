@@ -2,19 +2,20 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- НАСТРОЙКИ
+-- НАСТРОЙКИ (ОТКЛЮЧЕНЫ ПО УМОЛЧАНИЮ)
 local Settings = {
     AimbotEnabled = false,
     AimbotFOVRadius = 100,
     ShowAimbotFOV = false,
 
     TriggerbotEnabled = false,
-    TriggerbotDelay = 0.05,
+    TriggerbotDelay = 0.1,
 
-    Wallshot = false,
     WallCheck = false,
     TargetPart = "Head"
 }
@@ -30,7 +31,7 @@ local function GetScreenCenter()
     return Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 end
 
--- Безопасная проверка живого игрока
+-- Проверка живого персонажа
 local function IsAlive(player)
     if not player or player == LocalPlayer or not player.Character then return false end
     local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
@@ -39,9 +40,8 @@ local function IsAlive(player)
     return true
 end
 
--- Проверка видимости
+-- Проверка видимости для Aimbot
 local function IsVisible(targetHead)
-    if Settings.Wallshot then return true end
     if not Settings.WallCheck then return true end
     
     local origin = Camera.CFrame.Position
@@ -87,66 +87,44 @@ local function GetClosestTarget(maxRadius)
     return closestHead
 end
 
--- Проверка Triggerbot
+-- Безопасная проверка прицела для Triggerbot
 local function CheckTriggerbot()
-    local centerPos = GetScreenCenter()
-
-    if Settings.Wallshot then
-        for _, player in ipairs(Players:GetPlayers()) do
-            if IsAlive(player) then
-                local head = player.Character:FindFirstChild(Settings.TargetPart)
-                if head then
-                    local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
-                    if onScreen then
-                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - centerPos).Magnitude
-                        if dist <= 25 then
-                            return true
-                        end
-                    end
-                end
-            end
-        end
-        return false
-    else
-        local raycastParams = RaycastParams.new()
-        raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-        local ignoreList = {Camera}
-        if LocalPlayer.Character then
-            table.insert(ignoreList, LocalPlayer.Character)
-        end
-        raycastParams.FilterDescendantsInstances = ignoreList
-
-        local centerRay = Camera:ViewportPointToRay(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-        local result = workspace:Raycast(centerRay.Origin, centerRay.Direction * 1000, raycastParams)
-
-        if result and result.Instance then
-            local hitModel = result.Instance:FindFirstAncestorOfClass("Model")
-            if hitModel then
-                local player = Players:GetPlayerFromCharacter(hitModel)
-                if IsAlive(player) then
-                    return true
-                end
-            end
-        end
-        return false
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    local ignoreList = {Camera}
+    if LocalPlayer.Character then
+        table.insert(ignoreList, LocalPlayer.Character)
     end
+    raycastParams.FilterDescendantsInstances = ignoreList
+
+    local centerRay = Camera:ViewportPointToRay(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local result = workspace:Raycast(centerRay.Origin, centerRay.Direction * 1000, raycastParams)
+
+    if result and result.Instance then
+        local hitModel = result.Instance:FindFirstAncestorOfClass("Model")
+        if hitModel then
+            local player = Players:GetPlayerFromCharacter(hitModel)
+            if IsAlive(player) then
+                return true
+            end
+        end
+    end
+    return false
 end
 
--- Безопасный клик без блокировки потока персонажа
+-- Безопасный выстрел через VirtualInputManager (без зависания управления)
 local isShooting = false
 local function SafeClick()
     if isShooting then return end
     isShooting = true
     
     task.spawn(function()
-        if mouse1press and mouserelease then
-            mouse1press()
+        pcall(function()
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
             task.wait(0.01)
-            mouserelease()
-        elseif mouse1click then
-            mouse1click()
-        end
-        task.wait(Settings.TriggerbotDelay)
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+        end)
+        task.wait(math.max(Settings.TriggerbotDelay, 0.05))
         isShooting = false
     end)
 end
@@ -231,7 +209,7 @@ OpenUICorner.Parent = ToggleButton
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 320)
+MainFrame.Size = UDim2.new(0, 320, 0, 280)
 MainFrame.Position = UDim2.new(0.35, 0, 0.2, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.Visible = false
@@ -260,7 +238,7 @@ local ScrollContainer = Instance.new("ScrollingFrame")
 ScrollContainer.Size = UDim2.new(1, -20, 1, -50)
 ScrollContainer.Position = UDim2.new(0, 10, 0, 45)
 ScrollContainer.BackgroundTransparency = 1
-ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 360)
+ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 310)
 ScrollContainer.Parent = MainFrame
 
 local UIListLayout = Instance.new("UIListLayout")
@@ -320,6 +298,7 @@ local function CreateInput(labelText, defaultValue, callback)
     Input.FocusLost:Connect(function() callback(Input) end)
 end
 
+-- Элементы управления
 CreateToggle("Aimbot (Instant Head)", Settings.AimbotEnabled, function(s) Settings.AimbotEnabled = s end)
 CreateInput("Aimbot FOV (10-300):", Settings.AimbotFOVRadius, function(i)
     local v = tonumber(i.Text)
@@ -330,12 +309,12 @@ CreateToggle("Show Aimbot FOV", Settings.ShowAimbotFOV, function(s) Settings.Sho
 CreateToggle("Triggerbot", Settings.TriggerbotEnabled, function(s) Settings.TriggerbotEnabled = s end)
 CreateInput("Trigger Delay (sec):", Settings.TriggerbotDelay, function(i)
     local v = tonumber(i.Text)
-    if v then Settings.TriggerbotDelay = math.clamp(v, 0.01, 1.0) i.Text = tostring(Settings.TriggerbotDelay) end
+    if v then Settings.TriggerbotDelay = math.clamp(v, 0.05, 1.0) i.Text = tostring(Settings.TriggerbotDelay) end
 end)
 
-CreateToggle("Wallshot (Through Walls)", Settings.Wallshot, function(s) Settings.Wallshot = s end)
 CreateToggle("Wall Check", Settings.WallCheck, function(s) Settings.WallCheck = s end)
 
+-- Анимация Лойдера
 local tweenInfo = TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local tween = TweenService:Create(BarFill, tweenInfo, {Size = UDim2.new(1, 0, 1, 0)})
 tween:Play()
