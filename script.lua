@@ -19,7 +19,7 @@ local Settings = {
     SilentFOVRadius = 150,
     ShowSilentFOV = false,
     
-    ReloadMultiplier = 1, 
+    ReloadMultiplier = 1, -- 1 дефолт, 0.01 моментально
     WallCheck = true,
     ChamsEnabled = false,
     TargetPart = "Head"
@@ -113,22 +113,10 @@ local function GetClosestTargetInFOV(maxRadius)
     return closestHead
 end
 
-local oldWait
-oldWait = hookfunction(task.wait, function(delayTime)
-    if Settings.ReloadMultiplier < 1 and delayTime and delayTime > 0.1 then
-        local char = LocalPlayer.Character
-        local tool = char and char:FindFirstChildOfClass("Tool")
-        if tool then
-            return oldWait(delayTime * Settings.ReloadMultiplier)
-        end
-    end
-    return oldWait(delayTime)
-end)
-
-local function HardFixReload()
+-- Безопасный метод ускорения перезарядки без детектов хуков
+local function BypassFixReload()
     local char = LocalPlayer.Character
     if not char then return end
-    local tool = char:FindFirstChildOfClass("Tool")
     
     local hum = char:FindFirstChildOfClass("Humanoid")
     local animator = hum and hum:FindFirstChildOfClass("Animator")
@@ -136,49 +124,46 @@ local function HardFixReload()
         for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
             local name = string.lower(track.Animation.Name or "")
             if string.find(name, "reload") then
+                -- Принудительно ускоряем таймлайн без изменения task.wait
                 track:AdjustSpeed(1 / math.max(Settings.ReloadMultiplier, 0.01))
+                if Settings.ReloadMultiplier < 0.1 and track.TimePosition > 0.05 then
+                    track.TimePosition = track.Length - 0.02
+                end
             end
-        end
-    end
-
-    if tool and Settings.ReloadMultiplier < 0.2 then
-        local ammo = tool:FindFirstChild("Ammo") or tool:FindFirstChild("Clip")
-        if ammo and ammo:IsA("ValueBase") and ammo.Value < 1 then
-            ammo.Value = 5
         end
     end
 end
 
--- Хук выстрела использует свой независимый радиус SilentFOVRadius
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
-    
-    if Settings.SilentAimEnabled and (method == "FireServer" or method == "InvokeServer") then
-        local targetHead = GetClosestTargetInFOV(Settings.SilentFOVRadius)
-        if targetHead then
-            for i, arg in ipairs(args) do
-                if typeof(arg) == "Vector3" then
-                    args[i] = targetHead.Position
-                end
-            end
-            return oldNamecall(self, unpack(args))
+-- Безопасный легитный Silent Aim на событиях мыши без hookmetamethod
+local function ActiveSilentAimEvent()
+    if not Settings.SilentAimEnabled then return end
+    local targetHead = GetClosestTargetInFOV(Settings.SilentFOVRadius)
+    if targetHead then
+        local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        if tool and tool:FindFirstChild("RemoteEvent") then
+            -- Перенаправляем аргументы напрямую в обход Namecall проверки
+            tool.RemoteEvent:FireServer(targetHead.Position)
         end
     end
-    return oldNamecall(self, ...)
-end)
+end
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed or not Settings.FlickbotEnabled then return end
+    if gameProcessed then return end
     local inputType = input.UserInputType
     local isClick = (inputType == Enum.UserInputType.MouseButton1)
     local isTouch = (inputType == Enum.UserInputType.Touch)
 
     if isClick or isTouch then
-        local targetHead = GetClosestTargetInFOV(Settings.FlickFOVRadius)
-        if targetHead then
-            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetHead.Position)
+        -- Отрабатывает фликбот (если включен)
+        if Settings.FlickbotEnabled then
+            local targetHead = GetClosestTargetInFOV(Settings.FlickFOVRadius)
+            if targetHead then
+                Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetHead.Position)
+            end
+        end
+        -- Отрабатывает сайлент аим (если включен)
+        if Settings.SilentAimEnabled then
+            ActiveSilentAimEvent()
         end
     end
 end)
@@ -203,7 +188,7 @@ RunService.RenderStepped:Connect(function()
     end
 
     if Settings.ReloadMultiplier < 1 then
-        HardFixReload()
+        BypassFixReload()
     end
 
     if Settings.AimbotEnabled then
@@ -288,7 +273,7 @@ MainUICorner.Parent = MainFrame
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-Title.Text = "ApexF — Splitted FOV"
+Title.Text = "ApexF — AntiCheat Bypass"
 Title.TextColor3 = Color3.fromRGB(0, 200, 255)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 18
@@ -378,7 +363,7 @@ if v then Settings.FlickFOVRadius = math.clamp(v, 10, 800) i.Text = tostring(Set
 end)
 CreateToggle("Show Flick FOV", Settings.ShowFlickFOV, function(s) Settings.ShowFlickFOV = s end)
 
-CreateToggle("Silent Aim (No Flick)", Settings.SilentAimEnabled, function(s) Settings.SilentAimEnabled = s end)
+CreateToggle("Silent Aim (No Hook)", Settings.SilentAimEnabled, function(s) Settings.SilentAimEnabled = s end)
 CreateInput("Silent FOV:", Settings.SilentFOVRadius, function(i)
 local v = tonumber(i.Text)
 if v then Settings.SilentFOVRadius = math.clamp(v, 10, 800) i.Text = tostring(Settings.SilentFOVRadius) end
@@ -398,7 +383,7 @@ local tween = TweenService:Create(BarFill, tweenInfo, {Size = UDim2.new(1, 0, 1,
 tween:Play()
 
 tween.Completed:Connect(function()
-LoaderTitle.Text = "Loaded!"
+LoaderTitle.Text = "Bypassed!"
 task.wait(0.2)
 LoaderFrame:Destroy()
 ToggleButton.Visible = true
