@@ -2,7 +2,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local GuiService = game:GetService("GuiService")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -16,9 +15,8 @@ local Settings = {
     FlickbotEnabled = false,
     FlickFOVRadius = 120,
     ShowFlickFOV = false,
-    PingMS = 50,
+    PingMS = 0.1, -- Задержка в ms (0.1 - 100)
 
-    MapWallbang = false, -- Wallshot отключен по умолчанию
     WallCheck = true,    -- Проверка видимости цели за стеной
     ChamsEnabled = false,
     TargetPart = "Head"
@@ -38,9 +36,9 @@ FlickCircle.Color = Color3.fromRGB(180, 50, 255)
 FlickCircle.Filled = false
 FlickCircle.Transparency = 1
 
+-- Точный центр 3D-вьюпорта без лишних смещений
 local function GetScreenCenter()
-    local inset = GuiService:GetGuiInset()
-    return Vector2.new(Camera.ViewportSize.X / 2, (Camera.ViewportSize.Y - inset.Y) / 2)
+    return Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 end
 
 local function IsAlive(player)
@@ -72,67 +70,6 @@ local function IsVisible(targetHead)
     return false
 end
 
--- ОПРЕДЕЛЕНИЕ ПОЛА И ЗЕМЛИ (Оставляем пол твердым)
-local function IsFloor(part)
-    if not part:IsA("BasePart") or part:IsA("Terrain") then return true end
-    
-    local name = part.Name:lower()
-    if name:find("floor") or name:find("ground") or name:find("baseplate") or name:find("spawn") or name:find("land") or name:find("bottom") then
-        return true
-    end
-
-    local size = part.Size
-    local isHorizontal = math.abs(part.CFrame.UpVector.Y) > 0.85
-    if isHorizontal and (size.X > 12 and size.Z > 12) and size.Y <= 2 then
-        return true
-    end
-
-    return false
-end
-
--- СИСТЕМА WALLSHOT (Игнорирование физических лучей стенами)
-local originalProperties = {}
-
-local function ProcessPart(part)
-    if part:IsA("BasePart") and not part:IsDescendantOf(workspace.CurrentCamera) then
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player.Character and part:IsDescendantOf(player.Character) then
-                return
-            end
-        end
-
-        if not IsFloor(part) then
-            if not originalProperties[part] then
-                originalProperties[part] = {
-                    CanQuery = part.CanQuery,
-                    CanTouch = part.CanTouch
-                }
-            end
-
-            if Settings.MapWallbang then
-                part.CanQuery = false
-                part.CanTouch = false
-            else
-                part.CanQuery = originalProperties[part].CanQuery
-                part.CanTouch = originalProperties[part].CanTouch
-            end
-        end
-    end
-end
-
-local function ApplyMapWallbang()
-    for _, part in ipairs(workspace:GetDescendants()) do
-        ProcessPart(part)
-    end
-end
-
-workspace.DescendantAdded:Connect(function(part)
-    if Settings.MapWallbang then
-        task.wait(0.1)
-        ProcessPart(part)
-    end
-end)
-
 -- RED CHAMS
 local function ApplyChams(player)
     if not IsAlive(player) then return end
@@ -157,7 +94,7 @@ local function ApplyChams(player)
     end
 end
 
--- ПОИСК ЦЕЛИ В FOV
+-- ПОИСК ЦЕЛИ В FOV ПРЯМО НА ГОЛОВУ
 local function GetClosestTarget(maxRadius)
     local closestHead = nil
     local shortestDistance = maxRadius
@@ -169,7 +106,8 @@ local function GetClosestTarget(maxRadius)
             local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
 
             if onScreen then
-                local dist = (Vector2.new(screenPos.X, screenPos.Y) - centerPos).Magnitude
+                local headPos2D = Vector2.new(screenPos.X, screenPos.Y)
+                local dist = (headPos2D - centerPos).Magnitude
                 if dist <= shortestDistance then
                     if IsVisible(head) then
                         closestHead = head
@@ -182,17 +120,18 @@ local function GetClosestTarget(maxRadius)
     return closestHead
 end
 
--- ТОЧНЫЙ FLICKBOT
+-- ТОЧНЫЙ FLICKBOT (Срабатывает при нажатии InputBegan)
 local isFlicking = false
-UserInputService.InputEnded:Connect(function(input, gameProcessed)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if not Settings.FlickbotEnabled or isFlicking then return end
 
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 or input.UserInputType == Enum.UserInputType.Touch then
         isFlicking = true
         task.spawn(function()
-            local delayTime = math.clamp(Settings.PingMS, 1, 300) / 1000
-            task.wait(delayTime)
+            if Settings.PingMS > 0 then
+                task.wait(Settings.PingMS / 1000)
+            end
 
             local targetHead = GetClosestTarget(Settings.FlickFOVRadius)
             if targetHead then
@@ -230,13 +169,11 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-ApplyMapWallbang()
-
 -- GUI ИНТЕРФЕЙС
 local ParentContainer = (gethui and gethui()) or game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ApexF_FixedGui"
+ScreenGui.Name = "ApexF_CleanGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = ParentContainer
 
@@ -290,7 +227,7 @@ OpenUICorner.Parent = ToggleButton
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 400)
+MainFrame.Size = UDim2.new(0, 320, 0, 380)
 MainFrame.Position = UDim2.new(0.35, 0, 0.2, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.Visible = false
@@ -319,7 +256,7 @@ local ScrollContainer = Instance.new("ScrollingFrame")
 ScrollContainer.Size = UDim2.new(1, -20, 1, -50)
 ScrollContainer.Position = UDim2.new(0, 10, 0, 45)
 ScrollContainer.BackgroundTransparency = 1
-ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 550)
+ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 500)
 ScrollContainer.Parent = MainFrame
 
 local UIListLayout = Instance.new("UIListLayout")
@@ -387,21 +324,17 @@ end)
 CreateToggle("Show Aimbot FOV", Settings.ShowAimbotFOV, function(s) Settings.ShowAimbotFOV = s end)
 CreateToggle("Wall Check (Visible Only)", Settings.WallCheck, function(s) Settings.WallCheck = s end)
 
-CreateToggle("AimFlickBot (On Release)", Settings.FlickbotEnabled, function(s) Settings.FlickbotEnabled = s end)
+CreateToggle("AimFlickBot (On Press)", Settings.FlickbotEnabled, function(s) Settings.FlickbotEnabled = s end)
 CreateInput("Flick FOV (10-800):", Settings.FlickFOVRadius, function(i)
     local v = tonumber(i.Text)
     if v then Settings.FlickFOVRadius = math.clamp(v, 10, 800) i.Text = tostring(Settings.FlickFOVRadius) end
 end)
 CreateToggle("Show Flick FOV", Settings.ShowFlickFOV, function(s) Settings.ShowFlickFOV = s end)
-CreateInput("Flick Ping Delay (1-300ms):", Settings.PingMS, function(i)
+CreateInput("Flick Delay MS (0.1-100):", Settings.PingMS, function(i)
     local v = tonumber(i.Text)
-    if v then Settings.PingMS = math.clamp(v, 1, 300) i.Text = tostring(Settings.PingMS) end
+    if v then Settings.PingMS = math.clamp(v, 0.1, 100) i.Text = tostring(Settings.PingMS) end
 end)
 
-CreateToggle("Wallshot (Experimental)", Settings.MapWallbang, function(s) 
-    Settings.MapWallbang = s 
-    ApplyMapWallbang()
-end)
 CreateToggle("Red Chams (ESP)", Settings.ChamsEnabled, function(s) Settings.ChamsEnabled = s end)
 
 local tweenInfo = TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
