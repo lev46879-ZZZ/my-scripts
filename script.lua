@@ -15,8 +15,9 @@ local Settings = {
     FlickbotEnabled = false,
     FlickFOVRadius = 120,
     ShowFlickFOV = false,
-    FlickDelay = 0.1, -- Задержка между фликами (0.1 - 1.0 сек)
+    PingMS = 50, -- Задержка в миллисекундах (1 - 300 ms)
 
+    ChamsEnabled = false, -- Красные Chams
     WallCheck = false,
     TargetPart = "Head"
 }
@@ -48,6 +49,30 @@ local function IsAlive(player)
     return true
 end
 
+-- Система Red Chams
+local function ApplyChams(player)
+    if not IsAlive(player) then return end
+    local char = player.Character
+    local highlight = char:FindFirstChild("Apex_RedChams")
+
+    if Settings.ChamsEnabled then
+        if not highlight then
+            highlight = Instance.new("Highlight")
+            highlight.Name = "Apex_RedChams"
+            highlight.FillColor = Color3.fromRGB(255, 0, 0)
+            highlight.FillTransparency = 0.5
+            highlight.OutlineColor = Color3.fromRGB(255, 50, 50)
+            highlight.OutlineTransparency = 0
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            highlight.Parent = char
+        end
+    else
+        if highlight then
+            highlight:Destroy()
+        end
+    end
+end
+
 -- Проверка видимости (WallCheck)
 local function IsVisible(targetHead)
     if not Settings.WallCheck then return true end
@@ -70,7 +95,7 @@ local function IsVisible(targetHead)
     return false
 end
 
--- Поиск ближайшей цели в пределах FOV
+-- Поиск цели в пределах FOV
 local function GetClosestTarget(maxRadius)
     local closestHead = nil
     local shortestDistance = maxRadius
@@ -95,29 +120,30 @@ local function GetClosestTarget(maxRadius)
     return closestHead
 end
 
--- Логика AimFlickBot (срабатывает при выстреле/клике)
+-- Срабатывание AimFlickBot строго при ОТПУСКАНИИ кнопки выстрела
 local isFlicking = false
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if not Settings.FlickbotEnabled or isFlicking then return end
 
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        local targetHead = GetClosestTarget(Settings.FlickFOVRadius)
-        if targetHead then
-            isFlicking = true
-            task.spawn(function()
-                -- Мгновенный флик на голову
+        isFlicking = true
+        task.spawn(function()
+            -- Задержка пинга в миллисекундах перед фликом
+            local delayTime = math.clamp(Settings.PingMS, 1, 300) / 1000
+            task.wait(delayTime)
+
+            local targetHead = GetClosestTarget(Settings.FlickFOVRadius)
+            if targetHead then
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
-                
-                -- Выдержка задержки кулдауна
-                task.wait(math.clamp(Settings.FlickDelay, 0.1, 1.0))
-                isFlicking = false
-            end)
-        end
+            end
+            
+            isFlicking = false
+        end)
     end
 end)
 
--- Главный цикл отрисовки и постоянного аимбота
+-- Главный цикл обновлений
 RunService.RenderStepped:Connect(function()
     local centerPos = GetScreenCenter()
     
@@ -130,7 +156,14 @@ RunService.RenderStepped:Connect(function()
     FlickCircle.Radius = Settings.FlickFOVRadius
     FlickCircle.Visible = Settings.ShowFlickFOV and Settings.FlickbotEnabled
 
-    -- Обычный постоянный Aimbot
+    -- Обновление Chams для всех игроков
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            ApplyChams(player)
+        end
+    end
+
+    -- Обычный Aimbot
     if Settings.AimbotEnabled then
         local targetHead = GetClosestTarget(Settings.AimbotFOVRadius)
         if targetHead then
@@ -195,7 +228,7 @@ OpenUICorner.Parent = ToggleButton
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 340)
+MainFrame.Size = UDim2.new(0, 320, 0, 360)
 MainFrame.Position = UDim2.new(0.35, 0, 0.2, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.Visible = false
@@ -210,7 +243,7 @@ MainUICorner.Parent = MainFrame
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-Title.Text = "ApexF — Combat (AimFlick)"
+Title.Text = "ApexF — Combat (Flick & Chams)"
 Title.TextColor3 = Color3.fromRGB(0, 200, 255)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 18
@@ -224,7 +257,7 @@ local ScrollContainer = Instance.new("ScrollingFrame")
 ScrollContainer.Size = UDim2.new(1, -20, 1, -50)
 ScrollContainer.Position = UDim2.new(0, 10, 0, 45)
 ScrollContainer.BackgroundTransparency = 1
-ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 440)
+ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 480)
 ScrollContainer.Parent = MainFrame
 
 local UIListLayout = Instance.new("UIListLayout")
@@ -292,17 +325,18 @@ CreateInput("Aimbot FOV (10-300):", Settings.AimbotFOVRadius, function(i)
 end)
 CreateToggle("Show Aimbot FOV", Settings.ShowAimbotFOV, function(s) Settings.ShowAimbotFOV = s end)
 
-CreateToggle("AimFlickBot (On Click)", Settings.FlickbotEnabled, function(s) Settings.FlickbotEnabled = s end)
+CreateToggle("AimFlickBot (On Release)", Settings.FlickbotEnabled, function(s) Settings.FlickbotEnabled = s end)
 CreateInput("Flick FOV (10-300):", Settings.FlickFOVRadius, function(i)
     local v = tonumber(i.Text)
     if v then Settings.FlickFOVRadius = math.clamp(v, 10, 300) i.Text = tostring(Settings.FlickFOVRadius) end
 end)
 CreateToggle("Show Flick FOV", Settings.ShowFlickFOV, function(s) Settings.ShowFlickFOV = s end)
-CreateInput("Flick Delay (0.1-1.0s):", Settings.FlickDelay, function(i)
+CreateInput("Flick Ping Delay (1-300ms):", Settings.PingMS, function(i)
     local v = tonumber(i.Text)
-    if v then Settings.FlickDelay = math.clamp(v, 0.1, 1.0) i.Text = tostring(Settings.FlickDelay) end
+    if v then Settings.PingMS = math.clamp(v, 1, 300) i.Text = tostring(Settings.PingMS) end
 end)
 
+CreateToggle("Red Chams (ESP)", Settings.ChamsEnabled, function(s) Settings.ChamsEnabled = s end)
 CreateToggle("Wall Check", Settings.WallCheck, function(s) Settings.WallCheck = s end)
 
 -- Анимация Загрузки
