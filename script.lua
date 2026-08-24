@@ -15,9 +15,10 @@ local Settings = {
     FlickbotEnabled = false,
     FlickFOVRadius = 120,
     ShowFlickFOV = false,
-    PingMS = 50, -- Задержка в миллисекундах (1 - 300 ms)
+    PingMS = 50, -- Задержка флика в ms (1 - 300)
 
-    ChamsEnabled = false, -- Красные Chams
+    StandaloneWallbang = false, -- Автономный прострел сквозь стены (без аима)
+    ChamsEnabled = false,       -- Красные Chams
     WallCheck = false,
     TargetPart = "Head"
 }
@@ -73,7 +74,7 @@ local function ApplyChams(player)
     end
 end
 
--- Проверка видимости (WallCheck)
+-- Проверка видимости
 local function IsVisible(targetHead)
     if not Settings.WallCheck then return true end
     
@@ -120,7 +121,35 @@ local function GetClosestTarget(maxRadius)
     return closestHead
 end
 
--- Срабатывание AimFlickBot строго при ОТПУСКАНИИ кнопки выстрела
+-- АВТОНОМНЫЙ WALLBANG (Прострел сквозь стены без изменения направления прицела)
+local oldNamecall
+if hookmetamethod then
+    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local method = getnamecallmethod()
+        if Settings.StandaloneWallbang and not checkcaller() and (method == "Raycast" or method == "raycast") then
+            local args = {...}
+            local params = args[3] or RaycastParams.new()
+
+            -- Собираем всех живых врагов
+            local targetCharacters = {}
+            for _, player in ipairs(Players:GetPlayers()) do
+                if IsAlive(player) then
+                    table.insert(targetCharacters, player.Character)
+                end
+            end
+
+            -- Игнорируем карты и стены: луч реагирует исключительно на персонажей
+            params.FilterType = Enum.RaycastFilterType.Include
+            params.FilterDescendantsInstances = targetCharacters
+            
+            args[3] = params
+            return oldNamecall(self, unpack(args))
+        end
+        return oldNamecall(self, ...)
+    end)
+end
+
+-- AimFlickBot при отпускании кнопки
 local isFlicking = false
 UserInputService.InputEnded:Connect(function(input, gameProcessed)
     if gameProcessed then return end
@@ -129,7 +158,6 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         isFlicking = true
         task.spawn(function()
-            -- Задержка пинга в миллисекундах перед фликом
             local delayTime = math.clamp(Settings.PingMS, 1, 300) / 1000
             task.wait(delayTime)
 
@@ -143,11 +171,10 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
     end
 end)
 
--- Главный цикл обновлений
+-- Главный цикл
 RunService.RenderStepped:Connect(function()
     local centerPos = GetScreenCenter()
     
-    -- Отрисовка FOV
     AimCircle.Position = centerPos
     AimCircle.Radius = Settings.AimbotFOVRadius
     AimCircle.Visible = Settings.ShowAimbotFOV and Settings.AimbotEnabled
@@ -156,7 +183,7 @@ RunService.RenderStepped:Connect(function()
     FlickCircle.Radius = Settings.FlickFOVRadius
     FlickCircle.Visible = Settings.ShowFlickFOV and Settings.FlickbotEnabled
 
-    -- Обновление Chams для всех игроков
+    -- Обновление Chams
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             ApplyChams(player)
@@ -228,7 +255,7 @@ OpenUICorner.Parent = ToggleButton
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 360)
+MainFrame.Size = UDim2.new(0, 320, 0, 380)
 MainFrame.Position = UDim2.new(0.35, 0, 0.2, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.Visible = false
@@ -243,7 +270,7 @@ MainUICorner.Parent = MainFrame
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-Title.Text = "ApexF — Combat (Flick & Chams)"
+Title.Text = "ApexF — Flick Combat"
 Title.TextColor3 = Color3.fromRGB(0, 200, 255)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 18
@@ -257,7 +284,7 @@ local ScrollContainer = Instance.new("ScrollingFrame")
 ScrollContainer.Size = UDim2.new(1, -20, 1, -50)
 ScrollContainer.Position = UDim2.new(0, 10, 0, 45)
 ScrollContainer.BackgroundTransparency = 1
-ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 480)
+ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 500)
 ScrollContainer.Parent = MainFrame
 
 local UIListLayout = Instance.new("UIListLayout")
@@ -336,6 +363,7 @@ CreateInput("Flick Ping Delay (1-300ms):", Settings.PingMS, function(i)
     if v then Settings.PingMS = math.clamp(v, 1, 300) i.Text = tostring(Settings.PingMS) end
 end)
 
+CreateToggle("Wallbang (Shoot Through Walls)", Settings.StandaloneWallbang, function(s) Settings.StandaloneWallbang = s end)
 CreateToggle("Red Chams (ESP)", Settings.ChamsEnabled, function(s) Settings.ChamsEnabled = s end)
 CreateToggle("Wall Check", Settings.WallCheck, function(s) Settings.WallCheck = s end)
 
