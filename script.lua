@@ -15,7 +15,6 @@ local Settings = {
     FlickbotEnabled = false,
     FlickFOVRadius = 120,
     ShowFlickFOV = false,
-    FlickDelayMS = 0.1, -- Задержка в ms (от 0.1 до 10)
 
     WallCheck = true,    -- Проверка видимости цели за стеной
     ChamsEnabled = false,
@@ -119,26 +118,16 @@ local function GetClosestTarget(maxRadius)
     return closestHead
 end
 
--- ТОЧНЫЙ FLICKBOT С ЗАДЕРЖКОЙ (0.1 - 10 ms)
-local isFlicking = false
+-- МОМЕНТАЛЬНЫЙ FLICKBOT ПРИ ВЫСТРЕЛЕ (СИНХРОННЫЙ)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
-    if not Settings.FlickbotEnabled or isFlicking then return end
+    if not Settings.FlickbotEnabled then return end
 
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 or input.UserInputType == Enum.UserInputType.Touch then
-        isFlicking = true
-        task.spawn(function()
-            if Settings.FlickDelayMS > 0 then
-                task.wait(Settings.FlickDelayMS / 1000)
-            end
-
-            local targetHead = GetClosestTarget(Settings.FlickFOVRadius)
-            if targetHead then
-                Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetHead.Position)
-            end
-            
-            isFlicking = false
-        end)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local targetHead = GetClosestTarget(Settings.FlickFOVRadius)
+        if targetHead then
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetHead.Position)
+        end
     end
 end)
 
@@ -226,7 +215,7 @@ OpenUICorner.Parent = ToggleButton
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 380)
+MainFrame.Size = UDim2.new(0, 320, 0, 340)
 MainFrame.Position = UDim2.new(0.35, 0, 0.2, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.Visible = false
@@ -241,7 +230,7 @@ MainUICorner.Parent = MainFrame
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-Title.Text = "ApexF — Flick Combat"
+Title.Text = "ApexF — Instant Flick"
 Title.TextColor3 = Color3.fromRGB(0, 200, 255)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 18
@@ -255,7 +244,7 @@ local ScrollContainer = Instance.new("ScrollingFrame")
 ScrollContainer.Size = UDim2.new(1, -20, 1, -50)
 ScrollContainer.Position = UDim2.new(0, 10, 0, 45)
 ScrollContainer.BackgroundTransparency = 1
-ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 500)
+ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 420)
 ScrollContainer.Parent = MainFrame
 
 local UIListLayout = Instance.new("UIListLayout")
@@ -329,10 +318,6 @@ CreateInput("Flick FOV (10-800):", Settings.FlickFOVRadius, function(i)
     if v then Settings.FlickFOVRadius = math.clamp(v, 10, 800) i.Text = tostring(Settings.FlickFOVRadius) end
 end)
 CreateToggle("Show Flick FOV", Settings.ShowFlickFOV, function(s) Settings.ShowFlickFOV = s end)
-CreateInput("Flick Delay MS (0.1-10):", Settings.FlickDelayMS, function(i)
-    local v = tonumber(i.Text)
-    if v then Settings.FlickDelayMS = math.clamp(v, 0.1, 10) i.Text = tostring(Settings.FlickDelayMS) end
-end)
 
 CreateToggle("Red Chams (ESP)", Settings.ChamsEnabled, function(s) Settings.ChamsEnabled = s end)
 
