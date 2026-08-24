@@ -1,27 +1,52 @@
 --[[
-    APEX HUB | Redesigned Compact Horizontal GUI
-    Focus: Layout, Anime Character Eyes Banner, No Visuals Logic
+    APEX HUB | Horizontal GUI V5
+    Features: Direct Image Download, Pulse Wave Animation, Fixed Draggable TopBar
 ]]
 
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-if PlayerGui:FindFirstChild("ApexHubUI_V4") then
-    PlayerGui.ApexHubUI_V4:Destroy()
+if PlayerGui:FindFirstChild("ApexHubUI_V5") then
+    PlayerGui.ApexHubUI_V5:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ApexHubUI_V4"
+ScreenGui.Name = "ApexHubUI_V5"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = PlayerGui
 
 ---------------------------------------------------------
--- 1. LOADER FRAME (Компактный лежачий прямоугольник)
+-- 0. СКАЧИВАНИЕ И КЭШИРОВАНИЕ ИЗОБРАЖЕНИЯ (Asset Loader)
+---------------------------------------------------------
+local function GetDownloadedImage(fileName, url)
+    if getcustomasset and writefile and isfile then
+        if not isfile(fileName) then
+            local success, content = pcall(function()
+                return game:HttpGet(url)
+            end)
+            if success and content then
+                writefile(fileName, content)
+            end
+        end
+        if isfile(fileName) then
+            return getcustomasset(fileName)
+        end
+    end
+    -- Запасной fallback URL
+    return url
+end
+
+-- Прямая ссылка на загрузку фото с глазами
+local eyesImageUrl = GetDownloadedImage("apex_eyes.jpg", "https://i.ibb.co/6y4G1vR/anime-eyes.jpg")
+
+---------------------------------------------------------
+-- 1. LOADER FRAME (Центральный прямоугольник)
 ---------------------------------------------------------
 local LoaderFrame = Instance.new("Frame")
 LoaderFrame.Size = UDim2.new(0, 360, 0, 150)
@@ -56,7 +81,7 @@ local LoaderSub = Instance.new("TextLabel")
 LoaderSub.Size = UDim2.new(1, 0, 0, 20)
 LoaderSub.Position = UDim2.new(0, 0, 0.42, 0)
 LoaderSub.BackgroundTransparency = 1
-LoaderSub.Text = "Initializing UI..."
+LoaderSub.Text = "Downloading Assets..."
 LoaderSub.TextColor3 = Color3.fromRGB(0, 170, 255)
 LoaderSub.TextSize = 11
 LoaderSub.Font = Enum.Font.GothamMedium
@@ -87,10 +112,10 @@ FillCorner.CornerRadius = UDim.new(0, 3)
 FillCorner.Parent = ProgressBarFill
 
 ---------------------------------------------------------
--- 2. MAIN FRAME (Лежачий прямоугольник с глазами)
+-- 2. MAIN FRAME (Лежачий прямоугольник строго по центру)
 ---------------------------------------------------------
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 480, 0, 280) -- Лежачий компактный прямоугольник
+MainFrame.Size = UDim2.new(0, 480, 0, 280)
 MainFrame.Position = UDim2.new(0.5, -240, 0.5, -140)
 MainFrame.BackgroundColor3 = Color3.fromRGB(12, 13, 17)
 MainFrame.BorderSizePixel = 0
@@ -107,7 +132,7 @@ MainStroke.Color = Color3.fromRGB(30, 33, 45)
 MainStroke.Thickness = 1.2
 MainStroke.Parent = MainFrame
 
--- TopBar (Перетаскиваемый)
+-- TopBar
 local TopBar = Instance.new("Frame")
 TopBar.Size = UDim2.new(1, 0, 0, 38)
 TopBar.BackgroundColor3 = Color3.fromRGB(16, 17, 24)
@@ -118,7 +143,7 @@ local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Size = UDim2.new(0, 160, 1, 0)
 TitleLabel.Position = UDim2.new(0, 12, 0, 0)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "APEX HUB <font color=\"#00AAFF\">v4.0</font>"
+TitleLabel.Text = "APEX HUB <font color=\"#00AAFF\">v5.0</font>"
 TitleLabel.RichText = true
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.TextSize = 14
@@ -126,46 +151,60 @@ TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 TitleLabel.Parent = TopBar
 
--- Драг (перетаскивание окна)
-local dragging, dragInput, dragStart, startPos
+---------------------------------------------------------
+-- ИСПРАВЛЕННЫЙ DRAGGABLE (Свободное перетаскивание)
+---------------------------------------------------------
+local dragging = false
+local dragInput, dragStart, startPos
+
+local function UpdateInput(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
 TopBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         dragStart = input.Position
         startPos = MainFrame.Position
+
         input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
         end)
     end
 end)
+
 TopBar.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
 end)
+
 UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        UpdateInput(input)
     end
 end)
 
 -- Боковая панель (SideBar)
 local SideBar = Instance.new("Frame")
-SideBar.Size = UDim2.new(0, 130, 1, -38)
+SideBar.Size = UDim2.new(0, 135, 1, -38)
 SideBar.Position = UDim2.new(0, 0, 0, 38)
 SideBar.BackgroundColor3 = Color3.fromRGB(14, 15, 21)
 SideBar.BorderSizePixel = 0
 SideBar.Parent = MainFrame
 
 ---------------------------------------------------------
--- БАННЕР С ГЛАЗАМИ (Из предоставленного изображения)
+-- БАННЕР С ГЛАЗАМИ + АНИМИРОВАННАЯ ВОЛНА ПУЛЬСА
 ---------------------------------------------------------
 local EyesBanner = Instance.new("ImageLabel")
-EyesBanner.Size = UDim2.new(1, -16, 0, 50)
+EyesBanner.Size = UDim2.new(1, -16, 0, 52)
 EyesBanner.Position = UDim2.new(0, 8, 0, 8)
 EyesBanner.BackgroundColor3 = Color3.fromRGB(20, 22, 30)
 EyesBanner.BorderSizePixel = 0
--- Изображение с персом (кадрировано ровно на глаза)
-EyesBanner.Image = "rbxassetid://11681320490" 
+EyesBanner.Image = eyesImageUrl
 EyesBanner.ScaleType = Enum.ScaleType.Crop
 EyesBanner.Parent = SideBar
 
@@ -175,14 +214,44 @@ BannerCorner.Parent = EyesBanner
 
 local BannerStroke = Instance.new("UIStroke")
 BannerStroke.Color = Color3.fromRGB(0, 170, 255)
-BannerStroke.Transparency = 0.5
+BannerStroke.Transparency = 0.4
 BannerStroke.Thickness = 1
 BannerStroke.Parent = EyesBanner
 
--- Список вкладок под фото
+-- Линия Пульса (Pulse Wave Container)
+local PulseContainer = Instance.new("Frame")
+PulseContainer.Size = UDim2.new(1, 0, 0, 10)
+PulseContainer.Position = UDim2.new(0, 0, 1, -10)
+PulseContainer.BackgroundTransparency = 1
+PulseContainer.ClipsDescendants = true
+PulseContainer.Parent = EyesBanner
+
+local PulseLine = Instance.new("Frame")
+PulseLine.Size = UDim2.new(0, 30, 0, 2)
+PulseLine.Position = UDim2.new(-0.2, 0, 0.5, -1)
+PulseLine.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+PulseLine.BorderSizePixel = 0
+PulseLine.Parent = PulseContainer
+
+local PulseGlow = Instance.new("UIStroke")
+PulseGlow.Color = Color3.fromRGB(0, 170, 255)
+PulseGlow.Thickness = 1.5
+PulseGlow.Parent = PulseLine
+
+-- Анимация бегущей волны пульса
+local pulseTime = 0
+RunService.RenderStepped:Connect(function(dt)
+    if MainFrame.Visible then
+        pulseTime = pulseTime + dt * 1.5
+        local xPos = (pulseTime % 1.4) - 0.2
+        PulseLine.Position = UDim2.new(xPos, 0, 0.5, math.sin(pulseTime * 10) * 2)
+    end
+end)
+
+-- Контейнер для списка вкладок под фото
 local TabListContainer = Instance.new("Frame")
-TabListContainer.Size = UDim2.new(1, 0, 1, -66)
-TabListContainer.Position = UDim2.new(0, 0, 0, 64)
+TabListContainer.Size = UDim2.new(1, 0, 1, -68)
+TabListContainer.Position = UDim2.new(0, 0, 0, 66)
 TabListContainer.BackgroundTransparency = 1
 TabListContainer.Parent = SideBar
 
@@ -196,10 +265,10 @@ TabPadding.PaddingLeft = UDim.new(0, 8)
 TabPadding.PaddingRight = UDim.new(0, 8)
 TabPadding.Parent = TabListContainer
 
--- Контейнер основного содержимого
+-- Основной контейнер
 local ContentContainer = Instance.new("Frame")
-ContentContainer.Size = UDim2.new(1, -140, 1, -46)
-ContentContainer.Position = UDim2.new(0, 134, 0, 42)
+ContentContainer.Size = UDim2.new(1, -145, 1, -46)
+ContentContainer.Position = UDim2.new(0, 140, 0, 42)
 ContentContainer.BackgroundTransparency = 1
 ContentContainer.Parent = MainFrame
 
@@ -228,7 +297,7 @@ OpenStroke.Thickness = 1.2
 OpenStroke.Parent = OpenButton
 
 ---------------------------------------------------------
--- 4. ТАБ-СИСТЕМА И КНОПКИ
+-- 4. ТАБ-СИСТЕМА
 ---------------------------------------------------------
 local Tabs = {}
 local ContentFrames = {}
@@ -288,9 +357,7 @@ local function CreateTab(name)
     return ContentFrame
 end
 
--- Вкладки
 local MainTab = CreateTab("Main")
-local VisualsTab = CreateTab("Visuals")
 local SettingsTab = CreateTab("Settings")
 
 ---------------------------------------------------------
@@ -324,7 +391,7 @@ end
 OpenButton.MouseButton1Click:Connect(ToggleMenu)
 
 ---------------------------------------------------------
--- 6. ЗАГРУЗЧИК (Sequence)
+-- 6. ЗАГРУЗЧИК
 ---------------------------------------------------------
 task.spawn(function()
     TweenService:Create(LoaderFrame, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
@@ -334,18 +401,15 @@ task.spawn(function()
     TweenService:Create(ProgressBarBG, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
     TweenService:Create(ProgressBarFill, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
     
-    task.wait(0.4)
+    task.wait(0.3)
     
-    LoaderSub.Text = "Loading Layout..."
-    TweenService:Create(ProgressBarFill, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {Size = UDim2.new(0.5, 0, 1, 0)}):Play()
-    task.wait(0.6)
+    LoaderSub.Text = "Downloading Image Asset..."
+    TweenService:Create(ProgressBarFill, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {Size = UDim2.new(0.6, 0, 1, 0)}):Play()
+    task.wait(0.5)
     
-    LoaderSub.Text = "Loading Character Eye Asset..."
-    TweenService:Create(ProgressBarFill, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {Size = UDim2.new(1, 0, 1, 0)}):Play()
-    task.wait(0.6)
-    
-    LoaderSub.Text = "Done!"
-    task.wait(0.2)
+    LoaderSub.Text = "Initializing Interface..."
+    TweenService:Create(ProgressBarFill, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {Size = UDim2.new(1, 0, 1, 0)}):Play()
+    task.wait(0.5)
     
     TweenService:Create(LoaderFrame, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play()
     TweenService:Create(LoaderStroke, TweenInfo.new(0.25), {Transparency = 1}):Play()
