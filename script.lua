@@ -14,7 +14,7 @@ local Settings = {
     TriggerbotEnabled = false,
     TriggerbotDelay = 0.05,
 
-    WallshotEnabled = false, -- Выстрел и наводка сквозь стены
+    Wallshot = false, -- Работа аимбота и триггербота сквозь стены
     WallCheck = false,
     TargetPart = "Head"
 }
@@ -32,7 +32,7 @@ end
 
 -- Проверка видимости цели
 local function IsVisible(targetHead)
-    if Settings.WallshotEnabled then return true end -- Игнорирует стены при Wallshot
+    if Settings.Wallshot then return true end -- Игнорировать стены при Wallshot
     if not Settings.WallCheck then return true end
     
     local origin = Camera.CFrame.Position
@@ -53,7 +53,7 @@ local function IsVisible(targetHead)
     return false
 end
 
--- Поиск ближайшей цели
+-- Поиск ближайшей цели для Aimbot
 local function GetClosestTarget(maxRadius)
     local closestHead = nil
     local shortestDistance = maxRadius
@@ -81,22 +81,22 @@ local function GetClosestTarget(maxRadius)
     return closestHead
 end
 
--- Логика Triggerbot (поддержка Wallshot)
+-- Проверка наведения для Triggerbot
 local function CheckTriggerbot()
     local centerPos = GetScreenCenter()
 
-    if Settings.WallshotEnabled then
-        -- Проверка наведения на хитбокс противника прямо сквозь текстуры и стены
+    if Settings.Wallshot then
+        -- Проверка наведения сквозь любые преграды и стены
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character then
                 local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
                 if humanoid and humanoid.Health > 0 then
-                    local targetPart = player.Character:FindFirstChild(Settings.TargetPart) or player.Character:FindFirstChild("HumanoidRootPart")
-                    if targetPart then
-                        local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                    local head = player.Character:FindFirstChild(Settings.TargetPart)
+                    if head then
+                        local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
                         if onScreen then
                             local dist = (Vector2.new(screenPos.X, screenPos.Y) - centerPos).Magnitude
-                            if dist <= 20 then
+                            if dist <= 25 then -- Порог совпадения прицела с головой за стеной
                                 return true
                             end
                         end
@@ -106,7 +106,7 @@ local function CheckTriggerbot()
         end
         return false
     else
-        -- Стандартная проверка наведения с учетом физических препятствий
+        -- Обычная проверка видимого игрока
         local raycastParams = RaycastParams.new()
         raycastParams.FilterType = Enum.RaycastFilterType.Exclude
         local ignoreList = {Camera}
@@ -134,7 +134,7 @@ local function CheckTriggerbot()
     end
 end
 
--- Главный цикл
+-- Главный Рендер
 local lastTriggerTime = 0
 RunService.RenderStepped:Connect(function()
     local centerPos = GetScreenCenter()
@@ -164,13 +164,13 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ================= GUI И ЛОЙДЕР =================
+-- GUI и Лойдер
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ApexF_MainGui"
+ScreenGui.Name = "ApexF_CleanGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Лойдер
+-- Loader
 local LoaderFrame = Instance.new("Frame")
 LoaderFrame.Size = UDim2.new(0, 260, 0, 100)
 LoaderFrame.Position = UDim2.new(0.5, -130, 0.4, 0)
@@ -220,10 +220,10 @@ local OpenUICorner = Instance.new("UICorner")
 OpenUICorner.CornerRadius = UDim.new(0, 8)
 OpenUICorner.Parent = ToggleButton
 
--- Главное меню
+-- Главная панель
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 380)
+MainFrame.Size = UDim2.new(0, 320, 0, 320)
 MainFrame.Position = UDim2.new(0.35, 0, 0.2, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.Visible = false
@@ -252,7 +252,7 @@ local ScrollContainer = Instance.new("ScrollingFrame")
 ScrollContainer.Size = UDim2.new(1, -20, 1, -50)
 ScrollContainer.Position = UDim2.new(0, 10, 0, 45)
 ScrollContainer.BackgroundTransparency = 1
-ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 420)
+ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 360)
 ScrollContainer.Parent = MainFrame
 
 local UIListLayout = Instance.new("UIListLayout")
@@ -312,7 +312,7 @@ local function CreateInput(labelText, defaultValue, callback)
     Input.FocusLost:Connect(function() callback(Input) end)
 end
 
--- Элементы управления
+-- Очищенный список элементов меню
 CreateToggle("Aimbot (Instant Head)", Settings.AimbotEnabled, function(s) Settings.AimbotEnabled = s end)
 CreateInput("Aimbot FOV (10-300):", Settings.AimbotFOVRadius, function(i)
     local v = tonumber(i.Text)
@@ -326,11 +326,11 @@ CreateInput("Trigger Delay (sec):", Settings.TriggerbotDelay, function(i)
     if v then Settings.TriggerbotDelay = math.clamp(v, 0.01, 1.0) i.Text = tostring(Settings.TriggerbotDelay) end
 end)
 
-CreateToggle("Wallshot (Through Walls)", Settings.WallshotEnabled, function(s) Settings.WallshotEnabled = s end)
+CreateToggle("Wallshot (Through Walls)", Settings.Wallshot, function(s) Settings.Wallshot = s end)
 CreateToggle("Wall Check", Settings.WallCheck, function(s) Settings.WallCheck = s end)
 
 -- Анимация Лойдера
-local tweenInfo = TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local tweenInfo = TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local tween = TweenService:Create(BarFill, tweenInfo, {Size = UDim2.new(1, 0, 1, 0)})
 tween:Play()
 
