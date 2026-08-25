@@ -87,7 +87,7 @@ makeDraggable(MainMenu)
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Title.Text = "  ⚡ LITE SILENT v8"
+Title.Text = "  ⚡ LITE SILENT v9"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Font = Enum.Font.GothamBold
@@ -207,7 +207,7 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
     end)
 end
 
-createToggle(Scroll, "Safe Silent Aim (Upvalue-v2)", "SilentAimEnabled")
+createToggle(Scroll, "Safe Silent Aim (Instant Snap)", "SilentAimEnabled")
 createToggle(Scroll, "On-Shot Flickbot", "FlickMode")
 createToggle(Scroll, "Combat Aimbot", "AimbotEnabled")
 createToggle(Scroll, "Wallcheck Bypass", "WallCheck")
@@ -218,8 +218,6 @@ SectionLabel.Size = UDim2.new(1, 0, 0, 16); SectionLabel.BackgroundTransparency 
 createToggle(Scroll, "Show Silent FOV (Blue)", "ShowSilentFOV")
 createToggle(Scroll, "Show Flick FOV (Red)", "ShowFlickFOV")
 createToggle(Scroll, "Show Aim FOV (Green)", "ShowAimFOV")
-
-Use code with caution.
 
 local SectionLabel2 = Instance.new("TextLabel")
 SectionLabel2.Size = UDim2.new(1, 0, 0, 16); SectionLabel2.BackgroundTransparency = 1; SectionLabel2.Text = "--- VISUALS & MISC ---"; SectionLabel2.TextColor3 = Color3.fromRGB(120, 120, 120); SectionLabel2.Font = Enum.Font.GothamBold; SectionLabel2.TextSize = 10; SectionLabel2.Parent = Scroll
@@ -235,24 +233,33 @@ createSlider(Scroll, "Flick FOV", 10, 900, Settings.FlickFOV, false, function(v)
 createSlider(Scroll, "Flick Delay", 0.01, 1.00, Settings.FlickDelay, true, function(v) Settings.FlickDelay = v end)
 createSlider(Scroll, "BHop Power", 1, 10, Settings.BHopPower, false, function(v) Settings.BHopPower = v end)
 
--- Кольца FOV
-local Aim_Circle = Drawing.new("Circle")
+-- [[ БЕЗОПАСНАЯ ИНИЦИАЛИЗАЦИЯ КОЛЕЦ FOV ]] --
+local Aim_Circle, Flick_Circle, Silent_Circle
+
+local function initDrawingSafe()
+local success = pcall(function()
+Aim_Circle = Drawing.new("Circle")
 Aim_Circle.Visible = false; Aim_Circle.Thickness = 1; Aim_Circle.NumSides = 32; Aim_Circle.Filled = false; Aim_Circle.Color = Color3.fromRGB(0, 255, 150)
 
-local Flick_Circle = Drawing.new("Circle")
+Flick_Circle = Drawing.new("Circle")
 Flick_Circle.Visible = false; Flick_Circle.Thickness = 1; Flick_Circle.NumSides = 32; Flick_Circle.Filled = false; Flick_Circle.Color = Color3.fromRGB(255, 50, 50)
 
-local Silent_Circle = Drawing.new("Circle")
+Silent_Circle = Drawing.new("Circle")
 Silent_Circle.Visible = false; Silent_Circle.Thickness = 1; Silent_Circle.NumSides = 32; Silent_Circle.Filled = false; Silent_Circle.Color = Color3.fromRGB(0, 150, 255)
+end)
+if not success then
+local fakeCircle = {Visible = false, Position = Vector2.new(0,0), Radius = 0, Color = Color3.new(), Thickness = 0}
+Aim_Circle, Flick_Circle, Silent_Circle = fakeCircle, fakeCircle, fakeCircle
+end
+end
+initDrawingSafe()
 
--- Проверка стен
 local function checkWallVisibility(targetPart, character)
 if not Settings.WallCheck then return true end
 local partsObscuring = Camera:GetPartsObscuringTarget({targetPart.Position}, {LocalPlayer.Character, character, Camera})
 return #partsObscuring == 0
 end
 
--- Поиск цели к центру
 local function getClosestPlayer(currentFOV)
 local closestTarget = nil
 local minDistance = currentFOV + 1
@@ -282,22 +289,13 @@ end
 return closestTarget
 end
 
--- [[ ОПТИМИЗИРОВАННЫЙ АДРЕСНЫЙ SILENT AIM ]] --
--- Полностью заменяет getgc(), перехватывая вычисления внутри игровых CFrame-модулей
-local oldIndex
-oldIndex = hookmetamethod(game, "__index", function(self, key)
-if Settings.SilentAimEnabled and not checkcaller() and (key == "CFrame" or key == "Position") then
-local target = getClosestPlayer(Settings.SilentFOV)
-if target and self:IsA("BasePart") and self.Name == "Handle" then
-return target.CFrame
-end
-end
-return oldIndex(self, key)
-end)
-
--- Выполнение Флика
+-- ВЫСТРЕЛ СНАП
 UserInputService.InputBegan:Connect(function(input, processed)
 if processed then return end
+if Settings.SilentAimEnabled and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+local target = getClosestPlayer(Settings.SilentFOV)
+if target then Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position) end
+end
 if Settings.FlickMode and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) then
 local target = getClosestPlayer(Settings.FlickFOV)
 if target then
@@ -325,24 +323,24 @@ end
 end
 end
 
--- [[ ОПТИМИЗИРОВАННЫЙ ЦИКЛ ОБНОВЛЕНИЯ ]] --
+-- [[ ОСНОВНОЙ РЕНДЕР ЦИКЛ ]] --
 local lastUpdate = 0
 RunService.RenderStepped:Connect(function()
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
-if Settings.ShowAimFOV then
+if Settings.ShowAimFOV and Aim_Circle then
 Aim_Circle.Position = screenCenter; Aim_Circle.Radius = Settings.AimFOV; Aim_Circle.Visible = true
-else Aim_Circle.Visible = false end
+elseif Aim_Circle then Aim_Circle.Visible = false end
 
-if Settings.ShowFlickFOV then
+if Settings.ShowFlickFOV and Flick_Circle then
 Flick_Circle.Position = screenCenter; Flick_Circle.Radius = Settings.FlickFOV; Flick_Circle.Visible = true
-else Flick_Circle.Visible = false end
+elseif Flick_Circle then Flick_Circle.Visible = false end
 
-if Settings.ShowSilentFOV then
+if Settings.ShowSilentFOV and Silent_Circle then
 Silent_Circle.Position = screenCenter; Silent_Circle.Radius = Settings.SilentFOV; Silent_Circle.Visible = true
-else Silent_Circle.Visible = false end
+elseif Silent_Circle then Silent_Circle.Visible = false end
 
-if Settings.AimbotEnabled and not Settings.FlickMode then
+if Settings.AimbotEnabled and not Settings.FlickMode and not Settings.SilentAimEnabled then
 local target = getClosestPlayer(Settings.AimFOV)
 if target then Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position) end
 end
@@ -375,9 +373,7 @@ if Settings.EspLines and onScreen then
 visual.Line.From = screenCenter; visual.Line.To = Vector2.new(hrpPos.X, hrpPos.Y); visual.Line.Visible = true
 else visual.Line.Visible = false end
 
-if Settings.EspCharms then
-visual.Charms.Parent = character
-visual.Charms.Enabled = true
+if Settings.EspCharms then visual.Charms.Parent = character; visual.Charms.Enabled = true
 else visual.Charms.Enabled = false end
 else
 visual.Box.Visible = false; visual.Line.Visible = false; visual.Charms.Enabled = false
@@ -396,7 +392,7 @@ end
 local function removeESP(player)
 if ESP_Cache[player] then
 ESP_Cache[player].Box:Remove(); ESP_Cache[player].Line:Remove()
-if ESP_Cache[player].Charms then ESP_Cache[player].Charms:Destroy() end
+if ESP_Cache[player].Charms then pcall(function() ESP_Cache[player].Charms:Destroy() end) end
 ESP_Cache[player] = nil
 end
 end
