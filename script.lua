@@ -18,17 +18,18 @@ local Settings = {
     EspBox = false,
     EspCharms = false,
     EspLines = false,
-    -- Прыжковые стрейфы (Новое)
-    StrafeEnabled = false,
-    StrafePower = 1 -- От 1 до 10
+    -- Плавный BHOp (Новое взамен стрейфов)
+    BHopEnabled = false,
+    BHopPower = 1 -- Шкала от 1 до 10 для плавного разгона
 }
 
 local ESP_Cache = {}
-local LastCameraRotation = Camera.CFrame.LookVector
+local NormalSpeed = 16 -- Стандартная скорость в Roblox (адаптируется под игру)
+local CurrentBHopSpeed = NormalSpeed
 
 -- [[ GUI ХАБА ]] --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MobileGodHub"
+ScreenGui.Name = "MobileSafeBHopHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
@@ -73,8 +74,8 @@ makeDraggable(MainMenu)
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-Title.Text = "PREMIUM STRAFE HUB"
-Title.TextColor3 = Color3.fromRGB(255, 0, 150)
+Title.Text = "SMOOTH BHOP HUB"
+Title.TextColor3 = Color3.fromRGB(0, 255, 150)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 16
 Title.Parent = MainMenu
@@ -85,7 +86,7 @@ local Scroll = Instance.new("ScrollingFrame")
 Scroll.Size = UDim2.new(1, -20, 1, -50)
 Scroll.Position = UDim2.new(0, 10, 0, 45)
 Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 720) -- Увеличили под новые слайдеры
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 720)
 Scroll.ScrollBarThickness = 4
 Scroll.Parent = MainMenu
 local ContentLayout = Instance.new("UIListLayout"); ContentLayout.Padding = UDim.new(0, 6); ContentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; ContentLayout.Parent = Scroll
@@ -115,7 +116,7 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
     local bg = Instance.new("Frame")
     bg.Size = UDim2.new(1, 0, 0, 10); bg.BackgroundColor3 = Color3.fromRGB(45, 45, 45); bg.Parent = parent
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 14, 1, 0); btn.BackgroundColor3 = Color3.fromRGB(255, 0, 150); btn.Text = ""; btn.Parent = bg
+    btn.Size = UDim2.new(0, 14, 1, 0); btn.BackgroundColor3 = Color3.fromRGB(0, 255, 150); btn.Text = ""; btn.Parent = bg
 
     local initPercent = (default - min) / (max - min)
     btn.Position = UDim2.new(initPercent, -7, 0, 0)
@@ -136,8 +137,8 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
 end
 
 -- Рендер меню
-createToggle(Scroll, "Air Strafe Hack", "StrafeEnabled")
-createSlider(Scroll, "Strafe Power", 1, 10, Settings.StrafePower, false, function(v) Settings.StrafePower = v end)
+createToggle(Scroll, "Smooth BunnyHop", "BHopEnabled")
+createSlider(Scroll, "BHop Power", 1, 10, Settings.BHopPower, false, function(v) Settings.BHopPower = v end)
 createToggle(Scroll, "Combat Aimbot", "AimbotEnabled")
 createToggle(Scroll, "On-Shot Flick", "FlickMode")
 createToggle(Scroll, "Wallcheck Bypass", "WallCheck")
@@ -148,57 +149,35 @@ createSlider(Scroll, "Aim FOV", 10, 900, Settings.AimFOV, false, function(v) Set
 createSlider(Scroll, "Flick FOV", 10, 900, Settings.FlickFOV, false, function(v) Settings.FlickFOV = v end)
 createSlider(Scroll, "Flick Delay", 0.01, 1.00, Settings.FlickDelay, true, function(v) Settings.FlickDelay = v end)
 
--- [[ ЛОГИКА СТРЕЙФОВ (AIR STRAFE) ]] --
-local function getMoveDirection()
-    -- Получаем направление движения джойстика персонажа
-    local character = LocalPlayer.Character
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    if humanoid then
-        return humanoid.MoveDirection
-    end
-    return Vector3.new(0,0,0)
-end
+-- [[ ЛОГИКА БЕЗОПАСНОГО И ПЛАВНОГО BHOP ]] --
+local function handleSmoothBHop()
+    if not Settings.BHopEnabled then return end
 
-local function applyAirStrafe()
-    if not Settings.StrafeEnabled then return end
-    
     local character = LocalPlayer.Character
-    local hrp = character and character:FindFirstChild("HumanoidRootPart")
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     
-    if hrp and humanoid then
-        -- Проверяем, находится ли игрок в воздухе (в прыжке или падении)
+    if humanoid then
         local currentState = humanoid:GetState()
+        -- Проверяем, находится ли игрок в воздухе (в прыжке или падении)
         local isInAir = (currentState == Enum.HumanoidStateType.Freefall or currentState == Enum.HumanoidStateType.Jumping)
         
         if isInAir then
-            local moveDir = getMoveDirection()
-            -- Проверяем, отклонен ли джойстик в сторону (влево или вправо относительно взгляда)
-            if moveDir.Magnitude > 0 then
-                local currentLookVector = Camera.CFrame.LookVector
-                -- Находим угловое изменение (дельту) поворота камеры смартфона
-                local cameraDelta = currentLookVector.X - LastCameraRotation.X
+            -- Если джойстик отклонен (игрок двигается в любую сторону)
+            if humanoid.MoveDirection.Magnitude > 0 then
+                -- Рассчитываем шаг плавного ускорения на основе кадра (DeltaTime) и ползунка силы (1-10)
+                -- Умножение на 0.4 делает нарастание плавным, без рывков и телепортов
+                local accelerationStep = Settings.BHopPower * 0.4
+                local maxAllowedSpeed = NormalSpeed + (Settings.BHopPower * 6) -- Максимальный предел разгона
                 
-                -- Если камера поворачивается влево или вправо во время бега в воздухе
-                if math.abs(cameraDelta) > 0.001 then
-                    -- Рассчитываем силу импульса на основе выбранного уровня (1-10)
-                    -- Формула плавно прогрессирует: от базового подталкивания до мощного разгона
-                    local multi = Settings.StrafePower * 2.8
-                    
-                    -- Вектор ускорения направлен в сторону движения джойстика
-                    local strafeVelocity = Vector3.new(moveDir.X * multi, 0, moveDir.Z * multi)
-                    
-                    -- Добавляем горизонтальный импульс к текущей скорости персонажа
-                    hrp.AssemblyLinearVelocity = Vector3.new(
-                        hrp.AssemblyLinearVelocity.X + strafeVelocity.X,
-                        hrp.AssemblyLinearVelocity.Y, -- Не трогаем вертикальную скорость, чтобы прыжок не ломался
-                        hrp.AssemblyLinearVelocity.Z + strafeVelocity.Z
-                    )
-                end
+                CurrentBHopSpeed = math.clamp(CurrentBHopSpeed + accelerationStep, NormalSpeed, maxAllowedSpeed)
+                humanoid.WalkSpeed = CurrentBHopSpeed
             end
+        else
+            -- Моментальный сброс до дефолтной скорости игры при соприкосновении с землей
+            CurrentBHopSpeed = NormalSpeed
+            humanoid.WalkSpeed = NormalSpeed
         end
     end
-    LastCameraRotation = Camera.CFrame.LookVector
 end
 
 -- [[ ОСТАЛЬНАЯ ЛОГИКА (AIM / ESP) ]] --
@@ -208,21 +187,21 @@ FOV_Circle.Visible = true; FOV_Circle.Thickness = 1; FOV_Circle.NumSides = 64; F
 local function isVisible(targetPart, character)
     if not Settings.WallCheck then return true end
     local ignore = {LocalPlayer.Character, character, Camera}
-local params = RaycastParams.new(); params.FilterType = Enum.RaycastFilterType.Exclude; params.FilterDescendantsInstances = ignore
-local res = workspace:Raycast(Camera.CFrame.Position, targetPart.Position - Camera.CFrame.Position, params)
-return res == nil
+    local params = RaycastParams.new(); params.FilterType = Enum.RaycastFilterType.Exclude; params.FilterDescendantsInstances = ignore
+    local res = workspace:Raycast(Camera.CFrame.Position, targetPart.Position - Camera.CFrame.Position, params)
+    return res == nil
 end
 
 local function getClosestPlayer(currentFOV)
-local closestTarget, maxDistance = nil, currentFOV
-local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-for _, player in ipairs(Players:GetPlayers()) do
-if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-local targetPart = player.Character:FindFirstChild(Settings.TargetPart)
-if humanoid and humanoid.Health > 0 and targetPart then
-local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-if onScreen then
+    local closestTarget, maxDistance = nil, currentFOV
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            local targetPart = player.Character:FindFirstChild(Settings.TargetPart)
+            if humanoid and humanoid.Health > 0 and targetPart then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                if onScreen then
 local distance = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
 if distance < maxDistance and isVisible(targetPart, player.Character) then
 maxDistance = distance; closestTarget = targetPart
@@ -250,9 +229,9 @@ end)
 
 local function createESP(player)
 if ESP_Cache[player] then return end
-local box = Drawing.new("Square"); box.Color = Color3.fromRGB(255, 0, 150); box.Thickness = 1.5; box.Filled = false; box.Visible = false
+local box = Drawing.new("Square"); box.Color = Color3.fromRGB(0, 255, 150); box.Thickness = 1.5; box.Filled = false; box.Visible = false
 local line = Drawing.new("Line"); line.Color = Color3.fromRGB(255, 255, 255); line.Thickness = 1; line.Visible = false
-local charms = Instance.new("Highlight"); charms.FillColor = Color3.fromRGB(255, 0, 150); charms.FillTransparency = 0.5; charms.OutlineColor = Color3.fromRGB(255, 255, 255); charms.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; charms.Enabled = false
+local charms = Instance.new("Highlight"); charms.FillColor = Color3.fromRGB(0, 255, 150); charms.FillTransparency = 0.5; charms.OutlineColor = Color3.fromRGB(255, 255, 255); charms.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; charms.Enabled = false
 ESP_Cache[player] = {Box = box, Line = line, Charms = charms}
 end
 
@@ -272,10 +251,10 @@ RunService.RenderStepped:Connect(function()
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 FOV_Circle.Position = screenCenter
 FOV_Circle.Radius = Settings.FlickMode and Settings.FlickFOV or Settings.AimFOV
-FOV_Circle.Color = Settings.FlickMode and Color3.fromRGB(255, 80, 80) or Color3.fromRGB(255, 0, 150)
+FOV_Circle.Color = Settings.FlickMode and Color3.fromRGB(255, 80, 80) or Color3.fromRGB(0, 255, 150)
 
--- Вызов функции стрейфов в каждом кадре
-applyAirStrafe()
+-- Вызов безопасного BHOp в каждом кадре
+handleSmoothBHop()
 
 if Settings.AimbotEnabled and not Settings.FlickMode then
 local target = getClosestPlayer(Settings.AimFOV)
