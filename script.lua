@@ -3,7 +3,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu'))()
 
 -- Создание главного окна
 local Window = Rayfield:CreateWindow({
-    Name = "Rivals Silent/Instant Headshot",
+    Name = "Rivals Auto-Aim Headshot",
     LoadingTitle = "Загрузка скрипта...",
     LoadingSubtitle = "by AI Assistant",
     ConfigurationSaving = {
@@ -16,7 +16,7 @@ local Window = Rayfield:CreateWindow({
 -- Переменные для хранения настроек
 local AimbotEnabled = false
 local TeamCheck = false
-local WallCheck = false
+local WallCheck = true -- По умолчанию включено для безопасности
 local AimFOV = 100
 
 -- Сервисы Roblox
@@ -38,15 +38,15 @@ game:GetService("RunService").RenderStepped:Connect(function()
     local mousePos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     FOVCircle.Position = mousePos
     FOVCircle.Radius = AimFOV
-    FOVCircle.Visible = AimbotEnabled -- Круг виден только когда аимбот активен
+    FOVCircle.Visible = AimbotEnabled
 end)
 
 -- Создание вкладки в меню
 local MainTab = Window:CreateTab("Aimbot Settings", 4483362458)
 
--- Кнопка переключения Аимбота
+-- Кнопка переключения Автонаводки
 local ToggleAimbot = MainTab:CreateToggle({
-    Name = "Включить Headshot Aimbot",
+    Name = "Включить Автонаводку (Aimbot)",
     CurrentValue = false,
     Callback = function(Value)
         AimbotEnabled = Value
@@ -62,10 +62,10 @@ local ToggleTeam = MainTab:CreateToggle({
     end,
 })
 
--- Кнопка проверки стен
+-- Кнопка проверки стен (WallCheck)
 local ToggleWall = MainTab:CreateToggle({
     Name = "Проверка стен (WallCheck)",
-    CurrentValue = false,
+    CurrentValue = true, -- Сразу активно
     Callback = function(Value)
         WallCheck = Value
     end,
@@ -83,9 +83,9 @@ local SliderFOV = MainTab:CreateSlider({
     end,
 })
 
--- Функция проверки видимости головы за стеной
+-- Функция проверки видимости головы за стеной (WallCheck)
 local function isVisible(targetPart)
-    if not WallCheck then return true end
+    if not WallCheck then return true end -- Если проверка отключена, считаем врага видимым
     
     local origin = Camera.CFrame.Position
     local destination = targetPart.Position
@@ -93,34 +93,35 @@ local function isVisible(targetPart)
     
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    -- Игнорируем себя и камеру, чтобы луч не блокировался
     raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
     
     local raycastResult = workspace:Raycast(origin, direction, raycastParams)
     
     if raycastResult then
+        -- Если луч попал в часть персонажа цели, значит стены на пути нет
         if raycastResult.Instance:IsDescendantOf(targetPart.Parent) then
             return true
         end
-        return false
+        return false -- Луч врезался в стену/текстуру карты
     end
     return true
 end
 
--- Поиск ближайшего игрока (ориентир на Голову)
+-- Поиск ближайшего открытого игрока в радиусе FOV
 local function getClosestPlayer()
     local closestPlayer = nil
     local shortestDistance = AimFOV
 
     for _, player in pairs(Players:GetPlayers()) do
-        -- Теперь проверяем наличие детали "Head" (Голова)
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") then
-            
             if player.Character.Humanoid.Health > 0 then
+                -- Проверка на команду
                 if TeamCheck and player.Team == LocalPlayer.Team then
                     continue
                 end
 
-                local targetPart = player.Character.Head -- Целимся строго в голову
+                local targetPart = player.Character.Head
                 local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
 
                 if onScreen then
@@ -128,6 +129,7 @@ local function getClosestPlayer()
                     local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
 
                     if distance < shortestDistance then
+                        -- Жесткая проверка: наводимся только если цель видна
                         if isVisible(targetPart) then
                             shortestDistance = distance
                             closestPlayer = player
@@ -140,12 +142,12 @@ local function getClosestPlayer()
     return closestPlayer
 end
 
--- Основной цикл моментального наведения в голову
+-- Основной постоянный цикл автонаводки
 game:GetService("RunService").RenderStepped:Connect(function()
     if AimbotEnabled then
         local target = getClosestPlayer()
         if target and target.Character and target.Character:FindFirstChild("Head") then
-            -- Моментальный разворот камеры точно на объект Head
+            -- Моментальный жесткий лок прицела на голову видимого врага
             Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.Head.Position)
         end
     end
