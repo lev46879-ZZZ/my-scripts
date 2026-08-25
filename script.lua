@@ -9,7 +9,7 @@ local Camera = workspace.CurrentCamera
 local Settings = {
     AimbotEnabled = false,
     FlickMode = false,
-    SilentAimEnabled = false,
+    SilentAimEnabled = false, -- Мгновенный безопасный снап
     WallCheck = false,
     AimFOV = 120,
     FlickFOV = 180,
@@ -29,7 +29,7 @@ local CurrentBHopSpeed = NormalSpeed
 
 -- [[ СОЗДАНИЕ GUI ]] --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FlickUltimateHubV4"
+ScreenGui.Name = "FlickUltimateHubSafe"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -56,44 +56,37 @@ end
 
 task.wait(0.1)
 
--- [[ УЛУЧШЕННЫЙ ДИЗАЙН ПЛАВАЮЩЕЙ КНОПКИ ]] --
+-- [[ КНОПКА МЕНЮ ]] --
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0, 55, 0, 55)
 ToggleButton.Position = UDim2.new(0.05, 0, 0.15, 0)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(18, 18, 18) -- Глубокий черный
+ToggleButton.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
 ToggleButton.Text = "MENU"
-ToggleButton.TextColor3 = Color3.fromRGB(0, 255, 170) -- Яркий неоновый неон
+ToggleButton.TextColor3 = Color3.fromRGB(0, 255, 170)
 ToggleButton.Font = Enum.Font.GothamBold
 ToggleButton.TextSize = 13
 ToggleButton.Parent = ScreenGui
 
 local TBCorner = Instance.new("UICorner"); TBCorner.CornerRadius = UDim.new(0, 28); TBCorner.Parent = ToggleButton
-local TBBorder = Instance.new("UIStroke")
-TBBorder.Color = Color3.fromRGB(0, 255, 170)
-TBBorder.Thickness = 1.5
-TBBorder.Parent = ToggleButton
+local TBBorder = Instance.new("UIStroke"); TBBorder.Color = Color3.fromRGB(0, 255, 170); TBBorder.Thickness = 1.5; TBBorder.Parent = ToggleButton
 makeDraggable(ToggleButton)
 
--- [[ УЛУЧШЕННЫЙ ДИЗАЙН ГЛАВНОГО МЕНЮ ]] --
+-- [[ ГЛАВНОЕ МЕНЮ ]] --
 local MainMenu = Instance.new("Frame")
 MainMenu.Size = UDim2.new(0, 270, 0, 440)
 MainMenu.Position = UDim2.new(0.5, -135, 0.5, -220)
-MainMenu.BackgroundColor3 = Color3.fromRGB(14, 14, 14) -- Элитный темный задник
+MainMenu.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
 MainMenu.Visible = false
 MainMenu.Parent = ScreenGui
 
 local MenuCorner = Instance.new("UICorner"); MenuCorner.CornerRadius = UDim.new(0, 10); MenuCorner.Parent = MainMenu
-local MenuBorder = Instance.new("UIStroke")
-MenuBorder.Color = Color3.fromRGB(30, 30, 30) -- Стильная серая обводка
-MenuBorder.Thickness = 1
-MenuBorder.Parent = MainMenu
+local MenuBorder = Instance.new("UIStroke"); MenuBorder.Color = Color3.fromRGB(30, 30, 30); MenuBorder.Thickness = 1; MenuBorder.Parent = MainMenu
 makeDraggable(MainMenu)
 
--- Заголовок меню
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Title.Text = "  ⚡ FLICK SILENT V4 PREMIUM"
+Title.Text = "  ⚡ FLICK SAFE v5"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Font = Enum.Font.GothamBold
@@ -106,12 +99,10 @@ TitleGradient.Color = ColorSequence.new{
     ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 150, 255))
 }
 TitleGradient.Parent = Title
-
 local TitleCorner = Instance.new("UICorner"); TitleCorner.CornerRadius = UDim.new(0, 10); TitleCorner.Parent = Title
 
 ToggleButton.MouseButton1Click:Connect(function() MainMenu.Visible = not MainMenu.Visible end)
 
--- Контейнер скролла
 local Scroll = Instance.new("ScrollingFrame")
 Scroll.Size = UDim2.new(1, -16, 1, -55)
 Scroll.Position = UDim2.new(0, 8, 0, 48)
@@ -122,7 +113,6 @@ Scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 170)
 Scroll.Parent = MainMenu
 local ContentLayout = Instance.new("UIListLayout"); ContentLayout.Padding = UDim.new(0, 8); ContentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; ContentLayout.Parent = Scroll
 
--- [[ УЛУЧШЕННЫЕ КНОПКИ-ПЕРЕКЛЮЧАТЕЛИ ]] --
 local function createToggle(parent, text, settingName)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -4, 0, 36)
@@ -135,10 +125,7 @@ local function createToggle(parent, text, settingName)
     btn.Parent = parent
     
     local btnCorner = Instance.new("UICorner"); btnCorner.CornerRadius = UDim.new(0, 6); btnCorner.Parent = btn
-    local btnBorder = Instance.new("UIStroke")
-    btnBorder.Color = Color3.fromRGB(40, 40, 40)
-    btnBorder.Thickness = 1
-    btnBorder.Parent = btn
+    local btnBorder = Instance.new("UIStroke"); btnBorder.Color = Color3.fromRGB(40, 40, 40); btnBorder.Thickness = 1; btnBorder.Parent = btn
 
     local statusIndicator = Instance.new("Frame")
     statusIndicator.Size = UDim2.new(0, 8, 0, 8)
@@ -168,7 +155,6 @@ local function createToggle(parent, text, settingName)
     updateVisuals()
 end
 
--- [[ УЛУЧШЕННЫЕ СЛАЙДЕРЫ ]] --
 local function createSlider(parent, text, min, max, default, isFloat, callback)
     local container = Instance.new("Frame")
     container.Size = UDim2.new(1, -4, 0, 42)
@@ -223,8 +209,7 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
     end)
 end
 
--- Рендер красивых элементов меню
-createToggle(Scroll, "Silent Aim (No Rotate)", "SilentAimEnabled")
+createToggle(Scroll, "Instant Snap (Safe Silent)", "SilentAimEnabled")
 createToggle(Scroll, "On-Shot Flickbot", "FlickMode")
 createToggle(Scroll, "Combat Aimbot", "AimbotEnabled")
 createToggle(Scroll, "Wallcheck Bypass", "WallCheck")
@@ -233,27 +218,23 @@ createToggle(Scroll, "Lite ESP Box", "EspBox")
 createToggle(Scroll, "Lite Charms", "EspCharms")
 createToggle(Scroll, "Smooth BunnyHop", "BHopEnabled")
 
-createSlider(Scroll, "Silent FOV", 10, 900, Settings.SilentFOV, false, function(v) Settings.SilentFOV = v end)
+createSlider(Scroll, "Snap FOV", 10, 900, Settings.SilentFOV, false, function(v) Settings.SilentFOV = v end)
 createSlider(Scroll, "Aim FOV", 10, 900, Settings.AimFOV, false, function(v) Settings.AimFOV = v end)
 createSlider(Scroll, "Flick FOV", 10, 900, Settings.FlickFOV, false, function(v) Settings.FlickFOV = v end)
 createSlider(Scroll, "Flick Delay", 0.01, 1.00, Settings.FlickDelay, true, function(v) Settings.FlickDelay = v end)
 createSlider(Scroll, "BHop Power", 1, 10, Settings.BHopPower, false, function(v) Settings.BHopPower = v end)
 
--- Кольца FOV
 local FOV_Circle = Drawing.new("Circle")
 local Silent_Circle = Drawing.new("Circle")
-
 FOV_Circle.Visible = true; FOV_Circle.Thickness = 1; FOV_Circle.NumSides = 32; FOV_Circle.Filled = false
 Silent_Circle.Visible = false; Silent_Circle.Thickness = 1; Silent_Circle.NumSides = 32; Silent_Circle.Filled = false; Silent_Circle.Color = Color3.fromRGB(0, 150, 255)
 
--- Проверка стен
 local function checkWallVisibility(targetPart, character)
 if not Settings.WallCheck then return true end
 local partsObscuring = Camera:GetPartsObscuringTarget({targetPart.Position}, {LocalPlayer.Character, character, Camera})
 return #partsObscuring == 0
 end
 
--- Поиск цели к центру
 local function getClosestPlayer(currentFOV)
 local closestTarget = nil
 local minDistance = currentFOV + 1
@@ -283,39 +264,23 @@ end
 return closestTarget
 end
 
--- Safe Silent Aim
-local PlayerMouse = LocalPlayer:GetMouse()
-local oldIndex
-oldIndex = hookmetamethod(game, "__index", function(self, key)
-if Settings.SilentAimEnabled and self == PlayerMouse and not checkcaller() then
-local targetPart = getClosestPlayer(Settings.SilentFOV)
-if targetPart then
-if key == "Hit" then
-return targetPart.CFrame
-elseif key == "Target" then
-return targetPart
+-- [[ БЕЗОПАСНЫЙ СНАП ПРИ КЛИКЕ / СТРЕЛЬБЕ ]] --
+UserInputService.InputBegan:Connect(function(input, processed)
+if processed then return end
+if Settings.SilentAimEnabled and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+local target = getClosestPlayer(Settings.SilentFOV)
+if target then
+Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
 end
 end
-end
-return oldIndex(self, key)
-end)
 
--- Выполнение Флика
-local function doPerfectFlick()
+if Settings.FlickMode and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) then
 local target = getClosestPlayer(Settings.FlickFOV)
 if target then
 task.delay(Settings.FlickDelay, function()
-if target and target.Parent and target.Parent:FindFirstChildOfClass("Humanoid") and target.Parent:FindFirstChildOfClass("Humanoid").Health > 0 then
 Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
-end
 end)
 end
-end
-
-UserInputService.InputBegan:Connect(function(input, processed)
-if processed then return end
-if Settings.FlickMode and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) then
-doPerfectFlick()
 end
 end)
 
@@ -334,7 +299,6 @@ end
 end
 end
 
--- [[ ЦИКЛ ОБНОВЛЕНИЯ ВИЗУАЛОВ ]] --
 local lastUpdate = 0
 RunService.RenderStepped:Connect(function()
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -353,7 +317,7 @@ end
 
 handleSmoothBHop()
 
-if Settings.AimbotEnabled and not Settings.FlickMode then
+if Settings.AimbotEnabled and not Settings.FlickMode and not Settings.SilentAimEnabled then
 local target = getClosestPlayer(Settings.AimFOV)
 if target then Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position) end
 end
