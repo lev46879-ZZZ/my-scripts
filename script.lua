@@ -2,7 +2,6 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -19,8 +18,7 @@ local Settings = {
     EspCharms = false,
     EspLines = false,
     BHopEnabled = false,
-    BHopPower = 1,
-    UnlockCosmetics = false
+    BHopPower = 1
 }
 
 local ESP_Cache = {}
@@ -29,7 +27,7 @@ local CurrentBHopSpeed = NormalSpeed
 
 -- [[ СОЗДАНИЕ GUI ]] --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FlickFixedHub"
+ScreenGui.Name = "FlickPerfectHubV3"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -69,8 +67,8 @@ local TBCorner = Instance.new("UICorner"); TBCorner.CornerRadius = UDim.new(0, 2
 makeDraggable(ToggleButton)
 
 local MainMenu = Instance.new("Frame")
-MainMenu.Size = UDim2.new(0, 260, 0, 440)
-MainMenu.Position = UDim2.new(0.5, -130, 0.5, -220)
+MainMenu.Size = UDim2.new(0, 260, 0, 370) -- Уменьшили размер, так как убрали Unlock All
+MainMenu.Position = UDim2.new(0.5, -130, 0.5, -185)
 MainMenu.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 MainMenu.Visible = false
 MainMenu.Parent = ScreenGui
@@ -80,7 +78,7 @@ makeDraggable(MainMenu)
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
-Title.Text = "[FPS] FLICK PERFECT"
+Title.Text = "[FPS] FLICK PERFECT v3"
 Title.TextColor3 = Color3.fromRGB(0, 255, 150)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 14
@@ -92,12 +90,12 @@ local Scroll = Instance.new("ScrollingFrame")
 Scroll.Size = UDim2.new(1, -16, 1, -45)
 Scroll.Position = UDim2.new(0, 8, 0, 40)
 Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 680)
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 550)
 Scroll.ScrollBarThickness = 2
 Scroll.Parent = MainMenu
 local ContentLayout = Instance.new("UIListLayout"); ContentLayout.Padding = UDim.new(0, 5); ContentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; ContentLayout.Parent = Scroll
 
-local function createToggle(parent, text, settingName, callback)
+local function createToggle(parent, text, settingName)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 0, 34)
     btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
@@ -110,7 +108,6 @@ local function createToggle(parent, text, settingName, callback)
         Settings[settingName] = not Settings[settingName]
         btn.Text = text .. (Settings[settingName] and ": ON" or ": OFF")
         btn.TextColor3 = Settings[settingName] and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
-        if callback then callback(Settings[settingName]) end
     end)
 end
 
@@ -137,12 +134,6 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
     end)
 end
 
-createToggle(Scroll, "Unlock Cosmetics (Safe)", "UnlockCosmetics", function(v) 
-    if v then pcall(function() 
-        local inv = LocalPlayer:FindFirstChild("Inventory") 
-        if inv then for _, c in ipairs(inv:GetDescendants()) do if c:IsA("BoolValue") then c.Value = true end end end 
-    end) end 
-end)
 createToggle(Scroll, "On-Shot Flickbot", "FlickMode")
 createToggle(Scroll, "Combat Aimbot", "AimbotEnabled")
 createToggle(Scroll, "Wallcheck Bypass", "WallCheck")
@@ -159,15 +150,18 @@ createSlider(Scroll, "BHop Power", 1, 10, Settings.BHopPower, false, function(v)
 local FOV_Circle = Drawing.new("Circle")
 FOV_Circle.Visible = true; FOV_Circle.Thickness = 1; FOV_Circle.NumSides = 32; FOV_Circle.Filled = false
 
-local function isVisible(targetPart, character)
+-- [[ НОВЫЙ ИСПРАВЛЕННЫЙ WALLCHECK (ЧЕРЕЗ ОБСТРУКЦИЮ КАМЕРЫ) ]] --
+local function checkWallVisibility(targetPart, character)
     if not Settings.WallCheck then return true end
-    local ignore = {LocalPlayer.Character, character, Camera}
-    local params = RaycastParams.new(); params.FilterType = Enum.RaycastFilterType.Exclude; params.FilterDescendantsInstances = ignore
-    local res = workspace:Raycast(Camera.CFrame.Position, targetPart.Position - Camera.CFrame.Position, params)
-    return res == nil
+    
+    -- Получаем список всех объектов, которые физически перекрывают видимость от Камеры до Головы врага
+    local partsObscuring = Camera:GetPartsObscuringTarget({targetPart.Position}, {LocalPlayer.Character, character, Camera})
+    
+    -- Если таблица пустая (#partsObscuring == 0), значит между нами и врагом нет никаких стен
+    return #partsObscuring == 0
 end
 
--- [[ СТРОГИЙ ПОИСК БЛИЖАЙШЕЙ ЦЕЛИ БЕЗ ОШИБОК ]] --
+-- Поиск цели к центру экрана с учетом нового Wallcheck
 local function getClosestPlayer(currentFOV)
     local closestTarget = nil
     local minDistance = currentFOV + 1
@@ -184,10 +178,12 @@ local function getClosestPlayer(currentFOV)
                     local target2D = Vector2.new(screenPos.X, screenPos.Y)
                     local distance = (target2D - screenCenter).Magnitude
                     
-                    -- Выбираем цель строго по минимальной дистанции к прицелу
+                    -- Проверяем дистанцию и новую фильтрацию стен
                     if distance <= currentFOV and distance < minDistance then
-                        minDistance = distance
-                        closestTarget = targetPart
+                        if checkWallVisibility(targetPart, player.Character) then
+                            minDistance = distance
+                            closestTarget = targetPart
+                        end
                     end
                 end
             end
@@ -211,12 +207,11 @@ UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
     if Settings.FlickMode and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) then
         doPerfectFlick()
-end
+    end
 end)
 
-local ESP_Cache = {}
 local function createESP(player)
-if ESP_Cache[player] then return end
+    if ESP_Cache[player] then return end
 local box = Drawing.new("Square"); box.Color = Color3.fromRGB(0, 255, 150); box.Thickness = 1; box.Filled = false; box.Visible = false
 local line = Drawing.new("Line"); line.Color = Color3.fromRGB(0, 255, 150); line.Thickness = 1; line.Visible = false
 local charms = Instance.new("Highlight"); charms.FillColor = Color3.fromRGB(0, 255, 150); charms.FillTransparency = 0.6; charms.OutlineTransparency = 0.5; charms.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; charms.Enabled = false
