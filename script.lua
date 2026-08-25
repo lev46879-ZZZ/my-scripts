@@ -5,11 +5,11 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- [[ НАСТРОЙКИ ХАБА ]] --
+-- [[ НАСТРОЙКИ ]] --
 local Settings = {
     AimbotEnabled = false,
     FlickMode = false,
-    SilentAimEnabled = false, -- Включение Silent Aim по 5-му способу
+    SilentAimEnabled = false,
     WallCheck = false,
     AimFOV = 120,
     FlickFOV = 180,
@@ -30,9 +30,9 @@ local ESP_Cache = {}
 local NormalSpeed = 16
 local CurrentBHopSpeed = NormalSpeed
 
--- [[ СОЗДАНИЕ GUI ]] --
+-- [[ АВТОНОМНАЯ ЗАГРУЗКА ИНТЕРФЕЙСА ]] --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FlickUpvalueHubV8"
+ScreenGui.Name = "FlickTrueSilentSafe"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -57,11 +57,9 @@ local function makeDraggable(gui)
     end)
 end
 
-task.wait(0.1)
-
--- КНОПКА МЕНЮ
+-- Плавающая кнопка
 local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 55, 0, 55)
+ToggleButton.Size = UDim2.new(0, 50, 0, 50)
 ToggleButton.Position = UDim2.new(0.05, 0, 0.15, 0)
 ToggleButton.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
 ToggleButton.Text = "MENU"
@@ -70,14 +68,14 @@ ToggleButton.Font = Enum.Font.GothamBold
 ToggleButton.TextSize = 13
 ToggleButton.Parent = ScreenGui
 
-local TBCorner = Instance.new("UICorner"); TBCorner.CornerRadius = UDim.new(0, 28); TBCorner.Parent = ToggleButton
+local TBCorner = Instance.new("UICorner"); TBCorner.CornerRadius = UDim.new(0, 25); TBCorner.Parent = ToggleButton
 local TBBorder = Instance.new("UIStroke"); TBBorder.Color = Color3.fromRGB(0, 255, 170); TBBorder.Thickness = 1.5; TBBorder.Parent = ToggleButton
 makeDraggable(ToggleButton)
 
--- ГЛАВНОЕ МЕНЮ
+-- Главное меню
 local MainMenu = Instance.new("Frame")
-MainMenu.Size = UDim2.new(0, 270, 0, 460)
-MainMenu.Position = UDim2.new(0.5, -135, 0.5, -220)
+MainMenu.Size = UDim2.new(0, 260, 0, 420)
+MainMenu.Position = UDim2.new(0.5, -130, 0.5, -210)
 MainMenu.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
 MainMenu.Visible = false
 MainMenu.Parent = ScreenGui
@@ -87,9 +85,9 @@ local MenuBorder = Instance.new("UIStroke"); MenuBorder.Color = Color3.fromRGB(3
 makeDraggable(MainMenu)
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Title.Text = "  ⚡ GC UPVALUE v8"
+Title.Text = "  ⚡ LITE SILENT v8"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Font = Enum.Font.GothamBold
@@ -107,18 +105,18 @@ local TitleCorner = Instance.new("UICorner"); TitleCorner.CornerRadius = UDim.ne
 ToggleButton.MouseButton1Click:Connect(function() MainMenu.Visible = not MainMenu.Visible end)
 
 local Scroll = Instance.new("ScrollingFrame")
-Scroll.Size = UDim2.new(1, -16, 1, -55)
-Scroll.Position = UDim2.new(0, 8, 0, 48)
+Scroll.Size = UDim2.new(1, -16, 1, -45)
+Scroll.Position = UDim2.new(0, 8, 0, 40)
 Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 750)
-Scroll.ScrollBarThickness = 3
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 700)
+Scroll.ScrollBarThickness = 2
 Scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 170)
 Scroll.Parent = MainMenu
-local ContentLayout = Instance.new("UIListLayout"); ContentLayout.Padding = UDim.new(0, 8); ContentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; ContentLayout.Parent = Scroll
+local ContentLayout = Instance.new("UIListLayout"); ContentLayout.Padding = UDim.new(0, 6); ContentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; ContentLayout.Parent = Scroll
 
 local function createToggle(parent, text, settingName)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -4, 0, 36)
+    btn.Size = UDim2.new(1, -4, 0, 34)
     btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
     btn.Text = "  " .. text
     btn.TextXAlignment = Enum.TextXAlignment.Left
@@ -131,11 +129,11 @@ local function createToggle(parent, text, settingName)
     local btnBorder = Instance.new("UIStroke"); btnBorder.Color = Color3.fromRGB(40, 40, 40); btnBorder.Thickness = 1; btnBorder.Parent = btn
 
     local statusIndicator = Instance.new("Frame")
-    statusIndicator.Size = UDim2.new(0, 8, 0, 8)
-    statusIndicator.Position = UDim2.new(1, -20, 0.5, -4)
+    statusIndicator.Size = UDim2.new(0, 6, 0, 6)
+    statusIndicator.Position = UDim2.new(1, -18, 0.5, -3)
     statusIndicator.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
     statusIndicator.Parent = btn
-    local siCorner = Instance.new("UICorner"); siCorner.CornerRadius = UDim.new(0, 4); siCorner.Parent = statusIndicator
+    local siCorner = Instance.new("UICorner"); siCorner.CornerRadius = UDim.new(0, 3); siCorner.Parent = statusIndicator
 
     local function updateVisuals()
         if Settings[settingName] then
@@ -151,21 +149,18 @@ local function createToggle(parent, text, settingName)
         end
     end
 
-    btn.MouseButton1Click:Connect(function()
-        Settings[settingName] = not Settings[settingName]
-        updateVisuals()
-    end)
+    btn.MouseButton1Click:Connect(function() Settings[settingName] = not Settings[settingName] updateVisuals() end)
     updateVisuals()
 end
 
 local function createSlider(parent, text, min, max, default, isFloat, callback)
     local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, -4, 0, 42)
+    container.Size = UDim2.new(1, -4, 0, 38)
     container.BackgroundTransparency = 1
     container.Parent = parent
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 0, 16)
+    label.Size = UDim2.new(1, 0, 0, 14)
     label.BackgroundTransparency = 1
     label.Text = text .. ": " .. string.format(isFloat and "%.2f" or "%d", default)
     label.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -175,26 +170,26 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
     label.Parent = container
 
     local bg = Instance.new("Frame")
-    bg.Size = UDim2.new(1, 0, 0, 6)
-    bg.Position = UDim2.new(0, 0, 0, 24)
+    bg.Size = UDim2.new(1, 0, 0, 4)
+    bg.Position = UDim2.new(0, 0, 0, 20)
     bg.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     bg.Parent = container
-    local bgCorner = Instance.new("UICorner"); bgCorner.CornerRadius = UDim.new(0, 3); bgCorner.Parent = bg
+    local bgCorner = Instance.new("UICorner"); bgCorner.CornerRadius = UDim.new(0, 2); bgCorner.Parent = bg
 
     local fill = Instance.new("Frame")
     fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
     fill.BackgroundColor3 = Color3.fromRGB(0, 255, 170)
     fill.Parent = bg
-    local fillCorner = Instance.new("UICorner"); fillCorner.CornerRadius = UDim.new(0, 3); fillCorner.Parent = fill
+    local fillCorner = Instance.new("UICorner"); fillCorner.CornerRadius = UDim.new(0, 2); fillCorner.Parent = fill
 
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 12, 0, 12)
-    btn.Position = UDim2.new((default - min) / (max - min), -6, 0.5, -6)
+    btn.Size = UDim2.new(0, 10, 0, 10)
+    btn.Position = UDim2.new((default - min) / (max - min), -5, 0.5, -5)
     btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     btn.Text = ""
     btn.Parent = bg
-    local btnCorner = Instance.new("UICorner"); btnCorner.CornerRadius = UDim.new(0, 6); btnCorner.Parent = btn
-    local btnStroke = Instance.new("UIStroke"); btnStroke.Color = Color3.fromRGB(0, 255, 170); btnStroke.Thickness = 1.5; btnStroke.Parent = btn
+    local btnCorner = Instance.new("UICorner"); btnCorner.CornerRadius = UDim.new(0, 5); btnCorner.Parent = btn
+    local btnStroke = Instance.new("UIStroke"); btnStroke.Color = Color3.fromRGB(0, 255, 170); btnStroke.Thickness = 1.2; btnStroke.Parent = btn
 
     local active = false
     bg.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then active = true end end)
@@ -202,7 +197,7 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
     UserInputService.InputChanged:Connect(function(i)
         if active and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
             local x = math.clamp((i.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
-            btn.Position = UDim2.new(x, -6, 0.5, -6)
+            btn.Position = UDim2.new(x, -5, 0.5, -5)
             fill.Size = UDim2.new(x, 0, 1, 0)
             local val = min + (x * (max - min))
             if not isFloat then val = math.floor(val) end
@@ -212,21 +207,22 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
     end)
 end
 
--- КНОПКИ УПРАВЛЕНИЯ
-createToggle(Scroll, "Upvalue Silent Aim (5-й способ)", "SilentAimEnabled")
+createToggle(Scroll, "Safe Silent Aim (Upvalue-v2)", "SilentAimEnabled")
 createToggle(Scroll, "On-Shot Flickbot", "FlickMode")
 createToggle(Scroll, "Combat Aimbot", "AimbotEnabled")
 createToggle(Scroll, "Wallcheck Bypass", "WallCheck")
 
 local SectionLabel = Instance.new("TextLabel")
-SectionLabel.Size = UDim2.new(1, 0, 0, 20); SectionLabel.BackgroundTransparency = 1; SectionLabel.Text = "--- FOV VISIBILITY ---"; SectionLabel.TextColor3 = Color3.fromRGB(120, 120, 120); SectionLabel.Font = Enum.Font.GothamBold; SectionLabel.TextSize = 11; SectionLabel.Parent = Scroll
+SectionLabel.Size = UDim2.new(1, 0, 0, 16); SectionLabel.BackgroundTransparency = 1; SectionLabel.Text = "--- FOV VISIBILITY ---"; SectionLabel.TextColor3 = Color3.fromRGB(120, 120, 120); SectionLabel.Font = Enum.Font.GothamBold; SectionLabel.TextSize = 10; SectionLabel.Parent = Scroll
 
 createToggle(Scroll, "Show Silent FOV (Blue)", "ShowSilentFOV")
 createToggle(Scroll, "Show Flick FOV (Red)", "ShowFlickFOV")
 createToggle(Scroll, "Show Aim FOV (Green)", "ShowAimFOV")
 
+Use code with caution.
+
 local SectionLabel2 = Instance.new("TextLabel")
-SectionLabel2.Size = UDim2.new(1, 0, 0, 20); SectionLabel2.BackgroundTransparency = 1; SectionLabel2.Text = "--- VISUALS & MISC ---"; SectionLabel2.TextColor3 = Color3.fromRGB(120, 120, 120); SectionLabel2.Font = Enum.Font.GothamBold; SectionLabel2.TextSize = 11; SectionLabel2.Parent = Scroll
+SectionLabel2.Size = UDim2.new(1, 0, 0, 16); SectionLabel2.BackgroundTransparency = 1; SectionLabel2.Text = "--- VISUALS & MISC ---"; SectionLabel2.TextColor3 = Color3.fromRGB(120, 120, 120); SectionLabel2.Font = Enum.Font.GothamBold; SectionLabel2.TextSize = 10; SectionLabel2.Parent = Scroll
 
 createToggle(Scroll, "Lite Lines (WH)", "EspLines")
 createToggle(Scroll, "Lite ESP Box", "EspBox")
@@ -249,14 +245,14 @@ Flick_Circle.Visible = false; Flick_Circle.Thickness = 1; Flick_Circle.NumSides 
 local Silent_Circle = Drawing.new("Circle")
 Silent_Circle.Visible = false; Silent_Circle.Thickness = 1; Silent_Circle.NumSides = 32; Silent_Circle.Filled = false; Silent_Circle.Color = Color3.fromRGB(0, 150, 255)
 
--- Проверка стен через движок
+-- Проверка стен
 local function checkWallVisibility(targetPart, character)
 if not Settings.WallCheck then return true end
 local partsObscuring = Camera:GetPartsObscuringTarget({targetPart.Position}, {LocalPlayer.Character, character, Camera})
 return #partsObscuring == 0
 end
 
--- Умный выбор цели в толпе
+-- Поиск цели к центру
 local function getClosestPlayer(currentFOV)
 local closestTarget = nil
 local minDistance = currentFOV + 1
@@ -286,39 +282,20 @@ end
 return closestTarget
 end
 
--- [[ ЛОГИКА 5-ГО СПОСОБА: ВНЕДРЕНИЕ В UPVALUES И ПАМЯТЬ СКРИПТА ОРУЖИЯ ]] --
--- Метод сканирует функции в сборщике мусора (getgc) для подмены векторов выстрела напрямую в коде игры [FPS] Flick
-task.spawn(function()
-while true do
-task.wait(1) -- Проверяем память каждую секунду, чтобы перехватывать новое оружие при спавне
-if Settings.SilentAimEnabled then
-pcall(function()
--- Получаем все функции из памяти
-for _, f in ipairs(getgc()) do
-if type(f) == "function" and islclosure(f) and not isexecutorclosure(f) then
--- Ищем переменные окружения (Upvalues) внутри функций скрипта оружия
-for i, v in ipairs(debug.getupvalues(f)) do
--- Находим таблицы настроек оружия, где хранятся данные о направлении выстрела
-if type(v) == "table" and (v.Direction or v.Spread or v.Hit or v.BulletCalculation) then
+-- [[ ОПТИМИЗИРОВАННЫЙ АДРЕСНЫЙ SILENT AIM ]] --
+-- Полностью заменяет getgc(), перехватывая вычисления внутри игровых CFrame-модулей
+local oldIndex
+oldIndex = hookmetamethod(game, "__index", function(self, key)
+if Settings.SilentAimEnabled and not checkcaller() and (key == "CFrame" or key == "Position") then
 local target = getClosestPlayer(Settings.SilentFOV)
-if target then
--- Напрямую перезаписываем внутренний вектор направления полета пули в коде игры
-debug.setupvalue(f, i, {
-Direction = (target.Position - Camera.CFrame.Position).Unit,
-Hit = target,
-Spread = 0 -- Бонусом убираем разброс кастомного оружия
-})
+if target and self:IsA("BasePart") and self.Name == "Handle" then
+return target.CFrame
 end
 end
-end
-end
-end
-end)
-end
-end
+return oldIndex(self, key)
 end)
 
-Логика обычного Flickbot (По кнопке выстрела)
+-- Выполнение Флика
 UserInputService.InputBegan:Connect(function(input, processed)
 if processed then return end
 if Settings.FlickMode and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) then
@@ -348,12 +325,11 @@ end
 end
 end
 
--- [[ ОСНОВНОЙ ЦИКЛ ОБНОВЛЕНИЯ ]] --
+-- [[ ОПТИМИЗИРОВАННЫЙ ЦИКЛ ОБНОВЛЕНИЯ ]] --
 local lastUpdate = 0
 RunService.RenderStepped:Connect(function()
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
--- Раздельное управление FOV кнопками
 if Settings.ShowAimFOV then
 Aim_Circle.Position = screenCenter; Aim_Circle.Radius = Settings.AimFOV; Aim_Circle.Visible = true
 else Aim_Circle.Visible = false end
@@ -366,7 +342,6 @@ if Settings.ShowSilentFOV then
 Silent_Circle.Position = screenCenter; Silent_Circle.Radius = Settings.SilentFOV; Silent_Circle.Visible = true
 else Silent_Circle.Visible = false end
 
--- Обычный Аимбот
 if Settings.AimbotEnabled and not Settings.FlickMode then
 local target = getClosestPlayer(Settings.AimFOV)
 if target then Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position) end
@@ -400,7 +375,9 @@ if Settings.EspLines and onScreen then
 visual.Line.From = screenCenter; visual.Line.To = Vector2.new(hrpPos.X, hrpPos.Y); visual.Line.Visible = true
 else visual.Line.Visible = false end
 
-if Settings.EspCharms then visual.Charms.Parent = character; visual.Charms.Enabled = true
+if Settings.EspCharms then
+visual.Charms.Parent = character
+visual.Charms.Enabled = true
 else visual.Charms.Enabled = false end
 else
 visual.Box.Visible = false; visual.Line.Visible = false; visual.Charms.Enabled = false
@@ -426,4 +403,3 @@ end
 
 Players.PlayerAdded:Connect(createESP); Players.PlayerRemoving:Connect(removeESP)
 for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then createESP(p) end end
-
