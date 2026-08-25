@@ -27,23 +27,36 @@ local ESP_Cache = {}
 local NormalSpeed = 16
 local CurrentBHopSpeed = NormalSpeed
 
--- [[ GUI ХАБА ]] --
+-- [[ СОЗДАНИЕ GUI ДЛЯ СМАРТФОНОВ ]] --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MobilePredictionHub"
+ScreenGui.Name = "MobilePredictionHubFixed"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
-if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
+-- Безопасное добавление в CoreGui или PlayerGui
+local success, err = pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
+if not success or not ScreenGui.Parent then 
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") 
+end
+
+-- Функция перетаскивания окон на Touch-экранах
 local function makeDraggable(gui)
     local dragging, dragInput, dragStart, startPos
     gui.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true; dragStart = input.Position; startPos = gui.Position
-            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+            dragging = true
+            dragStart = input.Position
+            startPos = gui.Position
+            input.Changed:Connect(function() 
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end 
+            end)
         end
     end)
-    gui.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
+    gui.InputChanged:Connect(function(input) 
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then 
+            dragInput = input 
+        end 
+    end)
     UserInputService.InputChanged:Connect(function(input)
         if input == dragInput and dragging then
             local delta = input.Position - dragStart
@@ -52,45 +65,64 @@ local function makeDraggable(gui)
     end)
 end
 
+-- 1. ПЛАВАЮЩАЯ КНОПКА (Всегда появится на экране)
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0, 55, 0, 55)
 ToggleButton.Position = UDim2.new(0.05, 0, 0.1, 0)
 ToggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 ToggleButton.Text = "MENU"
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.TextSize = 14
 ToggleButton.Parent = ScreenGui
-local TBCorner = Instance.new("UICorner"); TBCorner.CornerRadius = UDim.new(0, 28); TBCorner.Parent = ToggleButton
+
+local TBCorner = Instance.new("UICorner")
+TBCorner.CornerRadius = UDim.new(0, 28)
+TBCorner.Parent = ToggleButton
 makeDraggable(ToggleButton)
 
+-- 2. ПЛАВАЮЩЕЕ МЕНЮ (Loader UI)
 local MainMenu = Instance.new("Frame")
-MainMenu.Size = UDim2.new(0, 280, 0, 500)
-MainMenu.Position = UDim2.new(0.5, -140, 0.5, -250)
+MainMenu.Size = UDim2.new(0, 280, 0, 480)
+MainMenu.Position = UDim2.new(0.5, -140, 0.5, -240)
 MainMenu.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 MainMenu.Visible = false
 MainMenu.Parent = ScreenGui
-local MenuCorner = Instance.new("UICorner"); MenuCorner.CornerRadius = UDim.new(0, 10); MenuCorner.Parent = MainMenu
+
+local MenuCorner = Instance.new("UICorner")
+MenuCorner.CornerRadius = UDim.new(0, 10)
+MenuCorner.Parent = MainMenu
 makeDraggable(MainMenu)
 
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-Title.Text = "PREDICTION & ESP HUB"
+Title.Text = "FIXED PREDICTION HUB"
 Title.TextColor3 = Color3.fromRGB(0, 255, 200)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 16
 Title.Parent = MainMenu
 
-ToggleButton.MouseButton1Click:Connect(function() MainMenu.Visible = not MainMenu.Visible end)
+-- Открытие/Закрытие меню по клику на кнопку
+ToggleButton.MouseButton1Click:Connect(function() 
+    MainMenu.Visible = not MainMenu.Visible 
+end)
 
+-- Скролл-контейнер для элементов
 local Scroll = Instance.new("ScrollingFrame")
 Scroll.Size = UDim2.new(1, -20, 1, -50)
 Scroll.Position = UDim2.new(0, 10, 0, 45)
 Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 720)
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 680)
 Scroll.ScrollBarThickness = 4
 Scroll.Parent = MainMenu
-local ContentLayout = Instance.new("UIListLayout"); ContentLayout.Padding = UDim.new(0, 6); ContentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; ContentLayout.Parent = Scroll
 
+local ContentLayout = Instance.new("UIListLayout")
+ContentLayout.Padding = UDim.new(0, 6)
+ContentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+ContentLayout.Parent = Scroll
+
+-- Исправленная функция создания кнопок
 local function createToggle(parent, text, settingName)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 0, 36)
@@ -100,6 +132,7 @@ local function createToggle(parent, text, settingName)
     btn.Font = Enum.Font.SourceSansBold
     btn.TextSize = 14
     btn.Parent = parent
+    
     btn.MouseButton1Click:Connect(function()
         Settings[settingName] = not Settings[settingName]
         btn.Text = text .. (Settings[settingName] and ": ON" or ": OFF")
@@ -107,23 +140,42 @@ local function createToggle(parent, text, settingName)
     end)
 end
 
+-- Полностью переписанная и исправленная функция слайдеров
 local function createSlider(parent, text, min, max, default, isFloat, callback)
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 0, 20); label.BackgroundTransparency = 1
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.BackgroundTransparency = 1
     label.Text = text .. ": " .. string.format(isFloat and "%.2f" or "%d", default)
-    label.TextColor3 = Color3.fromRGB(255, 255, 255); label.TextSize = 13; label.Parent = parent
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextSize = 13
+    label.Parent = parent
 
     local bg = Instance.new("Frame")
-    bg.Size = UDim2.new(1, 0, 0, 10); bg.BackgroundColor3 = Color3.fromRGB(45, 45, 45); bg.Parent = parent
+    bg.Size = UDim2.new(1, 0, 0, 10)
+    bg.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    bg.Parent = parent
+
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 14, 1, 0); btn.BackgroundColor3 = Color3.fromRGB(0, 255, 200); btn.Text = ""; btn.Parent = bg
+    btn.Size = UDim2.new(0, 14, 1, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
+    btn.Text = ""
+    btn.Parent = bg
 
     local initPercent = (default - min) / (max - min)
     btn.Position = UDim2.new(initPercent, -7, 0, 0)
 
     local active = false
-    bg.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then active = true end end)
-    UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then active = false end end)
+    
+    btn.InputBegan:Connect(function(input) 
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+            active = true 
+        end 
+    end)
+    UserInputService.InputEnded:Connect(function(input) 
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+            active = false 
+        end 
+    end)
     UserInputService.InputChanged:Connect(function(input)
         if active and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local sizeX = math.clamp((input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
@@ -136,6 +188,7 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
     end)
 end
 
+-- Рендер элементов управления в меню
 createToggle(Scroll, "On-Shot Flick", "FlickMode")
 createToggle(Scroll, "Combat Aimbot", "AimbotEnabled")
 createToggle(Scroll, "Wallcheck Bypass", "WallCheck")
@@ -144,7 +197,7 @@ createToggle(Scroll, "Visual ESP Box", "EspBox")
 createToggle(Scroll, "Visual Charms", "EspCharms")
 createToggle(Scroll, "Smooth BunnyHop", "BHopEnabled")
 
-createSlider(Scroll, "Aim FOV", 10, 900, Settings.AimFOV, false, function(v) Settings.AimFOV = v v end)
+createSlider(Scroll, "Aim FOV", 10, 900, Settings.AimFOV, false, function(v) Settings.AimFOV = v end)
 createSlider(Scroll, "Flick FOV", 10, 900, Settings.FlickFOV, false, function(v) Settings.FlickFOV = v end)
 createSlider(Scroll, "Flick Delay", 0.01, 1.00, Settings.FlickDelay, true, function(v) Settings.FlickDelay = v end)
 createSlider(Scroll, "BHop Power", 1, 10, Settings.BHopPower, false, function(v) Settings.BHopPower = v end)
@@ -166,16 +219,10 @@ end
 local function getPredictedPosition(targetPart, targetCharacter)
     local hrp = targetCharacter:FindFirstChild("HumanoidRootPart")
     if hrp then
-        -- Считываем физическую скорость движения врага в 3D пространстве
         local velocity = hrp.AssemblyLinearVelocity
-        -- Рассчитываем дистанцию между нами и врагом
         local distance = (Camera.CFrame.Position - targetPart.Position).Magnitude
-        
-        -- Динамический коэффицент времени полета пули/доводки (Пинг + Дистанция/Скорость + Ручная задержка)
         local pingComp = 0.03 
         local timeToTarget = (distance / 300) + Settings.FlickDelay + pingComp
-        
-        -- Прогнозируем точку нахождения головы
         return targetPart.Position + (velocity * timeToTarget)
     end
     return targetPart.Position
@@ -195,21 +242,18 @@ local function getClosestPlayer(currentFOV)
                     local distance = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
                     if distance < maxDistance and isVisible(targetPart, player.Character) then
                         maxDistance = distance; closestTarget = targetPart; closestChar = player.Character
-                    end
-                end
-            end
-        end
-    end
-    return closestTarget, closestChar
+end
+end
+end
+return closestTarget, closestChar
 end
 
 -- Выполнение Flick-шота с упреждением
 local function doFlickShot()
-    local targetPart, targetChar = getClosestPlayer(Settings.FlickFOV)
-    if targetPart and targetChar then
-        task.delay(Settings.FlickDelay, function()
+local targetPart, targetChar = getClosestPlayer(Settings.FlickFOV)
+if targetPart and targetChar then
+task.delay(Settings.FlickDelay, function()
 if targetPart and targetPart.Parent and targetChar:FindFirstChildOfClass("Humanoid") and targetChar:FindFirstChildOfClass("Humanoid").Health > 0 then
--- Наводимся не в текущую позицию, а в рассчитанную точку упреждения
 local predictedPos = getPredictedPosition(targetPart, targetChar)
 Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
 end
@@ -230,16 +274,14 @@ if ESP_Cache[player] then return end
 
 local box = Drawing.new("Square"); box.Color = Color3.fromRGB(0, 255, 200); box.Thickness = 1.5; box.Filled = false; box.Visible = false
 
--- Основная неоновая линия
 local mainLine = Drawing.new("Line")
 mainLine.Color = Color3.fromRGB(0, 255, 200)
-mainLine.Thickness = 2 -- Сделали толще для красоты
+mainLine.Thickness = 2
 mainLine.Visible = false
 
--- Линия тени (создает красивый неоновый 3D объем на экране)
 local shadowLine = Drawing.new("Line")
 shadowLine.Color = Color3.fromRGB(0, 0, 0)
-shadowLine.Thickness = 4 -- Шире основной, ложится под низ
+shadowLine.Thickness = 4
 shadowLine.Transparency = 0.5
 shadowLine.Visible = false
 
@@ -279,6 +321,7 @@ CurrentBHopSpeed = NormalSpeed; humanoid.WalkSpeed = NormalSpeed
 end
 end
 end
+
 -- [[ ЦИКЛ ОБНОВЛЕНИЯ (RENDERSTEPPED) ]] --
 RunService.RenderStepped:Connect(function()
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -288,7 +331,6 @@ FOV_Circle.Color = Settings.FlickMode and Color3.fromRGB(255, 80, 80) or Color3.
 
 handleSmoothBHop()
 
--- Логика обычного Аимбота с упреждением
 if Settings.AimbotEnabled and not Settings.FlickMode then
 local targetPart, targetChar = getClosestPlayer(Settings.AimFOV)
 if targetPart and targetChar then
@@ -297,7 +339,6 @@ Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
 end
 end
 
--- Рендер красивого ESP и Линий
 for player, visual in pairs(ESP_Cache) do
 local character = player.Character
 local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -306,10 +347,7 @@ local head = character and character:FindFirstChild("Head")
 
 if character and humanoid and hrp and head and humanoid.Health > 0 then
 local hrpPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-
--- Отрезаем Z координату для отрисовки линий 2D
 local target2D = Vector2.new(hrpPos.X, hrpPos.Y)
--- Считаем дистанцию для кастомизации прозрачности
 local distance = (Camera.CFrame.Position - hrp.Position).Magnitude
 
 if Settings.EspBox and onScreen then
@@ -319,22 +357,17 @@ local height = math.abs(headPos.Y - legPos.Y); local width = height / 1.5
 visual.Box.Size = Vector2.new(width, height); visual.Box.Position = Vector2.new(hrpPos.X - width / 2, hrpPos.Y - height / 2); visual.Box.Visible = true
 else visual.Box.Visible = false end
 
--- КРАСИВЫЕ КАСКАДНЫЕ ЛИНИИ СКВОЗЬ СТЕНЫ
 if Settings.EspLines and onScreen then
--- Динамическое угасание линии в зависимости от дальности до игрока
 local dynamicTransparency = math.clamp(1 - (distance / 500), 0.3, 1)
 
--- 1. Отрисовка подложки-тени
 visual.ShadowLine.From = screenCenter
 visual.ShadowLine.To = target2D
 visual.ShadowLine.Transparency = dynamicTransparency * 0.4
 visual.ShadowLine.Visible = true
 
--- 2. Отрисовка основной неоновой линии поверх тени
 visual.MainLine.From = screenCenter
 visual.MainLine.To = target2D
 visual.MainLine.Transparency = dynamicTransparency
--- Цвет плавно переходит от бирюзового к красному, если враг подошел вплотную
 visual.MainLine.Color = distance < 40 and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(0, 255, 200)
 visual.MainLine.Visible = true
 else
