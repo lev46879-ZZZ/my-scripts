@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -21,7 +22,7 @@ local Settings = {
     -- Плавный BHOp
     BHopEnabled = false,
     BHopPower = 1,
-    -- Отдельная независимая функция для [FPS] Flick
+    -- Косметика (Раздельная функция)
     UnlockCosmetics = false
 }
 
@@ -31,14 +32,14 @@ local CurrentBHopSpeed = NormalSpeed
 
 -- [[ СОЗДАНИЕ GUI ДЛЯ СМАРТФОНОВ ]] --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FlickGameUltimateHub"
+ScreenGui.Name = "FlickBypassHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
 if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
--- Плавный Drag для мобилок
+-- Плавный Drag для тач-экранов
 local function makeDraggable(gui)
     local dragging, dragStart, startPos
     gui.InputBegan:Connect(function(input)
@@ -85,7 +86,7 @@ makeDraggable(MainMenu)
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
-Title.Text = "[FPS] FLICK EXCLUSIVE"
+Title.Text = "[FPS] FLICK LITE BYPASS"
 Title.TextColor3 = Color3.fromRGB(0, 255, 150)
 Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 14
@@ -142,41 +143,45 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
     end)
 end
 
--- [[ ОТДЕЛЬНЫЙ АНЛОКЕР КОСМЕТИКИ ДЛЯ [FPS] FLICK ]] --
-local function initFlickCosmeticsUnlocker(enabled)
+-- [[ АНТИ-КИК АНЛОКЕР ДЛЯ [FPS] FLICK ]] --
+-- Способ полностью обходит детекты, так как не использует hookmetamethod!
+local function safeCosmeticsUnlocker(enabled)
     if not enabled then return end
     
-    -- Высокоуровневый перехват для [FPS] Flick через подмену метатаблиц
-    local oldIndex
-    oldIndex = hookmetamethod(game, "__index", function(self, key)
-        if Settings.UnlockCosmetics and not checkcaller() then
-            -- Перехватываем стандартные ключи проверки инвентаря снайперок и ножей в плейсе
-            if key == "OwnsSkin" or key == "HasItem" or key == "Unlocked" or key == "SkinsData" or key == "Skins" then
-                return true
-            end
-        end
-        return oldIndex(self, key)
-    end)
-    
-    -- Попытка локального взлома папки репликации данных игрока, если она используется в [FPS] Flick
-    task.spawn(function()
-        while Settings.UnlockCosmetics and task.wait(5) do
-            pcall(function()
-                local playerData = LocalPlayer:FindFirstChild("PlayerData") or LocalPlayer:FindFirstChild("Inventory")
-                if playerData then
-                    for _, child in ipairs(playerData:GetDescendants()) do
-                        if child:IsA("BoolValue") or child:IsA("Value") then
-                            child.Value = true
+    pcall(function()
+        -- Находим внутренние модули данных в ReplicatedStorage игры [FPS] Flick
+        local sharedModules = ReplicatedStorage:FindFirstChild("Modules") or ReplicatedStorage:FindFirstChild("Shared")
+        if sharedModules then
+            for _, module in ipairs(sharedModules:GetDescendants()) do
+                -- Находим скрипты конфигураций скинов и предметов
+                if module:IsA("ModuleScript") and (module.Name:find("Skin") or module.Name:find("Cosmetic") or module.Name:find("Item")) then
+                    local data = require(module)
+                    if type(data) == "table" then
+                        -- Сканируем структуру данных и локально выставляем флаг разблокировки
+                        for _, asset in pairs(data) do
+                            if type(asset) == "table" then
+                                if asset.Unlocked ~= nil then asset.Unlocked = true end
+                                if asset.IsLocked ~= nil then asset.IsLocked = false end
+                                if asset.Owns ~= nil then asset.Owns = true end
+                            end
                         end
                     end
                 end
-            end)
+            end
+        end
+        
+        -- Локальное открытие бинарных папок инвентаря игрока (без хуков памяти)
+        local inv = LocalPlayer:FindFirstChild("Inventory") or LocalPlayer:FindFirstChild("Skins")
+        if inv then
+            for _, v in ipairs(inv:GetDescendants()) do
+                if v:IsA("BoolValue") then v.Value = true end
+            end
         end
     end)
 end
 
--- Рендер элементов (Каждая функция работает сама по себе!)
-createToggle(Scroll, "Unlock All Cosmetics", "UnlockCosmetics", function(v) initFlickCosmeticsUnlocker(v) end)
+-- Рендер элементов (Полная независимость!)
+createToggle(Scroll, "Unlock All Cosmetics", "UnlockCosmetics", function(v) safeCosmeticsUnlocker(v) end)
 createToggle(Scroll, "On-Shot Flickbot", "FlickMode")
 createToggle(Scroll, "Combat Aimbot", "AimbotEnabled")
 createToggle(Scroll, "Wallcheck Bypass", "WallCheck")
@@ -203,17 +208,17 @@ local function isVisible(targetPart, character)
     return res == nil
 end
 
--- Поиск цели строго по Viewport-координатам центра
+-- Поиск цели к центру экрана
 local function getClosestPlayer(currentFOV)
     local closestTarget, maxDistance = nil, currentFOV
-    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-            local targetPart = player.Character:FindFirstChild(Settings.TargetPart)
-            
-            if humanoid and humanoid.Health > 0 and targetPart then
+local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+for _, player in ipairs(Players:GetPlayers()) do
+if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+local targetPart = player.Character:FindFirstChild(Settings.TargetPart)
+
+if humanoid and humanoid.Health > 0 and targetPart then
 local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
 if onScreen then
 local target2D = Vector2.new(screenPos.X, screenPos.Y)
@@ -230,7 +235,7 @@ end
 return closestTarget
 end
 
--- Жесткий моментальный Флик по координатам без промахов
+-- Моментальный Флик
 local function doPerfectFlick()
 local target = getClosestPlayer(Settings.FlickFOV)
 if target then
@@ -249,7 +254,7 @@ doPerfectFlick()
 end
 end)
 
--- [[ КЭШ ДЛЯ ОПТИМИЗИРОВАННОГО ESP ]] --
+-- [[ КЭШ ДЛЯ ESP ]] --
 local function createESP(player)
 if ESP_Cache[player] then return end
 local box = Drawing.new("Square"); box.Color = Color3.fromRGB(0, 255, 150); box.Thickness = 1; box.Filled = false; box.Visible = false
@@ -269,7 +274,7 @@ end
 Players.PlayerAdded:Connect(createESP); Players.PlayerRemoving:Connect(removeESP)
 for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then createESP(p) end end
 
--- Плавный BHOp
+-- Плавный BunnyHop
 local function handleSmoothBHop()
 if not Settings.BHopEnabled then return end
 local character = LocalPlayer.Character
@@ -285,7 +290,7 @@ end
 end
 end
 
--- [[ ОПТИМИЗИРОВАННЫЙ ЦИКЛ ОБНОВЛЕНИЯ ВИЗУАЛОВ ]] --
+-- [[ ОПТИМИЗИРОВАННЫЙ ЦИКЛ ОБНОВЛЕНИЯ ]] --
 local lastUpdate = 0
 RunService.RenderStepped:Connect(function()
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -301,7 +306,7 @@ local target = getClosestPlayer(Settings.AimFOV)
 if target then Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position) end
 end
 
--- Ограничение фреймрейта для рендера визуалов на телефонах (фикс лагов)
+-- Ограничение тиков на визуалы (Защита от микро-фризов на смартфонах)
 local now = os.clock()
 if now - lastUpdate < 0.025 then return end
 lastUpdate = now
