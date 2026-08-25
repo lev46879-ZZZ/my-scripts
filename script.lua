@@ -12,12 +12,13 @@ local Settings = {
     WallCheck = false,
     AimFOV = 100,
     FlickFOV = 150,
+    FlickDelay = 0.01, -- Новая настройка задержки (в секундах)
     TargetPart = "Head"
 }
 
 -- [[ СОЗДАНИЕ GUI ДЛЯ СМАРТФОНОВ ]] --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MobileAutoFlickHub"
+ScreenGui.Name = "MobileDelayFlickHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
@@ -67,8 +68,8 @@ makeDraggable(ToggleButton)
 
 -- ПЛАВАЮЩЕЕ МЕНЮ (Loader UI)
 local MainMenu = Instance.new("Frame")
-MainMenu.Size = UDim2.new(0, 280, 0, 420)
-MainMenu.Position = UDim2.new(0.5, -140, 0.5, -210)
+MainMenu.Size = UDim2.new(0, 280, 0, 460) -- Увеличен размер под третий слайдер
+MainMenu.Position = UDim2.new(0.5, -140, 0.5, -230)
 MainMenu.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainMenu.Visible = false
 MainMenu.Parent = ScreenGui
@@ -81,8 +82,8 @@ makeDraggable(MainMenu)
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-Title.Text = "AUTO FLICK LAUNCHER"
-Title.TextColor3 = Color3.fromRGB(0, 255, 150)
+Title.Text = "DELAY FLICK LAUNCHER"
+Title.TextColor3 = Color3.fromRGB(255, 200, 0)
 Title.TextSize = 16
 Title.Font = Enum.Font.SourceSansBold
 Title.Parent = MainMenu
@@ -93,7 +94,7 @@ end)
 
 -- КОНТЕНТ МЕНЮ
 local Container = Instance.new("Frame")
-Container.Size = UDim2.new(0, 260, 0, 360)
+Container.Size = UDim2.new(0, 260, 0, 400)
 Container.Position = UDim2.new(0, 10, 0, 50)
 Container.BackgroundTransparency = 1
 Container.Parent = MainMenu
@@ -104,11 +105,11 @@ ContentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 ContentLayout.Parent = Container
 
 -- Функция для создания слайдеров
-local function createSlider(parent, text, min, max, default, callback)
+local function createSlider(parent, text, min, max, default, isFloat, callback)
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 0, 22)
     label.BackgroundTransparency = 1
-    label.Text = text .. ": " .. default
+    label.Text = text .. ": " .. string.format(isFloat and "%.2f" or "%d", default)
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.TextSize = 14
     label.Font = Enum.Font.SourceSans
@@ -121,7 +122,7 @@ local function createSlider(parent, text, min, max, default, callback)
 
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0, 16, 1, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
+    btn.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
     btn.Text = ""
     btn.Parent = bg
 
@@ -132,8 +133,11 @@ local function createSlider(parent, text, min, max, default, callback)
     local function update(input)
         local sizeX = math.clamp((input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
         btn.Position = UDim2.new(sizeX, -8, 0, 0)
-        local value = math.floor(min + (sizeX * (max - min)))
-        label.Text = text .. ": " .. value
+        
+        local value = min + (sizeX * (max - min))
+        if not isFloat then value = math.floor(value) end
+        
+        label.Text = text .. ": " .. string.format(isFloat and "%.2f" or "%d", value)
         callback(value)
     end
 
@@ -164,7 +168,7 @@ AimToggle.MouseButton1Click:Connect(function()
     AimToggle.TextColor3 = Settings.AimbotEnabled and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
 end)
 
--- Кнопка: Режим Flick On-Shot (Авто-Флик при тапе)
+-- Кнопка: Режим Flick On-Shot
 local FlickToggle = Instance.new("TextButton")
 FlickToggle.Size = UDim2.new(1, 0, 0, 38)
 FlickToggle.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
@@ -196,13 +200,17 @@ WallToggle.MouseButton1Click:Connect(function()
     WallToggle.TextColor3 = Settings.WallCheck and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
 end)
 
-createSlider(Container, "Aim FOV", 10, 900, Settings.AimFOV, function(value) Settings.AimFOV = value end)
-createSlider(Container, "Flick FOV", 10, 900, Settings.FlickFOV, function(value) Settings.FlickFOV = value end)
+-- Слайдеры
+createSlider(Container, "Aim FOV", 10, 900, Settings.AimFOV, false, function(value) Settings.AimFOV = value end)
+createSlider(Container, "Flick FOV", 10, 900, Settings.FlickFOV, false, function(value) Settings.FlickFOV = value end)
+
+-- НОВЫЙ СЛАЙДЕР: Настройка задержки (от 0.01 до 1.00 сек)
+createSlider(Container, "Flick Delay", 0.01, 1.00, Settings.FlickDelay, true, function(value) Settings.FlickDelay = value end)
 
 -- [[ КОРРЕКТНЫЙ ЦЕНТР ЭКРАНА ДЛЯ FOV ]] --
 local FOV_Circle = Drawing.new("Circle")
 FOV_Circle.Visible = true
-FOV_Circle.Color = Color3.fromRGB(0, 255, 150)
+FOV_Circle.Color = Color3.fromRGB(255, 200, 0)
 FOV_Circle.Thickness = 1
 FOV_Circle.NumSides = 64
 FOV_Circle.Filled = false
@@ -238,35 +246,39 @@ local function getClosestPlayer(currentFOV)
                     local distance = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
                     
                     if distance < maxDistance then
-                        if isVisible(targetPart, player.Character) then
-                            maxDistance = distance
-                            closestTarget = targetPart
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return closestTarget
+if isVisible(targetPart, player.Character) then
+maxDistance = distance
+closestTarget = targetPart
+end
+end
+end
+end
+end
+end
+return closestTarget
 end
 
--- Функция выполнения моментального Флика
+-- Функция выполнения отложенного Флика
 local function doFlickShot()
-    local target = getClosestPlayer(Settings.FlickFOV)
-    if target then
--- Мгновенно наводим камеру на цель в момент начала тапа по экрану
+-- Фиксируем цель в момент нажатия на экран
+local target = getClosestPlayer(Settings.FlickFOV)
+
+if target then
+-- Асинхронное выполнение задержки без фризов
+task.delay(Settings.FlickDelay, function()
+-- Проверяем повторно, жива ли еще цель после задержки
+if target and target.Parent and target.Parent:FindFirstChildOfClass("Humanoid") and target.Parent:FindFirstChildOfClass("Humanoid").Health > 0 then
 Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
 end
+end)
+end
 end
 
--- [[ ОТСЛЕЖИВАНИЕ НАЖАТИЙ НА ЭКРАН ТЕЛЕФОНА (ВЫСТРЕЛ) ]] --
+-- [[ ОТСЛЕЖИВАНИЕ НАЖАТИЙ НА ЭКРАН ТЕЛЕФОНА ]] --
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
--- Игнорируем нажатия, если вы кликаете по элементам нашего Чит-Меню
 if gameProcessed then return end
 
--- Проверяем, включен ли режим автоматического флика при стрельбе
 if Settings.FlickMode then
--- Touch — это нажатие пальцем по экрану (основной выстрел на смартфонах)
 if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
 doFlickShot()
 end
@@ -280,13 +292,12 @@ FOV_Circle.Position = screenCenter
 
 if Settings.FlickMode then
 FOV_Circle.Radius = Settings.FlickFOV
-FOV_Circle.Color = Color3.fromRGB(255, 80, 80) -- Красный круг для режима флика
+FOV_Circle.Color = Color3.fromRGB(255, 80, 80)
 else
 FOV_Circle.Radius = Settings.AimFOV
-FOV_Circle.Color = Color3.fromRGB(0, 255, 150) -- Зеленый круг для обычного аима
+FOV_Circle.Color = Color3.fromRGB(255, 200, 0)
 end
 
--- Обычный аимбот (постоянный трекинг) работает, только если On-Shot Flick выключен
 if Settings.AimbotEnabled and not Settings.FlickMode then
 local target = getClosestPlayer(Settings.AimFOV)
 if target then
