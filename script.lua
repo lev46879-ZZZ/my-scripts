@@ -9,7 +9,7 @@ local Camera = workspace.CurrentCamera
 local Settings = {
     AimbotEnabled = false,
     FlickMode = false,
-    SilentAimEnabled = false, -- Новая 100% безопасная логика
+    SilentAimEnabled = false, -- Включение Silent Aim по 5-му способу
     WallCheck = false,
     AimFOV = 120,
     FlickFOV = 180,
@@ -20,7 +20,10 @@ local Settings = {
     EspCharms = false,
     EspLines = false,
     BHopEnabled = false,
-    BHopPower = 1
+    BHopPower = 1,
+    ShowAimFOV = false,
+    ShowFlickFOV = false,
+    ShowSilentFOV = false
 }
 
 local ESP_Cache = {}
@@ -29,7 +32,7 @@ local CurrentBHopSpeed = NormalSpeed
 
 -- [[ СОЗДАНИЕ GUI ]] --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FlickTrueSilentHub"
+ScreenGui.Name = "FlickUpvalueHubV8"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -56,7 +59,7 @@ end
 
 task.wait(0.1)
 
--- [[ КНОПКА МЕНЮ ]] --
+-- КНОПКА МЕНЮ
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0, 55, 0, 55)
 ToggleButton.Position = UDim2.new(0.05, 0, 0.15, 0)
@@ -71,9 +74,9 @@ local TBCorner = Instance.new("UICorner"); TBCorner.CornerRadius = UDim.new(0, 2
 local TBBorder = Instance.new("UIStroke"); TBBorder.Color = Color3.fromRGB(0, 255, 170); TBBorder.Thickness = 1.5; TBBorder.Parent = ToggleButton
 makeDraggable(ToggleButton)
 
--- [[ ГЛАВНОЕ МЕНЮ ]] --
+-- ГЛАВНОЕ МЕНЮ
 local MainMenu = Instance.new("Frame")
-MainMenu.Size = UDim2.new(0, 270, 0, 440)
+MainMenu.Size = UDim2.new(0, 270, 0, 460)
 MainMenu.Position = UDim2.new(0.5, -135, 0.5, -220)
 MainMenu.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
 MainMenu.Visible = false
@@ -86,7 +89,7 @@ makeDraggable(MainMenu)
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Title.Text = "  ⚡ TRUE SILENT v6"
+Title.Text = "  ⚡ GC UPVALUE v8"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Font = Enum.Font.GothamBold
@@ -107,7 +110,7 @@ local Scroll = Instance.new("ScrollingFrame")
 Scroll.Size = UDim2.new(1, -16, 1, -55)
 Scroll.Position = UDim2.new(0, 8, 0, 48)
 Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 660)
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 750)
 Scroll.ScrollBarThickness = 3
 Scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 170)
 Scroll.Parent = MainMenu
@@ -209,10 +212,22 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
     end)
 end
 
-createToggle(Scroll, "Vector Silent Aim (Floor Hit)", "SilentAimEnabled")
+-- КНОПКИ УПРАВЛЕНИЯ
+createToggle(Scroll, "Upvalue Silent Aim (5-й способ)", "SilentAimEnabled")
 createToggle(Scroll, "On-Shot Flickbot", "FlickMode")
 createToggle(Scroll, "Combat Aimbot", "AimbotEnabled")
 createToggle(Scroll, "Wallcheck Bypass", "WallCheck")
+
+local SectionLabel = Instance.new("TextLabel")
+SectionLabel.Size = UDim2.new(1, 0, 0, 20); SectionLabel.BackgroundTransparency = 1; SectionLabel.Text = "--- FOV VISIBILITY ---"; SectionLabel.TextColor3 = Color3.fromRGB(120, 120, 120); SectionLabel.Font = Enum.Font.GothamBold; SectionLabel.TextSize = 11; SectionLabel.Parent = Scroll
+
+createToggle(Scroll, "Show Silent FOV (Blue)", "ShowSilentFOV")
+createToggle(Scroll, "Show Flick FOV (Red)", "ShowFlickFOV")
+createToggle(Scroll, "Show Aim FOV (Green)", "ShowAimFOV")
+
+local SectionLabel2 = Instance.new("TextLabel")
+SectionLabel2.Size = UDim2.new(1, 0, 0, 20); SectionLabel2.BackgroundTransparency = 1; SectionLabel2.Text = "--- VISUALS & MISC ---"; SectionLabel2.TextColor3 = Color3.fromRGB(120, 120, 120); SectionLabel2.Font = Enum.Font.GothamBold; SectionLabel2.TextSize = 11; SectionLabel2.Parent = Scroll
+
 createToggle(Scroll, "Lite Lines (WH)", "EspLines")
 createToggle(Scroll, "Lite ESP Box", "EspBox")
 createToggle(Scroll, "Lite Charms", "EspCharms")
@@ -234,14 +249,14 @@ Flick_Circle.Visible = false; Flick_Circle.Thickness = 1; Flick_Circle.NumSides 
 local Silent_Circle = Drawing.new("Circle")
 Silent_Circle.Visible = false; Silent_Circle.Thickness = 1; Silent_Circle.NumSides = 32; Silent_Circle.Filled = false; Silent_Circle.Color = Color3.fromRGB(0, 150, 255)
 
--- Проверка видимости стен
+-- Проверка стен через движок
 local function checkWallVisibility(targetPart, character)
 if not Settings.WallCheck then return true end
 local partsObscuring = Camera:GetPartsObscuringTarget({targetPart.Position}, {LocalPlayer.Character, character, Camera})
 return #partsObscuring == 0
 end
 
--- Поиск цели к центру экрана (Умный выбор в толпе)
+-- Умный выбор цели в толпе
 local function getClosestPlayer(currentFOV)
 local closestTarget = nil
 local minDistance = currentFOV + 1
@@ -271,37 +286,39 @@ end
 return closestTarget
 end
 
--- [[ НАСТОЯЩИЙ И БЕЗОПАСНЫЙ SILENT AIM (ПЕРЕХВАТ ЛУЧЕЙ РЕНДЕРА) ]] --
--- Перехватываем функцию Raycast на уровне игрового движка. Камера игрока при этом не шевелится.
-local oldRaycast
-oldRaycast = hookmetamethod(workspace, "Raycast", function(self, origin, direction, params)
-if Settings.SilentAimEnabled and not checkcaller() then
-local targetPart = getClosestPlayer(Settings.SilentFOV)
-if targetPart then
--- Рассчитываем новый вектор направления пули прямо в голову врага
-local newDirection = (targetPart.Position - origin).Unit * direction.Magnitude
--- Подменяем оригинальный луч на наш читерский вектор
-return oldRaycast(self, origin, newDirection, params)
+-- [[ ЛОГИКА 5-ГО СПОСОБА: ВНЕДРЕНИЕ В UPVALUES И ПАМЯТЬ СКРИПТА ОРУЖИЯ ]] --
+-- Метод сканирует функции в сборщике мусора (getgc) для подмены векторов выстрела напрямую в коде игры [FPS] Flick
+task.spawn(function()
+while true do
+task.wait(1) -- Проверяем память каждую секунду, чтобы перехватывать новое оружие при спавне
+if Settings.SilentAimEnabled then
+pcall(function()
+-- Получаем все функции из памяти
+for _, f in ipairs(getgc()) do
+if type(f) == "function" and islclosure(f) and not isexecutorclosure(f) then
+-- Ищем переменные окружения (Upvalues) внутри функций скрипта оружия
+for i, v in ipairs(debug.getupvalues(f)) do
+-- Находим таблицы настроек оружия, где хранятся данные о направлении выстрела
+if type(v) == "table" and (v.Direction or v.Spread or v.Hit or v.BulletCalculation) then
+local target = getClosestPlayer(Settings.SilentFOV)
+if target then
+-- Напрямую перезаписываем внутренний вектор направления полета пули в коде игры
+debug.setupvalue(f, i, {
+Direction = (target.Position - Camera.CFrame.Position).Unit,
+Hit = target,
+Spread = 0 -- Бонусом убираем разброс кастомного оружия
+})
 end
 end
-return oldRaycast(self, origin, direction, params)
+end
+end
+end
+end)
+end
+end
 end)
 
--- Логика для старых пушек, если они используют FindPartOnRay
-local oldFindPartOnRay
-oldFindPartOnRay = hookmetamethod(workspace, "FindPartOnRay", function(self, ray, ignoreInstance, ...)
-if Settings.SilentAimEnabled and not checkcaller() then
-local targetPart = getClosestPlayer(Settings.SilentFOV)
-if targetPart then
--- Пересоздаем луч от лица камеры ровно в цель
-local newRay = Ray.new(ray.Origin, (targetPart.Position - ray.Origin).Unit * ray.Direction.Magnitude)
-return oldFindPartOnRay(self, newRay, ignoreInstance, ...)
-end
-end
-return oldFindPartOnRay(self, ray, ignoreInstance, ...)
-end)
-
--- Логика обычного Flickbot (Доводчик по нажатию экрана)
+Логика обычного Flickbot (По кнопке выстрела)
 UserInputService.InputBegan:Connect(function(input, processed)
 if processed then return end
 if Settings.FlickMode and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) then
@@ -331,36 +348,28 @@ end
 end
 end
 
+-- [[ ОСНОВНОЙ ЦИКЛ ОБНОВЛЕНИЯ ]] --
 local lastUpdate = 0
 RunService.RenderStepped:Connect(function()
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
--- Управление кругами
-if Settings.AimbotEnabled and not Settings.FlickMode and not Settings.SilentAimEnabled then
-Aim_Circle.Position = screenCenter
-Aim_Circle.Radius = Settings.AimFOV
-Aim_Circle.Visible = true
+-- Раздельное управление FOV кнопками
+if Settings.ShowAimFOV then
+Aim_Circle.Position = screenCenter; Aim_Circle.Radius = Settings.AimFOV; Aim_Circle.Visible = true
+else Aim_Circle.Visible = false end
 
+if Settings.ShowFlickFOV then
+Flick_Circle.Position = screenCenter; Flick_Circle.Radius = Settings.FlickFOV; Flick_Circle.Visible = true
+else Flick_Circle.Visible = false end
+
+if Settings.ShowSilentFOV then
+Silent_Circle.Position = screenCenter; Silent_Circle.Radius = Settings.SilentFOV; Silent_Circle.Visible = true
+else Silent_Circle.Visible = false end
+
+-- Обычный Аимбот
+if Settings.AimbotEnabled and not Settings.FlickMode then
 local target = getClosestPlayer(Settings.AimFOV)
 if target then Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position) end
-else
-Aim_Circle.Visible = false
-end
-
-if Settings.FlickMode then
-Flick_Circle.Position = screenCenter
-Flick_Circle.Radius = Settings.FlickFOV
-Flick_Circle.Visible = true
-else
-Flick_Circle.Visible = false
-end
-
-if Settings.SilentAimEnabled then
-Silent_Circle.Position = screenCenter
-Silent_Circle.Radius = Settings.SilentFOV
-Silent_Circle.Visible = true
-else
-Silent_Circle.Visible = false
 end
 
 handleSmoothBHop()
@@ -388,14 +397,10 @@ visual.Box.Visible = true
 else visual.Box.Visible = false end
 
 if Settings.EspLines and onScreen then
-visual.Line.From = screenCenter
-visual.Line.To = Vector2.new(hrpPos.X, hrpPos.Y)
-visual.Line.Visible = true
+visual.Line.From = screenCenter; visual.Line.To = Vector2.new(hrpPos.X, hrpPos.Y); visual.Line.Visible = true
 else visual.Line.Visible = false end
 
-if Settings.EspCharms then
-visual.Charms.Parent = character
-visual.Charms.Enabled = true
+if Settings.EspCharms then visual.Charms.Parent = character; visual.Charms.Enabled = true
 else visual.Charms.Enabled = false end
 else
 visual.Box.Visible = false; visual.Line.Visible = false; visual.Charms.Enabled = false
@@ -421,3 +426,4 @@ end
 
 Players.PlayerAdded:Connect(createESP); Players.PlayerRemoving:Connect(removeESP)
 for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then createESP(p) end end
+
