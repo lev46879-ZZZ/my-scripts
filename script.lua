@@ -9,7 +9,7 @@ local Camera = workspace.CurrentCamera
 local Settings = {
     AimbotEnabled = false,
     FlickMode = false,
-    SilentAimEnabled = false, -- Мгновенный безопасный снап
+    SilentAimEnabled = false, -- Новая 100% безопасная логика
     WallCheck = false,
     AimFOV = 120,
     FlickFOV = 180,
@@ -29,7 +29,7 @@ local CurrentBHopSpeed = NormalSpeed
 
 -- [[ СОЗДАНИЕ GUI ]] --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FlickUltimateHubSafe"
+ScreenGui.Name = "FlickTrueSilentHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -86,7 +86,7 @@ makeDraggable(MainMenu)
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Title.Text = "  ⚡ FLICK SAFE v5"
+Title.Text = "  ⚡ TRUE SILENT v6"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Font = Enum.Font.GothamBold
@@ -209,7 +209,7 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
     end)
 end
 
-createToggle(Scroll, "Instant Snap (Safe Silent)", "SilentAimEnabled")
+createToggle(Scroll, "Vector Silent Aim (Floor Hit)", "SilentAimEnabled")
 createToggle(Scroll, "On-Shot Flickbot", "FlickMode")
 createToggle(Scroll, "Combat Aimbot", "AimbotEnabled")
 createToggle(Scroll, "Wallcheck Bypass", "WallCheck")
@@ -218,23 +218,30 @@ createToggle(Scroll, "Lite ESP Box", "EspBox")
 createToggle(Scroll, "Lite Charms", "EspCharms")
 createToggle(Scroll, "Smooth BunnyHop", "BHopEnabled")
 
-createSlider(Scroll, "Snap FOV", 10, 900, Settings.SilentFOV, false, function(v) Settings.SilentFOV = v end)
+createSlider(Scroll, "Silent FOV", 10, 900, Settings.SilentFOV, false, function(v) Settings.SilentFOV = v end)
 createSlider(Scroll, "Aim FOV", 10, 900, Settings.AimFOV, false, function(v) Settings.AimFOV = v end)
 createSlider(Scroll, "Flick FOV", 10, 900, Settings.FlickFOV, false, function(v) Settings.FlickFOV = v end)
 createSlider(Scroll, "Flick Delay", 0.01, 1.00, Settings.FlickDelay, true, function(v) Settings.FlickDelay = v end)
 createSlider(Scroll, "BHop Power", 1, 10, Settings.BHopPower, false, function(v) Settings.BHopPower = v end)
 
-local FOV_Circle = Drawing.new("Circle")
+-- Кольца FOV
+local Aim_Circle = Drawing.new("Circle")
+Aim_Circle.Visible = false; Aim_Circle.Thickness = 1; Aim_Circle.NumSides = 32; Aim_Circle.Filled = false; Aim_Circle.Color = Color3.fromRGB(0, 255, 150)
+
+local Flick_Circle = Drawing.new("Circle")
+Flick_Circle.Visible = false; Flick_Circle.Thickness = 1; Flick_Circle.NumSides = 32; Flick_Circle.Filled = false; Flick_Circle.Color = Color3.fromRGB(255, 50, 50)
+
 local Silent_Circle = Drawing.new("Circle")
-FOV_Circle.Visible = true; FOV_Circle.Thickness = 1; FOV_Circle.NumSides = 32; FOV_Circle.Filled = false
 Silent_Circle.Visible = false; Silent_Circle.Thickness = 1; Silent_Circle.NumSides = 32; Silent_Circle.Filled = false; Silent_Circle.Color = Color3.fromRGB(0, 150, 255)
 
+-- Проверка видимости стен
 local function checkWallVisibility(targetPart, character)
 if not Settings.WallCheck then return true end
 local partsObscuring = Camera:GetPartsObscuringTarget({targetPart.Position}, {LocalPlayer.Character, character, Camera})
 return #partsObscuring == 0
 end
 
+-- Поиск цели к центру экрана (Умный выбор в толпе)
 local function getClosestPlayer(currentFOV)
 local closestTarget = nil
 local minDistance = currentFOV + 1
@@ -264,21 +271,46 @@ end
 return closestTarget
 end
 
--- [[ БЕЗОПАСНЫЙ СНАП ПРИ КЛИКЕ / СТРЕЛЬБЕ ]] --
+-- [[ НАСТОЯЩИЙ И БЕЗОПАСНЫЙ SILENT AIM (ПЕРЕХВАТ ЛУЧЕЙ РЕНДЕРА) ]] --
+-- Перехватываем функцию Raycast на уровне игрового движка. Камера игрока при этом не шевелится.
+local oldRaycast
+oldRaycast = hookmetamethod(workspace, "Raycast", function(self, origin, direction, params)
+if Settings.SilentAimEnabled and not checkcaller() then
+local targetPart = getClosestPlayer(Settings.SilentFOV)
+if targetPart then
+-- Рассчитываем новый вектор направления пули прямо в голову врага
+local newDirection = (targetPart.Position - origin).Unit * direction.Magnitude
+-- Подменяем оригинальный луч на наш читерский вектор
+return oldRaycast(self, origin, newDirection, params)
+end
+end
+return oldRaycast(self, origin, direction, params)
+end)
+
+-- Логика для старых пушек, если они используют FindPartOnRay
+local oldFindPartOnRay
+oldFindPartOnRay = hookmetamethod(workspace, "FindPartOnRay", function(self, ray, ignoreInstance, ...)
+if Settings.SilentAimEnabled and not checkcaller() then
+local targetPart = getClosestPlayer(Settings.SilentFOV)
+if targetPart then
+-- Пересоздаем луч от лица камеры ровно в цель
+local newRay = Ray.new(ray.Origin, (targetPart.Position - ray.Origin).Unit * ray.Direction.Magnitude)
+return oldFindPartOnRay(self, newRay, ignoreInstance, ...)
+end
+end
+return oldFindPartOnRay(self, ray, ignoreInstance, ...)
+end)
+
+-- Логика обычного Flickbot (Доводчик по нажатию экрана)
 UserInputService.InputBegan:Connect(function(input, processed)
 if processed then return end
-if Settings.SilentAimEnabled and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-local target = getClosestPlayer(Settings.SilentFOV)
-if target then
-Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
-end
-end
-
 if Settings.FlickMode and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) then
 local target = getClosestPlayer(Settings.FlickFOV)
 if target then
 task.delay(Settings.FlickDelay, function()
+if target and target.Parent and target.Parent:FindFirstChildOfClass("Humanoid") and target.Parent:FindFirstChildOfClass("Humanoid").Health > 0 then
 Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+end
 end)
 end
 end
@@ -303,9 +335,25 @@ local lastUpdate = 0
 RunService.RenderStepped:Connect(function()
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
-FOV_Circle.Position = screenCenter
-FOV_Circle.Radius = Settings.FlickMode and Settings.FlickFOV or Settings.AimFOV
-FOV_Circle.Color = Settings.FlickMode and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(0, 255, 150)
+-- Управление кругами
+if Settings.AimbotEnabled and not Settings.FlickMode and not Settings.SilentAimEnabled then
+Aim_Circle.Position = screenCenter
+Aim_Circle.Radius = Settings.AimFOV
+Aim_Circle.Visible = true
+
+local target = getClosestPlayer(Settings.AimFOV)
+if target then Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position) end
+else
+Aim_Circle.Visible = false
+end
+
+if Settings.FlickMode then
+Flick_Circle.Position = screenCenter
+Flick_Circle.Radius = Settings.FlickFOV
+Flick_Circle.Visible = true
+else
+Flick_Circle.Visible = false
+end
 
 if Settings.SilentAimEnabled then
 Silent_Circle.Position = screenCenter
@@ -316,11 +364,6 @@ Silent_Circle.Visible = false
 end
 
 handleSmoothBHop()
-
-if Settings.AimbotEnabled and not Settings.FlickMode and not Settings.SilentAimEnabled then
-local target = getClosestPlayer(Settings.AimFOV)
-if target then Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position) end
-end
 
 local now = os.clock()
 if now - lastUpdate < 0.025 then return end
