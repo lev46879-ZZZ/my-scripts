@@ -2,6 +2,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local Stats = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -20,10 +21,15 @@ local Settings = {
     BHopEnabled = false,
     BHopPower = 1,
     ShowAimFOV = false,
-    ShowFlickFOV = false
+    ShowFlickFOV = false,
+    -- Новые настройки:
+    InstantReload = false,
+    FPSUnlocker = false,
+    PerfMonitor = false
 }
 
 local ESP_Cache = {}
+local fpsTable = {}
 local NormalSpeed = 16
 local CurrentBHopSpeed = NormalSpeed
 
@@ -71,8 +77,8 @@ makeDraggable(ToggleButton)
 
 -- Главное меню
 local MainMenu = Instance.new("Frame")
-MainMenu.Size = UDim2.new(0, 260, 0, 420)
-MainMenu.Position = UDim2.new(0.5, -130, 0.5, -210)
+MainMenu.Size = UDim2.new(0, 260, 0, 460) -- Немного увеличили высоту под новые функции
+MainMenu.Position = UDim2.new(0.5, -130, 0.5, -230)
 MainMenu.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
 MainMenu.Visible = false
 MainMenu.Parent = ScreenGui
@@ -84,7 +90,7 @@ makeDraggable(MainMenu)
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Title.Text = "  ⚡ LITE FLICK v9"
+Title.Text = "  ⚡ LITE FLICK v10"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Font = Enum.Font.GothamBold
@@ -105,13 +111,37 @@ local Scroll = Instance.new("ScrollingFrame")
 Scroll.Size = UDim2.new(1, -16, 1, -45)
 Scroll.Position = UDim2.new(0, 8, 0, 40)
 Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 600)
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 720) -- Увеличили размер прокрутки
 Scroll.ScrollBarThickness = 2
 Scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 170)
 Scroll.Parent = MainMenu
 local ContentLayout = Instance.new("UIListLayout"); ContentLayout.Padding = UDim.new(0, 6); ContentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; ContentLayout.Parent = Scroll
 
-local function createToggle(parent, text, settingName)
+-- [[ ОВЕРЛЕЙ PERFORMANCE MONITOR ]] --
+local PerfFrame = Instance.new("Frame")
+PerfFrame.Size = UDim2.new(0, 140, 0, 75)
+PerfFrame.Position = UDim2.new(1, -150, 0, 10)
+PerfFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+PerfFrame.BackgroundTransparency = 0.2
+PerfFrame.Visible = false
+PerfFrame.Parent = ScreenGui
+
+local PerfCorner = Instance.new("UICorner"); PerfCorner.CornerRadius = UDim.new(0, 5); PerfCorner.Parent = PerfFrame
+local PerfStroke = Instance.new("UIStroke"); PerfStroke.Color = Color3.fromRGB(0, 255, 170); PerfStroke.Thickness = 1; PerfStroke.Parent = PerfFrame
+
+local PerfText = Instance.new("TextLabel")
+PerfText.Size = UDim2.new(1, -10, 1, -10)
+PerfText.Position = UDim2.new(0, 5, 0, 5)
+PerfText.BackgroundTransparency = 1
+PerfText.TextColor3 = Color3.fromRGB(240, 240, 240)
+PerfText.Font = Enum.Font.Code
+PerfText.TextSize = 11
+PerfText.TextXAlignment = Enum.TextXAlignment.Left
+PerfText.TextYAlignment = Enum.TextYAlignment.Top
+PerfText.Parent = PerfFrame
+
+
+local function createToggle(parent, text, settingName, extraCallback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -4, 0, 34)
     btn.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
@@ -146,7 +176,11 @@ local function createToggle(parent, text, settingName)
         end
     end
 
-    btn.MouseButton1Click:Connect(function() Settings[settingName] = not Settings[settingName] updateVisuals() end)
+    btn.MouseButton1Click:Connect(function() 
+        Settings[settingName] = not Settings[settingName] 
+        updateVisuals() 
+        if extraCallback then extraCallback(Settings[settingName]) end
+    end)
     updateVisuals()
 end
 
@@ -192,18 +226,19 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
     bg.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then active = true end end)
     UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then active = false end end)
     UserInputService.InputChanged:Connect(function(i)
-        if active and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-            local x = math.clamp((i.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
-            btn.Position = UDim2.new(x, -5, 0.5, -5)
-            fill.Size = UDim2.new(x, 0, 1, 0)
-            local val = min + (x * (max - min))
-            if not isFloat then val = math.floor(val) end
-            label.Text = text .. ": " .. string.format(isFloat and "%.2f" or "%d", val)
-            callback(val)
-        end
-    end)
+if active and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+local x = math.clamp((i.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
+btn.Position = UDim2.new(x, -5, 0.5, -5)
+fill.Size = UDim2.new(x, 0, 1, 0)
+local val = min + (x * (max - min))
+if not isFloat then val = math.floor(val) end
+label.Text = text .. ": " .. string.format(isFloat and "%.2f" or "%d", val)
+callback(val)
+end
+end)
 end
 
+-- Добавление элементов в меню
 createToggle(Scroll, "On-Shot Flickbot", "FlickMode")
 createToggle(Scroll, "Combat Aimbot", "AimbotEnabled")
 createToggle(Scroll, "Wallcheck Bypass", "WallCheck")
@@ -221,6 +256,18 @@ createToggle(Scroll, "Lite Lines (WH)", "EspLines")
 createToggle(Scroll, "Lite ESP Box", "EspBox")
 createToggle(Scroll, "Lite Charms", "EspCharms")
 createToggle(Scroll, "Smooth BunnyHop", "BHopEnabled")
+
+-- НОВЫЕ ТУМБЛЕРЫ ДЛЯ ФУНКЦИЙ 24, 45, 50
+local SectionLabel3 = Instance.new("TextLabel")
+SectionLabel3.Size = UDim2.new(1, 0, 0, 16); SectionLabel3.BackgroundTransparency = 1; SectionLabel3.Text = "--- NEW UTILITIES ---"; SectionLabel3.TextColor3 = Color3.fromRGB(120, 120, 120); SectionLabel3.Font = Enum.Font.GothamBold; SectionLabel3.TextSize = 10; SectionLabel3.Parent = Scroll
+
+createToggle(Scroll, "Instant Reload", "InstantReload")
+createToggle(Scroll, "FPS Unlocker (999 FPS)", "FPSUnlocker", function(state)
+if setfpscap then setfpscap(state and 999 or 60) end
+end)
+createToggle(Scroll, "Performance Monitor", "PerfMonitor", function(state)
+PerfFrame.Visible = state
+end)
 
 createSlider(Scroll, "Aim FOV", 10, 900, Settings.AimFOV, false, function(v) Settings.AimFOV = v end)
 createSlider(Scroll, "Flick FOV", 10, 900, Settings.FlickFOV, false, function(v) Settings.FlickFOV = v end)
@@ -310,11 +357,34 @@ end
 end
 end
 
+-- ЛОГИКА INSTANT RELOAD
+local function handleInstantReload()
+if not Settings.InstantReload then return end
+local char = LocalPlayer.Character
+local backpack = LocalPlayer:FindFirstChild("Backpack")
+
+local function clearDelay(tool)
+if tool:IsA("Tool") then
+for _, obj in ipairs(tool:GetDescendants()) do
+if obj:IsA("NumberValue") or obj:IsA("IntValue") then
+if obj.Name:lower():find("reload") or obj.Name:lower():find("delay") then
+obj.Value = 0
+end
+end
+end
+end
+end
+
+if char then for _, t in ipairs(char:GetChildren()) do clearDelay(t) end end
+if backpack then for _, t in ipairs(backpack:GetChildren()) do clearDelay(t) end end
+end
+
 -- [[ ОСНОВНОЙ РЕНДЕР ЦИКЛ ]] --
 local lastUpdate = 0
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(dt)
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
+-- Обновление колец FOV
 if Settings.ShowAimFOV and Aim_Circle then
 Aim_Circle.Position = screenCenter; Aim_Circle.Radius = Settings.AimFOV; Aim_Circle.Visible = true
 elseif Aim_Circle then Aim_Circle.Visible = false end
@@ -323,13 +393,33 @@ if Settings.ShowFlickFOV and Flick_Circle then
 Flick_Circle.Position = screenCenter; Flick_Circle.Radius = Settings.FlickFOV; Flick_Circle.Visible = true
 elseif Flick_Circle then Flick_Circle.Visible = false end
 
+-- Обычный аимбот
 if Settings.AimbotEnabled and not Settings.FlickMode then
 local target = getClosestPlayer(Settings.AimFOV)
 if target then Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position) end
 end
 
 handleSmoothBHop()
+handleInstantReload()
 
+-- Расчет данных для Performance Monitor (если включен)
+if Settings.PerfMonitor then
+local now = os.clock()
+table.insert(fpsTable, now)
+while fpsTable[1] and fpsTable[1] < now - 1 do
+table.remove(fpsTable, 1)
+end
+local currentFps = #fpsTable
+local currentPing = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+local currentMem = string.format("%.1f", Stats:GetTotalMemoryUsageMb())
+
+PerfText.Text = string.format(
+"⚡ PERF MONITOR\n\nFPS: %d\nPING: %d ms\nMEM: %s MB",
+currentFps, currentPing, currentMem
+)
+end
+
+-- Лимитер для более тяжелого ESP (40 FPS / каждые 0.025 сек)
 local now = os.clock()
 if now - lastUpdate < 0.025 then return end
 lastUpdate = now
