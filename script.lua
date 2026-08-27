@@ -33,13 +33,9 @@ local Settings = {
     FlickFOV = 180,
     FlickDelay = 0.01,
     TargetPart = "Head",
-    EspLines = false,
     EspCharms = false,
-    BHopEnabled = false,
-    BHopPower = 1.0,
     ShowAimFOV = false,
     ShowFlickFOV = false,
-    InstantReload = false,
     FPSUnlocker = false,
     PerfMonitor = false,
     TriggerbotEnabled = false,
@@ -142,8 +138,8 @@ makeDraggable(ToggleButton)
 
 -- Главное меню
 local MainMenu = Instance.new("Frame")
-MainMenu.Size = UDim2.new(0, 320, 0, 450)
-MainMenu.Position = UDim2.new(0.5, -160, 0.5, -225)
+MainMenu.Size = UDim2.new(0, 320, 0, 380) -- Уменьшил размер, так как функций стало меньше
+MainMenu.Position = UDim2.new(0.5, -160, 0.5, -190)
 MainMenu.BackgroundColor3 = Color3.fromRGB(8, 10, 15)
 MainMenu.Visible = false
 MainMenu.Parent = ScreenGui
@@ -157,7 +153,7 @@ makeDraggable(MainMenu)
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
-Title.Text = "   NEVERLOSE.CC // Flick Premium"
+Title.Text = "   NEVERLOSE.CC // Flick Lite"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Font = Enum.Font.GothamBold
@@ -173,7 +169,7 @@ local Scroll = Instance.new("ScrollingFrame")
 Scroll.Size = UDim2.new(1, -16, 1, -50)
 Scroll.Position = UDim2.new(0, 8, 0, 45)
 Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 1200)
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 800)
 Scroll.ScrollBarThickness = 4
 Scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 162, 255)
 Scroll.Parent = MainMenu
@@ -266,8 +262,8 @@ local function createSlider(parent, text, min, max, default, isFloat, step, call
     sliderBtn.Text = ""
     Instance.new("UICorner", sliderBtn).CornerRadius = UDim.new(0, 6)
 
-local active = false
-local function updateSlider(inputPosition)
+    local active = false
+    local function updateSlider(inputPosition)
 local x = math.clamp((inputPosition.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
 local rawVal = min + (x * (max - min))
 
@@ -306,7 +302,7 @@ end
 end)
 end
 
--- [[ НАПОЛНЕНИЕ МЕНЮ ]] --
+-- [[ НАПОЛНЕНИЕ МЕНЮ (ТОЛЬКО НУЖНЫЕ ФУНКЦИИ) ]] --
 createToggle(Scroll, "On-Shot Flickbot", "FlickMode")
 createToggle(Scroll, "Combat Aimbot", "AimbotEnabled")
 createToggle(Scroll, "Triggerbot", "TriggerbotEnabled")
@@ -316,13 +312,8 @@ createToggle(Scroll, "Aim/Flick Wallcheck", "WallCheck")
 createToggle(Scroll, "Show Flick FOV (Red)", "ShowFlickFOV")
 createToggle(Scroll, "Show Aim FOV (Blue)", "ShowAimFOV")
 
-createToggle(Scroll, "ESP Line", "EspLines")
 createToggle(Scroll, "ESP Box (Charms)", "EspCharms")
 
-createToggle(Scroll, "BunnyHop (Force Velocity)", "BHopEnabled")
-createSlider(Scroll, "BHop Boost Multiplier", 1, 5, Settings.BHopPower, true, 0.2, function(v) Settings.BHopPower = v end)
-
-createToggle(Scroll, "Instant Reload (Universal)", "InstantReload")
 createToggle(Scroll, "FPS Unlocker (999 FPS)", "FPSUnlocker", function(state)
 if setfpscap then setfpscap(state and 999 or 60) end
 end)
@@ -357,7 +348,7 @@ end
 end)
 end
 
--- [[ ПРЯМОЙ СКАНИРОВЩИК БЕЗ ОПТИМИЗАЦИИ ]] --
+-- [[ СКАНИРОВЩИК WORKSPACE ДЛЯ НАВЕДЕНИЯ ]] --
 local function getClosestPlayer(currentFOV)
 local closestTarget = nil
 local minDistance = currentFOV + 1
@@ -422,88 +413,21 @@ end
 end)
 end
 
--- [[ МГНОВЕННАЯ ПЕРЕЗАРЯДКА ]] --
-local function handleInstantReload()
-if not Settings.InstantReload then return end
-pcall(function()
-local char = LocalPlayer.Character
-local targetTools = {}
-if char then
-for _, v in ipairs(char:GetChildren()) do if v:IsA("Tool") then table.insert(targetTools, v) end end
-end
-local backpack = LocalPlayer:FindFirstChild("Backpack")
-if backpack then
-for _, v in ipairs(backpack:GetChildren()) do if v:IsA("Tool") then table.insert(targetTools, v) end end
-end
-for _, tool in ipairs(targetTools) do
-for _, obj in ipairs(tool:GetDescendants()) do
-if obj:IsA("NumberValue") or obj:IsA("IntValue") then
-local name = obj.Name:lower()
-if name:find("reload") or name:find("delay") or name:find("cooldown") or name:find("time") or name:find("duration") then
-obj.Value = 0
-elseif name:find("ammo") or name:find("clip") or name:find("mag") then
-if obj.Value < 30 then obj.Value = 999 end
-end
-end
-end
-end
-end)
-end
-
--- [[ АДАПТИВНЫЙ ВЕКТОРНЫЙ BHOP ]] --
-local function handleBunnyHop()
-if not Settings.BHopEnabled then return end
-local char = LocalPlayer.Character
-local hrp = char and char:FindFirstChild("HumanoidRootPart")
-local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-if not hrp or not humanoid or humanoid.Health <= 0 then return end
-
-if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-if humanoid.FloorMaterial == Enum.Material.Air or humanoid.FloorMaterial == Enum.Material.None then
-local moveDir = humanoid.MoveDirection
-if moveDir.Magnitude > 0 then
-hrp.AssemblyLinearVelocity = Vector3.new(
-moveDir.X * (16 * Settings.BHopPower),
-hrp.AssemblyLinearVelocity.Y,
-moveDir.Z * (16 * Settings.BHopPower)
-)
-end
-end
-end
-end
-
--- [[ ЭЛЕМЕНТЫ ESP ]] --
+-- [[ Слой CHARMS ESP ]] --
 local function createESPObjects(model)
 if model == LocalPlayer.Character then return end
-
 pcall(function()
-if ESP_Cache[model] then
-if ESP_Cache[model].Line then ESP_Cache[model].Line:Destroy() end
-if ESP_Cache[model].Highlight then ESP_Cache[model].Highlight:Destroy() end
+if ESP_Cache[model] and ESP_Cache[model].Highlight then
+ESP_Cache[model].Highlight:Destroy()
 end
 end)
-
-local espData = {}
-
-local lineFrame = Instance.new("Frame")
-lineFrame.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
-lineFrame.BorderSizePixel = 0
-lineFrame.BackgroundTransparency = 0.1
-lineFrame.Visible = false
-lineFrame.ZIndex = 100
-lineFrame.Parent = EspGui
-
-espData.Line = lineFrame
-ESP_Cache[model] = espData
+ESP_Cache[model] = {}
 end
 
--- [[ ИСПРАВЛЕННЫЕ АДЕКВАТНЫЕ ЛИНИИ ПРЯМЫМ ЦИКЛОМ WORKSPACE ]] --
 local function updateESP()
-local screenSize = Camera.ViewportSize
-local center = Vector2.new(screenSize.X / 2, screenSize.Y / 2)
 local list = workspace:GetChildren()
 
--- Полный неоптимизированный перебор для стопроцентного захвата целей в Flick
+-- Сбор моделей противников напрямую через workspace
 for i = 1, #list do
 local obj = list[i]
 if obj:IsA("Model") and obj ~= LocalPlayer.Character and obj:FindFirstChildOfClass("Humanoid") then
@@ -519,7 +443,7 @@ local humanoid = model:FindFirstChildOfClass("Humanoid")
 local hrp = model:FindFirstChild("HumanoidRootPart")
 
 if humanoid.Health > 0 then
--- Фикс синтаксиса в Charms (Добавлено пропущенное ==)
+-- Отрисовка 3D силуэтов (Charms)
 if Settings.EspCharms then
 if not data.Highlight or data.Highlight.Parent ~= model then
 pcall(function()
@@ -538,33 +462,10 @@ end
 else
 if data.Highlight then pcall(function() data.Highlight:Destroy() end) data.Highlight = nil end
 end
-
--- Фикс неадекватных линий: добавлена строгая проверка глубины vector.Z > 0
-local targetPart = model:FindFirstChild(Settings.TargetPart) or hrp
-local vector, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-
-if Settings.EspLines and onScreen and vector.Z > 0 then
-if data.Line then
-data.Line.Visible = true
-local screenPos = Vector2.new(vector.X, vector.Y)
-local delta = screenPos - center
-local length = delta.Magnitude
-local angle = math.atan2(delta.Y, delta.X)
-
-data.Line.Size = UDim2.new(0, length, 0, 2)
-data.Line.Position = UDim2.new(0, center.X, 0, center.Y)
-data.Line.Rotation = math.deg(angle)
-data.Line.AnchorPoint = Vector2.new(0, 0.5)
-end
 else
-if data.Line then data.Line.Visible = false end
-end
-else
-if data.Line then data.Line.Visible = false end
 if data.Highlight then pcall(function() data.Highlight:Destroy() end) data.Highlight = nil end
 end
 else
-if data.Line then data.Line.Visible = false end
 if data.Highlight then pcall(function() data.Highlight:Destroy() end) data.Highlight = nil end
 ESP_Cache[model] = nil
 end
@@ -627,7 +528,5 @@ end
 end
 
 runTriggerbot()
-handleInstantReload()
-handleBunnyHop()
 updateESP()
 end)
