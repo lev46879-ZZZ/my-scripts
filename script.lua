@@ -20,7 +20,6 @@ local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
 
--- Обновление ссылки на камеру при её смене
 workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
     Camera = workspace.CurrentCamera
 end)
@@ -53,7 +52,6 @@ local ESP_Cache = {}
 local fpsTable = {}
 local lastShotTime = 0
 local triggerShotCooldown = 0.05
-local defaultWalkSpeed = 16
 
 -- [[ ФУНКЦИЯ ПОЛУЧЕНИЯ КОНТЕЙНЕРА ДЛЯ GUI ]] --
 local function getSecureContainer()
@@ -83,17 +81,19 @@ EspGui.Parent = getSecureContainer()
 -- [[ ДЛЯ КРУГОВ FOV ]] --
 local Aim_Circle, Flick_Circle
 pcall(function()
-    Aim_Circle = Drawing.new("Circle")
-    Aim_Circle.Visible = false
-    Aim_Circle.Color = Color3.fromRGB(0, 162, 255)
-    Aim_Circle.Thickness = 1.5
-    Aim_Circle.Filled = false
+    if Drawing and Drawing.new then
+        Aim_Circle = Drawing.new("Circle")
+        Aim_Circle.Visible = false
+        Aim_Circle.Color = Color3.fromRGB(0, 162, 255)
+        Aim_Circle.Thickness = 1.5
+        Aim_Circle.Filled = false
 
-    Flick_Circle = Drawing.new("Circle")
-    Flick_Circle.Visible = false
-    Flick_Circle.Color = Color3.fromRGB(255, 50, 50)
-    Flick_Circle.Thickness = 1.5
-    Flick_Circle.Filled = false
+        Flick_Circle = Drawing.new("Circle")
+        Flick_Circle.Visible = false
+        Flick_Circle.Color = Color3.fromRGB(255, 50, 50)
+        Flick_Circle.Thickness = 1.5
+        Flick_Circle.Filled = false
+    end
 end)
 
 local PerfText = nil
@@ -157,7 +157,7 @@ makeDraggable(MainMenu)
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
-Title.Text = "   NEVERLOSE.CC // Premium Custom v16"
+Title.Text = "   NEVERLOSE.CC // Flick Premium"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Font = Enum.Font.GothamBold
@@ -270,7 +270,7 @@ local function createSlider(parent, text, min, max, default, isFloat, step, call
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = container
 
-    local bg = Instance.new("Frame")
+local bg = Instance.new("Frame")
 bg.Size = UDim2.new(1, -20, 0, 6)
 bg.Position = UDim2.new(0, 10, 0, 24)
 bg.BackgroundColor3 = Color3.fromRGB(25, 30, 45)
@@ -342,18 +342,14 @@ createToggle(Scroll, "Show Aim FOV (Blue)", "ShowAimFOV")
 createToggle(Scroll, "ESP Line", "EspLines")
 createToggle(Scroll, "ESP Box (Charms)", "EspCharms")
 
-createToggle(Scroll, "BunnyHop", "BHopEnabled")
-createSlider(Scroll, "BHop Power Strength", 1, 15, Settings.BHopPower, true, 0.5, function(v) Settings.BHopPower = v end)
+createToggle(Scroll, "BunnyHop (Force Velocity)", "BHopEnabled")
+createSlider(Scroll, "BHop Boost Multiplier", 1, 5, Settings.BHopPower, true, 0.2, function(v) Settings.BHopPower = v end)
 
 createToggle(Scroll, "Instant Reload (Universal)", "InstantReload")
 createToggle(Scroll, "FPS Unlocker (999 FPS)", "FPSUnlocker", function(state)
-if setfpscap then
-setfpscap(state and 999 or 60)
-end
+if setfpscap then setfpscap(state and 999 or 60) end
 end)
-createToggle(Scroll, "Performance Monitor", "PerfMonitor", function(state)
-PerfFrame.Visible = state
-end)
+createToggle(Scroll, "Performance Monitor", "PerfMonitor", function(state) PerfFrame.Visible = state end)
 
 createSlider(Scroll, "Aim FOV", 10, 900, Settings.AimFOV, false, nil, function(v) Settings.AimFOV = v end)
 createSlider(Scroll, "Flick FOV", 10, 900, Settings.FlickFOV, false, nil, function(v) Settings.FlickFOV = v end)
@@ -378,12 +374,9 @@ end
 
 local function secureDeltaClick()
 pcall(function()
-if mouse1click then
-mouse1click()
+if mouse1click then mouse1click()
 elseif mouse1press and mouse1release then
-mouse1press()
-task.wait(0.005)
-mouse1release()
+mouse1press() task.wait(0.005) mouse1release()
 end
 end)
 end
@@ -431,7 +424,6 @@ if not char then return end
 local humanoid = char:FindFirstChildOfClass("Humanoid")
 local player = Players:GetPlayerFromCharacter(char)
 if humanoid and humanoid.Health > 0 and player and player ~= LocalPlayer then
-if player.Team ~= LocalPlayer.Team or player.Team == nil then
 if checkWallVisibility(instance, char) then
 local currentTime = os.clock()
 if currentTime - lastShotTime >= triggerShotCooldown then
@@ -439,13 +431,10 @@ if MathRandom(1, 100) <= Settings.TriggerbotHitchance then
 lastShotTime = currentTime
 if Settings.TriggerbotDelay > 0 then
 task.delay(Settings.TriggerbotDelay, function()
-if Mouse.Target and Mouse.Target:IsDescendantOf(char) then
-secureDeltaClick()
-end
+if Mouse.Target and Mouse.Target:IsDescendantOf(char) then secureDeltaClick() end
 end)
 else
 secureDeltaClick()
-end
 end
 end
 end
@@ -461,15 +450,11 @@ pcall(function()
 local char = LocalPlayer.Character
 local targetTools = {}
 if char then
-for _, v in ipairs(char:GetChildren()) do
-if v:IsA("Tool") then table.insert(targetTools, v) end
-end
+for _, v in ipairs(char:GetChildren()) do if v:IsA("Tool") then table.insert(targetTools, v) end end
 end
 local backpack = LocalPlayer:FindFirstChild("Backpack")
 if backpack then
-for _, v in ipairs(backpack:GetChildren()) do
-if v:IsA("Tool") then table.insert(targetTools, v) end
-end
+for _, v in ipairs(backpack:GetChildren()) do if v:IsA("Tool") then table.insert(targetTools, v) end end
 end
 for _, tool in ipairs(targetTools) do
 for _, obj in ipairs(tool:GetDescendants()) do
@@ -486,49 +471,41 @@ end
 end)
 end
 
--- [[ BHOP / СКОРОСТЬ ]] --
+-- [[ АДАПТИВНЫЙ ВЕКТОРНЫЙ BHOP ДЛЯ FLICK ]] --
 local function handleBunnyHop()
+if not Settings.BHopEnabled then return end
 local char = LocalPlayer.Character
-if not char then return end
-local humanoid = char:FindFirstChildOfClass("Humanoid")
-if not humanoid or humanoid.Health <= 0 then return end
-
-if not Settings.BHopEnabled then
-if humanoid.WalkSpeed ~= defaultWalkSpeed then
-humanoid.WalkSpeed = defaultWalkSpeed
-end
-return
-end
-
--- Рассчитываем прибавку к базовой скорости плейса
-local boost = defaultWalkSpeed + ((Settings.BHopPower - 1) * 4)
+local hrp = char and char:FindFirstChild("HumanoidRootPart")
+local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+if not hrp or not humanoid or humanoid.Health <= 0 then return end
 
 if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
 if humanoid.FloorMaterial == Enum.Material.Air or humanoid.FloorMaterial == Enum.Material.None then
-humanoid.WalkSpeed = boost
-else
-humanoid.WalkSpeed = defaultWalkSpeed
+local moveDir = humanoid.MoveDirection
+if moveDir.Magnitude > 0 then
+hrp.AssemblyLinearVelocity = Vector3.new(
+moveDir.X * (16 * Settings.BHopPower),
+hrp.AssemblyLinearVelocity.Y,
+moveDir.Z * (16 * Settings.BHopPower)
+)
 end
-else
-humanoid.WalkSpeed = defaultWalkSpeed
+end
 end
 end
 
--- [[ ИСПРАВЛЕННЫЙ ESP (LINE ОТ ЦЕНТРА + REAL 3D CHARMS) ]] --
+-- [[ ДИНАМИЧЕСКИЙ ESP ПОД СТРУКТУРУ КАРТЫ FLICK ]] --
 local function createESPObjects(player)
 if player == LocalPlayer then return end
 
-if ESP_Cache[player] then
 pcall(function()
+if ESP_Cache[player] then
 if ESP_Cache[player].Line then ESP_Cache[player].Line:Destroy() end
 if ESP_Cache[player].Highlight then ESP_Cache[player].Highlight:Destroy() end
-end)
-ESP_Cache[player] = nil
 end
+end)
 
 local espData = {}
 
--- Линия (2D линия, рисуется из центра экрана)
 local lineFrame = Instance.new("Frame")
 lineFrame.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
 lineFrame.BorderSizePixel = 0
@@ -561,31 +538,31 @@ local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
 if char and humanoid and hrp and humanoid.Health > 0 and player ~= LocalPlayer then
-local isEnemy = (player.Team ~= LocalPlayer.Team or player.Team == nil)
 
--- Логика 3D Charms (Highlight)
-if Settings.EspCharms and isEnemy then
+if Settings.EspCharms then
 if not data.Highlight or data.Highlight.Parent ~= char then
+pcall(function()
 if data.Highlight then data.Highlight:Destroy() end
-local hl = Instance.new("Highlight")
-hl.FillColor = Color3.fromRGB(0, 162, 255)
-hl.FillTransparency = 0.4
-hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-hl.OutlineTransparency = 0
-hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- Видно сквозь стены!
-hl.Parent = char
-data.Highlight = hl
+local box = Instance.new("BoxHandleAdornment")
+box.Size = Vector3.new(4, 6, 4)
+box.Color3 = Color3.fromRGB(0, 162, 255)
+box.Transparency = 0.5
+box.AlwaysOnTop = true
+box.ZIndex = 5
+box.Adornee = hrp
+box.Parent = char
+data.Highlight = box
+end)
 end
 else
 if data.Highlight then
-data.Highlight:Destroy()
+pcall(function() data.Highlight:Destroy() end)
 data.Highlight = nil
 end
 end
 
--- Логика линий (Линия строго от центра экрана к игроку)
 local vector, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-if Settings.EspLines and isEnemy and onScreen then
+if Settings.EspLines and onScreen then
 if data.Line then
 data.Line.Visible = true
 local screenPos = Vector2.new(vector.X, vector.Y)
@@ -593,7 +570,7 @@ local delta = screenPos - center
 local length = delta.Magnitude
 local angle = math.atan2(delta.Y, delta.X)
 
-data.Line.Size = UDim2.new(0, length, 0, 2) -- Толщина линии 2 пикселя
+data.Line.Size = UDim2.new(0, length, 0, 2)
 data.Line.Position = UDim2.new(0, center.X, 0, center.Y)
 data.Line.Rotation = math.deg(angle)
 data.Line.AnchorPoint = Vector2.new(0, 0.5)
@@ -604,32 +581,27 @@ end
 else
 if data.Line then data.Line.Visible = false end
 if data.Highlight then
-data.Highlight:Destroy()
+pcall(function() data.Highlight:Destroy() end)
 data.Highlight = nil
 end
 end
 end
 end
 
--- Слушатели игроков
-local function onPlayerAdded(player)
-player.CharacterAdded:Connect(function(char)
-task.wait(0.5) -- Даем персонажу прогрузиться в игре
+local function setupPlayerListeners(player)
+player.CharacterAdded:Connect(function()
+task.wait(0.3)
 createESPObjects(player)
 end)
 player.CharacterRemoving:Connect(function()
 clearESPData(player)
 end)
-if player.Character then
-createESPObjects(player)
-end
+if player.Character then createESPObjects(player) end
 end
 
-Players.PlayerAdded:Connect(onPlayerAdded)
+Players.PlayerAdded:Connect(setupPlayerListeners)
 Players.PlayerRemoving:Connect(clearESPData)
-for _, p in ipairs(Players:GetPlayers()) do
-onPlayerAdded(p)
-end
+for _, p in ipairs(Players:GetPlayers()) do setupPlayerListeners(p) end
 
 -- Flick-Snap
 UserInputService.InputBegan:Connect(function(input, processed)
@@ -656,41 +628,33 @@ RunService.RenderStepped:Connect(function()
 local nowClock = os.clock()
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
--- FOV круги
 pcall(function()
 if Settings.ShowAimFOV and Aim_Circle then
 Aim_Circle.Position = screenCenter
 Aim_Circle.Radius = Settings.AimFOV
 Aim_Circle.Visible = true
-elseif Aim_Circle then
-Aim_Circle.Visible = false
-end
+elseif Aim_Circle then Aim_Circle.Visible = false end
+
 if Settings.ShowFlickFOV and Flick_Circle then
 Flick_Circle.Position = screenCenter
 Flick_Circle.Radius = Settings.FlickFOV
 Flick_Circle.Visible = true
-elseif Flick_Circle then
-Flick_Circle.Visible = false
-end
+elseif Flick_Circle then Flick_Circle.Visible = false end
 end)
 
--- Аимбот
 if Settings.AimbotEnabled and not Settings.FlickMode then
 local target = getClosestPlayer(Settings.AimFOV)
 if target then
-pcall(function()
-Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
-end)
+pcall(function() Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position) end)
 end
 end
 
--- Запуск систем
 runTriggerbot()
 handleInstantReload()
 handleBunnyHop()
 updateESP()
 
--- Монитор производительности
+-- Монитор производительности (ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ БЛОК)
 if Settings.PerfMonitor then
 table.insert(fpsTable, nowClock)
 while #fpsTable > 0 and fpsTable[1] < nowClock - 1 do
@@ -703,10 +667,12 @@ local pingStat = Stats.Network.ServerStatsItem["Data Ping"]
 if pingStat then curPing = math.floor(pingStat:GetValue()) end
 end)
 local curMem = "0.0"
-pcall(function() curMem = string.format("%.1f", Stats:GetTotalMemoryUsageMb()) end)
+pcall(function()
+curMem = string.format("%.1f", Stats:GetTotalMemoryUsageMb())
+end)
+if PerfText then
 PerfText.Text = string.format("⚡ PERFORMANCE\n\nFPS: %d\nPING: %d ms\nMEM: %s MB", curFps, curPing, curMem)
 end
+end
 end)
-
-### Что было изменено и исправлено: * **ESP Charms (Силуэты):** Вместо создания обычного прозрачного `Frame` (который не работал в 3D) теперь динамически создается официальный объект `Highlight` для каждого противника. Он принудительно переведен в режим `AlwaysOnTop`, благодаря чему игроки полноценно подсвечиваются сплошным цветом сквозь любые стены и текстуры. * **ESP Line (Линии):** Исправлена логика тригонометрического расчета `math.atan2` и размера контейнера. Теперь начальная точка (`Position`) жестко зафиксирована на центре вашего экрана (`Camera.ViewportSize / 2`), а длина линии идеально подстраивается под позицию врага на экране. Линии автоматически скрываются, если враг за спиной или мертв. * **Bhop (Распрыжка):** Переписана логика `WalkSpeed`. Скорость теперь увеличивается не только при изменении ползунка, но и удерживается в цикле `RenderStepped`, пока зажат Пробел и персонаж находится в воздухе (`Material.Air`). При приземлении скорость плавно сбрасывается до стандартной. * **Камера:** Добавлен автоматический перерасчет при обновлении `CurrentCamera` движком игры, чтобы ESP не ломался при переходе из лобби в сам матч. <FollowUp> Если у вас возникнут проблемы или какая-то функция будет работать некорректно в конкретном режиме, уточните: * В каком **именно плейсе** (название режима в Roblox) вы запускаете скрипт? * Используете ли вы **Delta Emulator** на ПК или на телефоне (Android)? </FollowUp> 
 
