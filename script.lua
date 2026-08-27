@@ -1,601 +1,359 @@
--- [[ СИСТЕМА АНТИ-КРАША И ГЕНЕРАЦИИ ]] --
-local MathRandom = math.random
-local function generateRandomName()
-    local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
-    local name = ""
-    for i = 1, MathRandom(12, 18) do
-        local randIdx = MathRandom(1, #chars)
-        name = name .. string.sub(chars, randIdx, randIdx)
-    end
-    return name
-end
+-- ==============================================
+-- [FPS] FLICK ULTIMATE v3 (Mobile/Delta)
+-- Aimbot, Flickbot, Triggerbot, ESP, BHop
+-- ==============================================
 
--- [[ СЕРВИСЫ ROBLOX ]] --
+-- [[ СЕРВИСЫ ]] --
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local Stats = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
 
--- [[ ГЛОБАЛЬНЫЕ НАСТРОЙКИ ]] --
+-- [[ НАСТРОЙКИ ПО УМОЛЧАНИЮ ]] --
 local Settings = {
-    AimbotEnabled = false,
-    FlickMode = false,
-    WallCheck = false,
-    AimFOV = 120,
-    FlickFOV = 180,
-    FlickDelay = 0.01,
-    TargetPart = "Head",
-    EspLines = false,
-    EspCharms = false,
-    BHopEnabled = false,
-    BHopPower = 1.0,
-    ShowAimFOV = false,
-    ShowFlickFOV = false,
-    InstantReload = false,
-    FPSUnlocker = false,
-    PerfMonitor = false,
-    TriggerbotEnabled = false,
-    TriggerbotDelay = 0,
-    TriggerbotHitchance = 100
+    Aimbot = false,        -- включить аимбот
+    AimbotFOV = 150,       -- поле зрения
+    WallCheck = false,     -- проверка стен
+    Triggerbot = false,
+    Flickbot = false,      -- флик при нажатии
+    FlickFOV = 200,
+    EspLine = false,
+    EspBox = false,
+    BHop = false,
+    BHopPower = 1,         -- 1..15 (добавка к скорости)
+    SilentAim = false,     -- бесшумный аим (быстрое наведение)
 }
 
--- [[ КЭШ И СЛУЖЕБНЫЕ ПЕРЕМЕННЫЕ ]] --
-local ESP_Cache = {}
-local fpsTable = {}
-local lastShotTime = 0
-local triggerShotCooldown = 0.05
+-- [[ ПЕРЕМЕННЫЕ ]] --
+local ESP_Objects = {}     -- { [player] = {Line, Box} }
 local defaultWalkSpeed = 0
+local bhopActive = false
+local lastShotTime = 0
+local triggerCooldown = 0.05
+local screenCenter = Vector2.new()
+local targetPart = "HumanoidRootPart"  -- можно "Head" для хедшотов
 
--- [[ ФУНКЦИЯ ПОЛУЧЕНИЯ КОНТЕЙНЕРА ДЛЯ GUI ]] --
-local function getSecureContainer()
-    local target = nil
-    pcall(function()
-        if game:GetService("CoreGui") then
-            target = game:GetService("CoreGui"):FindFirstChildOfClass("Folder") or game:GetService("CoreGui")
-        end
-    end)
-    return target or LocalPlayer:WaitForChild("PlayerGui", 15)
-end
+-- ==============================================
+--  СОЗДАНИЕ ГРАФИЧЕСКОГО ИНТЕРФЕЙСА
+-- ==============================================
 
--- [[ ГЛАВНОЕ МЕНЮ GUI ]] --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = generateRandomName()
+ScreenGui.Name = "FlickUltimate"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = getSecureContainer()
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- [[ ESP GUI (отдельный, чтобы не мешался) ]] --
-local EspGui = Instance.new("ScreenGui")
-EspGui.Name = "EspGui_" .. generateRandomName()
-EspGui.ResetOnSpawn = false
-EspGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-EspGui.Parent = getSecureContainer()
+-- Кнопка-переключатель меню
+local MenuButton = Instance.new("ImageButton")
+MenuButton.Size = UDim2.new(0, 60, 0, 60)
+MenuButton.Position = UDim2.new(0.03, 0, 0.3, 0)
+MenuButton.BackgroundColor3 = Color3.fromRGB(20, 25, 40)
+MenuButton.Image = "rbxassetid://6031091211"  -- крутая иконка
+MenuButton.ImageColor3 = Color3.fromRGB(0, 200, 255)
+MenuButton.Parent = ScreenGui
+Instance.new("UICorner", MenuButton).CornerRadius = UDim.new(1, 0)
 
--- [[ ДЛЯ КРУГОВ FOV (Drawing, но они не критичны) ]] --
-local Aim_Circle, Flick_Circle
-pcall(function()
-    Aim_Circle = Drawing.new("Circle")
-    Aim_Circle.Visible = false
-    Aim_Circle.Color = Color3.fromRGB(0, 162, 255)
-    Aim_Circle.Thickness = 1.5
-    Aim_Circle.Filled = false
+-- Панель меню
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 280, 0, 420)
+MainFrame.Position = UDim2.new(0.5, -140, 0.5, -210)
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 14, 22)
+MainFrame.Visible = false
+MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
 
-    Flick_Circle = Drawing.new("Circle")
-    Flick_Circle.Visible = false
-    Flick_Circle.Color = Color3.fromRGB(255, 50, 50)
-    Flick_Circle.Thickness = 1.5
-    Flick_Circle.Filled = false
-end)
-
--- [[ ПЕРЕМЕННЫЕ ДЛЯ GUI МЕНЮ ]] --
-local PerfText = nil  -- будет создан позже
-
--- Функция плавного перетаскивания
-local function makeDraggable(gui)
-    local dragging, dragStart, startPos
-    gui.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = gui.Position
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStart
-            TweenService:Create(gui, TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-            }):Play()
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-end
-
--- Плавающая кнопка
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 55, 0, 55)
-ToggleButton.Position = UDim2.new(0.05, 0, 0.2, 0)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(10, 14, 22)
-ToggleButton.Text = "NL"
-ToggleButton.TextColor3 = Color3.fromRGB(0, 180, 255)
-ToggleButton.Font = Enum.Font.GothamBold
-ToggleButton.TextSize = 16
-ToggleButton.Parent = ScreenGui
-
-Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 28)
-local TBBorder = Instance.new("UIStroke", ToggleButton)
-TBBorder.Color = Color3.fromRGB(0, 162, 255)
-TBBorder.Thickness = 2
-makeDraggable(ToggleButton)
-
--- Главное меню
-local MainMenu = Instance.new("Frame")
-MainMenu.Size = UDim2.new(0, 320, 0, 450)
-MainMenu.Position = UDim2.new(0.5, -160, 0.5, -225)
-MainMenu.BackgroundColor3 = Color3.fromRGB(8, 10, 15)
-MainMenu.Visible = false
-MainMenu.Parent = ScreenGui
-
-Instance.new("UICorner", MainMenu).CornerRadius = UDim.new(0, 12)
-local MenuBorder = Instance.new("UIStroke", MainMenu)
-MenuBorder.Color = Color3.fromRGB(25, 30, 45)
-MenuBorder.Thickness = 1.5
-makeDraggable(MainMenu)
-
+-- Заголовок
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
-Title.Text = "   NEVERLOSE.CC // Premium Custom v16"
+Title.BackgroundColor3 = Color3.fromRGB(15, 20, 35)
+Title.Text = "  ⚡ FLICK ULTIMATE"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 12
-Title.Parent = MainMenu
+Title.TextSize = 16
+Title.Parent = MainFrame
 Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 12)
 
-ToggleButton.MouseButton1Click:Connect(function()
-    MainMenu.Visible = not MainMenu.Visible
-end)
-
+-- Скроллинг-контейнер
 local Scroll = Instance.new("ScrollingFrame")
-Scroll.Size = UDim2.new(1, -16, 1, -50)
-Scroll.Position = UDim2.new(0, 8, 0, 45)
+Scroll.Size = UDim2.new(1, -10, 1, -50)
+Scroll.Position = UDim2.new(0, 5, 0, 45)
 Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 1200)
-Scroll.ScrollBarThickness = 4
-Scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 162, 255)
-Scroll.Parent = MainMenu
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 600)
+Scroll.ScrollBarThickness = 3
+Scroll.Parent = MainFrame
 
-local ContentLayout = Instance.new("UIListLayout", Scroll)
-ContentLayout.Padding = UDim.new(0, 6)
-ContentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+local UIList = Instance.new("UIListLayout", Scroll)
+UIList.Padding = UDim.new(0, 6)
+UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
--- Монитор производительности
-local PerfFrame = Instance.new("Frame")
-PerfFrame.Size = UDim2.new(0, 150, 0, 80)
-PerfFrame.Position = UDim2.new(1, -165, 0, 15)
-PerfFrame.BackgroundColor3 = Color3.fromRGB(8, 10, 15)
-PerfFrame.Visible = false
-PerfFrame.Parent = ScreenGui
-
-Instance.new("UICorner", PerfFrame).CornerRadius = UDim.new(0, 6)
-local PerfStroke = Instance.new("UIStroke", PerfFrame)
-PerfStroke.Color = Color3.fromRGB(0, 162, 255)
-
-PerfText = Instance.new("TextLabel")
-PerfText.Size = UDim2.new(1, -12, 1, -12)
-PerfText.Position = UDim2.new(0, 6, 0, 6)
-PerfText.BackgroundTransparency = 1
-PerfText.TextColor3 = Color3.fromRGB(255, 255, 255)
-PerfText.Font = Enum.Font.Code
-PerfText.TextSize = 11
-PerfText.TextXAlignment = Enum.TextXAlignment.Left
-PerfText.TextYAlignment = Enum.TextYAlignment.Top
-PerfText.Parent = PerfFrame
-
--- [[ КОНСТРУКТОРЫ ЭЛЕМЕНТОВ МЕНЮ ]] --
-local function createToggle(parent, text, settingName, extraCallback)
+-- Функция создания переключателя (Toggle)
+local function createToggle(text, setting, callback)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -4, 0, 36)
-    btn.BackgroundColor3 = Color3.fromRGB(14, 18, 26)
+    btn.Size = UDim2.new(1, -10, 0, 38)
+    btn.BackgroundColor3 = Color3.fromRGB(20, 26, 42)
     btn.Text = "   " .. text
+    btn.TextColor3 = Color3.fromRGB(180, 190, 210)
     btn.TextXAlignment = Enum.TextXAlignment.Left
-    btn.TextColor3 = Color3.fromRGB(150, 160, 180)
     btn.Font = Enum.Font.GothamMedium
-    btn.TextSize = 12
-    btn.Parent = parent
-
+    btn.TextSize = 14
+    btn.Parent = Scroll
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    local btnBorder = Instance.new("UIStroke", btn)
-    btnBorder.Color = Color3.fromRGB(28, 34, 46)
-    btnBorder.Thickness = 1
 
     local indicator = Instance.new("Frame", btn)
-    indicator.Size = UDim2.new(0, 8, 0, 8)
-    indicator.Position = UDim2.new(1, -22, 0.5, -4)
+    indicator.Size = UDim2.new(0, 14, 0, 14)
+    indicator.Position = UDim2.new(1, -22, 0.5, -7)
     indicator.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-    Instance.new("UICorner", indicator).CornerRadius = UDim.new(0, 4)
-
-    local function updateVisuals(animate)
-        local targetBg = Settings[settingName] and Color3.fromRGB(16, 36, 54) or Color3.fromRGB(14, 18, 26)
-        local targetBorder = Settings[settingName] and Color3.fromRGB(0, 162, 255) or Color3.fromRGB(28, 34, 46)
-        local targetInd = Settings[settingName] and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(255, 60, 60)
-        local targetText = Settings[settingName] and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 160, 180)
-
-        if animate then
-            TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = targetBg, TextColor3 = targetText}):Play()
-            TweenService:Create(btnBorder, TweenInfo.new(0.12), {Color = targetBorder}):Play()
-            TweenService:Create(indicator, TweenInfo.new(0.12), {BackgroundColor3 = targetInd}):Play()
-        else
-            btn.BackgroundColor3 = targetBg
-            btn.TextColor3 = targetText
-            btnBorder.Color = targetBorder
-            indicator.BackgroundColor3 = targetInd
-        end
-    end
+    Instance.new("UICorner", indicator).CornerRadius = UDim.new(0, 7)
 
     btn.MouseButton1Click:Connect(function()
-        Settings[settingName] = not Settings[settingName]
-        updateVisuals(true)
-        if extraCallback then pcall(extraCallback, Settings[settingName]) end
+        Settings[setting] = not Settings[setting]
+        local on = Settings[setting]
+        indicator.BackgroundColor3 = on and Color3.fromRGB(0, 200, 80) or Color3.fromRGB(255, 60, 60)
+        btn.BackgroundColor3 = on and Color3.fromRGB(30, 50, 80) or Color3.fromRGB(20, 26, 42)
+        btn.TextColor3 = on and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 190, 210)
+        if callback then callback(on) end
     end)
-    updateVisuals(false)
 end
 
-local function createSlider(parent, text, min, max, default, isFloat, step, callback)
+-- Функция создания ползунка (Slider)
+local function createSlider(text, setting, min, max, default, callback)
     local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, -4, 0, 44)
+    container.Size = UDim2.new(1, -10, 0, 48)
     container.BackgroundTransparency = 1
-    container.Parent = parent
+    container.Parent = Scroll
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 0, 16)
+    label.Size = UDim2.new(1, 0, 0, 18)
     label.BackgroundTransparency = 1
-    label.Text = "   " .. text .. ": " .. string.format(isFloat and "%.2f" or "%d", default)
-    label.TextColor3 = Color3.fromRGB(180, 190, 205)
+    label.Text = text .. ": " .. tostring(default)
+    label.TextColor3 = Color3.fromRGB(180, 190, 210)
     label.Font = Enum.Font.GothamMedium
-    label.TextSize = 11
+    label.TextSize = 13
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = container
 
     local bg = Instance.new("Frame")
     bg.Size = UDim2.new(1, -20, 0, 6)
-    bg.Position = UDim2.new(0, 10, 0, 24)
-    bg.BackgroundColor3 = Color3.fromRGB(25, 30, 45)
+    bg.Position = UDim2.new(0, 10, 0, 28)
+    bg.BackgroundColor3 = Color3.fromRGB(40, 45, 60)
     bg.Parent = container
     Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 3)
 
     local fill = Instance.new("Frame", bg)
     fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    fill.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
+    fill.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
     Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 3)
 
-    local sliderBtn = Instance.new("TextButton", bg)
-    sliderBtn.Size = UDim2.new(0, 12, 0, 12)
-    sliderBtn.Position = UDim2.new((default - min) / (max - min), -6, 0.5, -6)
-    sliderBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    sliderBtn.Text = ""
-    Instance.new("UICorner", sliderBtn).CornerRadius = UDim.new(0, 6)
+    local thumb = Instance.new("TextButton", bg)
+    thumb.Size = UDim2.new(0, 16, 0, 16)
+    thumb.Position = UDim2.new((default - min) / (max - min), -8, 0.5, -8)
+    thumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    thumb.Text = ""
+    Instance.new("UICorner", thumb).CornerRadius = UDim.new(0, 8)
 
     local active = false
-    local function updateSlider(inputPosition)
-        local x = math.clamp((inputPosition.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
-        local rawVal = min + (x * (max - min))
-
-        if step then
-            rawVal = math.round(rawVal / step) * step
-        elseif not isFloat then
-            rawVal = math.floor(rawVal)
-        end
-        rawVal = math.clamp(rawVal, min, max)
-
-        local visualX = (rawVal - min) / (max - min)
-        sliderBtn.Position = UDim2.new(visualX, -6, 0.5, -6)
-        fill.Size = UDim2.new(visualX, 0, 1, 0)
-
-        label.Text = "   " .. text .. ": " .. string.format(isFloat and "%.1f" or "%d", rawVal)
-        pcall(callback, rawVal)
+    local function update(inputPos)
+        local x = math.clamp((inputPos.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
+        local val = min + (x * (max - min))
+        val = math.round(val)
+        fill.Size = UDim2.new((val - min) / (max - min), 0, 1, 0)
+        thumb.Position = UDim2.new((val - min) / (max - min), -8, 0.5, -8)
+        label.Text = text .. ": " .. tostring(val)
+        Settings[setting] = val
+        if callback then callback(val) end
     end
 
     bg.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
             active = true
-            updateSlider(i.Position)
+            update(i.Position)
         end
     end)
-
     UserInputService.InputEnded:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
             active = false
         end
     end)
-
     UserInputService.InputChanged:Connect(function(i)
         if active and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-            updateSlider(i.Position)
+            update(i.Position)
         end
     end)
 end
 
--- [[ НАПОЛНЕНИЕ МЕНЮ ]] --
-createToggle(Scroll, "On-Shot Flickbot", "FlickMode")
-createToggle(Scroll, "Combat Aimbot", "AimbotEnabled")
-createToggle(Scroll, "Triggerbot", "TriggerbotEnabled")
-createSlider(Scroll, "Trigger Delay (ms)", 0, 500, Settings.TriggerbotDelay * 1000, false, nil, function(v) Settings.TriggerbotDelay = v / 1000 end)
-createSlider(Scroll, "Trigger Hitchance", 10, 100, Settings.TriggerbotHitchance, false, nil, function(v) Settings.TriggerbotHitchance = v end)
-createToggle(Scroll, "Aim/Flick Wallcheck", "WallCheck")
-createToggle(Scroll, "Show Flick FOV (Red)", "ShowFlickFOV")
-createToggle(Scroll, "Show Aim FOV (Blue)", "ShowAimFOV")
+-- Создаём элементы меню
+createToggle("Aimbot", "Aimbot")
+createSlider("Aim FOV", "AimbotFOV", 30, 300, 150)
+createToggle("Wall Check", "WallCheck")
+createToggle("Silent Aim", "SilentAim")
 
-createToggle(Scroll, "ESP Line", "EspLines")
-createToggle(Scroll, "ESP Box (Charms)", "EspCharms")
+createToggle("Triggerbot", "Triggerbot")
+createToggle("Flickbot (on shoot)", "Flickbot")
+createSlider("Flick FOV", "FlickFOV", 30, 300, 200)
 
-createToggle(Scroll, "BunnyHop", "BHopEnabled")
-createSlider(Scroll, "BHop Power Strength", 1, 15, Settings.BHopPower, true, 0.5, function(v) Settings.BHopPower = v end)
+createToggle("ESP Line", "EspLine")
+createToggle("ESP Box (Chams)", "EspBox")
 
-createToggle(Scroll, "Instant Reload (Universal)", "InstantReload")
-createToggle(Scroll, "FPS Unlocker (999 FPS)", "FPSUnlocker", function(state)
-    if setfpscap then
-        setfpscap(state and 999 or 60)
-    end
-end)
-createToggle(Scroll, "Performance Monitor", "PerfMonitor", function(state)
-    PerfFrame.Visible = state
+createToggle("Bunny Hop", "BHop")
+createSlider("BHOP Power", "BHopPower", 1, 15, 1)
+
+-- Открытие/закрытие меню
+MenuButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
 end)
 
-createSlider(Scroll, "Aim FOV", 10, 900, Settings.AimFOV, false, nil, function(v) Settings.AimFOV = v end)
-createSlider(Scroll, "Flick FOV", 10, 900, Settings.FlickFOV, false, nil, function(v) Settings.FlickFOV = v end)
-createSlider(Scroll, "Flick Delay", 0.01, 1.00, Settings.FlickDelay, true, 0.01, function(v) Settings.FlickDelay = v end)
+-- ==============================================
+--  ОСНОВНАЯ ЛОГИКА
+-- ==============================================
 
--- [[ ФУНКЦИОНАЛ: ПРОВЕРКА СТЕН ]] --
-local function checkWallVisibility(targetPart, enemyCharacter)
+-- Проверка видимости (WallCheck)
+local function isVisible(targetPart, enemyChar)
     if not Settings.WallCheck then return true end
-    if not targetPart or not enemyCharacter then return false end
     local origin = Camera.CFrame.Position
-    local direction = (targetPart.Position - origin)
-    local distance = direction.Magnitude
-    if distance < 1 then return true end
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-    raycastParams.IgnoreWater = true
-    local result = workspace:Raycast(origin, direction, raycastParams)
+    local direction = targetPart.Position - origin
+    local ray = RaycastParams.new()
+    ray.FilterType = Enum.RaycastFilterType.Exclude
+    ray.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+    local result = workspace:Raycast(origin, direction, ray)
     if result and result.Instance then
-        return result.Instance:IsDescendantOf(enemyCharacter)
+        return result.Instance:IsDescendantOf(enemyChar)
     end
     return true
 end
 
--- Безопасный клик
-local function secureDeltaClick()
-    pcall(function()
-        if mouse1click then
-            mouse1click()
-        elseif mouse1press and mouse1release then
-            mouse1press()
-            task.wait(0.005)
-            mouse1release()
-        end
-    end)
-end
+-- Получение ближайшего врага в FOV
+local function getClosestEnemy(fov)
+    local bestTarget = nil
+    local bestDist = fov + 1
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
--- Поиск ближайшего игрока к прицелу
-local function getClosestPlayer(currentFOV)
-    local closestTarget = nil
-    local minDistance = currentFOV + 1
-    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    local players = Players:GetPlayers()
-    for i = 1, #players do
-        local player = players[i]
+    for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             local char = player.Character
-            local humanoid = char:FindFirstChildOfClass("Humanoid")
-            local targetPart = char:FindFirstChild(Settings.TargetPart) or char:FindFirstChild("HumanoidRootPart")
-            if humanoid and humanoid.Health > 0 and targetPart then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            local part = char:FindFirstChild(targetPart) or char:FindFirstChild("HumanoidRootPart")
+            if hum and hum.Health > 0 and part then
+                local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
                 if onScreen then
-                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-                    if distance <= currentFOV and distance < minDistance then
-                        if checkWallVisibility(targetPart, char) then
-                            minDistance = distance
-                            closestTarget = targetPart
+                    local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if dist <= fov and dist < bestDist then
+                        if isVisible(part, char) then
+                            bestDist = dist
+                            bestTarget = part
                         end
                     end
                 end
             end
         end
     end
-    return closestTarget
+    return bestTarget
 end
 
--- [[ ФУНКЦИОНАЛ: ТРИГГЕРБОТ ]] --
-local function runTriggerbot()
-    if not Settings.TriggerbotEnabled then return end
-    if not Mouse or not Mouse.Target then return end
+-- Симуляция выстрела (для триггербота)
+local function shoot()
     pcall(function()
-        local instance = Mouse.Target
-        local char = instance.Parent
-        while char and not char:IsA("Model") do
-            char = char.Parent
-            if not char then break end
-        end
-        if not char then return end
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        local player = Players:GetPlayerFromCharacter(char)
-        if humanoid and humanoid.Health > 0 and player and player ~= LocalPlayer then
-            if player.Team ~= LocalPlayer.Team or player.Team == nil then
-                if checkWallVisibility(instance, char) then
-                    local currentTime = os.clock()
-                    if currentTime - lastShotTime >= triggerShotCooldown then
-                        if MathRandom(1, 100) <= Settings.TriggerbotHitchance then
-                            lastShotTime = currentTime
-                            if Settings.TriggerbotDelay > 0 then
-                                task.delay(Settings.TriggerbotDelay, function()
-                                    if Mouse.Target and Mouse.Target:IsDescendantOf(char) then
-                                        secureDeltaClick()
-                                    end
-                                end)
-                            else
-                                secureDeltaClick()
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end)
-end
-
--- [[ ФУНКЦИОНАЛ: МГНОВЕННАЯ ПЕРЕЗАРЯДКА ]] --
-local function handleInstantReload()
-    if not Settings.InstantReload then return end
-    pcall(function()
-        local char = LocalPlayer.Character
-        local targetTools = {}
-        if char then
-            for _, v in ipairs(char:GetChildren()) do
-                if v:IsA("Tool") then
-                    table.insert(targetTools, v)
-                end
-            end
-        end
-        local backpack = LocalPlayer:FindFirstChild("Backpack")
-        if backpack then
-            for _, v in ipairs(backpack:GetChildren()) do
-                if v:IsA("Tool") then
-                    table.insert(targetTools, v)
-                end
-            end
-        end
-        for _, tool in ipairs(targetTools) do
-            for _, obj in ipairs(tool:GetDescendants()) do
-                if obj:IsA("NumberValue") or obj:IsA("IntValue") then
-                    local name = obj.Name:lower()
-                    if name:find("reload") or name:find("delay") or name:find("cooldown") or name:find("time") or name:find("duration") then
-                        obj.Value = 0
-                    elseif name:find("ammo") or name:find("clip") or name:find("mag") then
-                        if obj.Value < 30 then
-                            obj.Value = 999
-                        end
-                    end
-                end
-            end
-        end
+        if mouse1click then mouse1click() end
     end)
 end
 
 -- ==============================================
---  BHOP (WalkSpeed с ползунком)
+--  BHOP (WalkSpeed)
 -- ==============================================
-local function handleBunnyHop()
-    if not Settings.BHopEnabled then
+local function handleBHop()
+    if not Settings.BHop then
         local char = LocalPlayer.Character
         if char then
-            local humanoid = char:FindFirstChildOfClass("Humanoid")
-            if humanoid and humanoid.WalkSpeed ~= defaultWalkSpeed then
-                humanoid.WalkSpeed = defaultWalkSpeed
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum and defaultWalkSpeed > 0 and hum.WalkSpeed ~= defaultWalkSpeed then
+                hum.WalkSpeed = defaultWalkSpeed
             end
         end
         return
     end
     local char = LocalPlayer.Character
     if not char then return end
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not humanoid or humanoid.Health <= 0 then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return end
     if defaultWalkSpeed == 0 then
-        defaultWalkSpeed = humanoid.WalkSpeed
+        defaultWalkSpeed = hum.WalkSpeed
         if defaultWalkSpeed == 0 then defaultWalkSpeed = 16 end
     end
-    if UserInputService:IsKeyDown(Enum.KeyCode.Space) and humanoid.FloorMaterial == Enum.Material.Air then
+
+    if UserInputService:IsKeyDown(Enum.KeyCode.Space) and hum.FloorMaterial == Enum.Material.Air then
         local add = (Settings.BHopPower - 1) * (20 / 14)
         local boost = defaultWalkSpeed + add
-        if humanoid.WalkSpeed ~= boost then
-            humanoid.WalkSpeed = boost
-        end
+        if hum.WalkSpeed ~= boost then hum.WalkSpeed = boost end
     else
-        if humanoid.WalkSpeed ~= defaultWalkSpeed then
-            humanoid.WalkSpeed = defaultWalkSpeed
-        end
+        if hum.WalkSpeed ~= defaultWalkSpeed then hum.WalkSpeed = defaultWalkSpeed end
     end
 end
 
 -- ==============================================
---  ESP: GUI-версия (Line + Box)
+--  ESP (Line + Box) через GUI (стабильно на телефоне)
 -- ==============================================
 
--- Создание ESP объектов для игрока
-local function createESPObjects(player)
+-- Создание объектов ESP для игрока
+local function createESP(player)
     if player == LocalPlayer then return end
-    if ESP_Cache[player] then
+    if ESP_Objects[player] then
         pcall(function()
-            if ESP_Cache[player].Line then ESP_Cache[player].Line:Destroy() end
-            if ESP_Cache[player].Box then ESP_Cache[player].Box:Destroy() end
+            ESP_Objects[player].Line:Destroy()
+            ESP_Objects[player].Box:Destroy()
         end)
-        ESP_Cache[player] = nil
+        ESP_Objects[player] = nil
     end
 
-    local espData = {}
+    local line = Instance.new("Frame")
+    line.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+    line.BorderSizePixel = 0
+    line.BackgroundTransparency = 0.3
+    line.Visible = false
+    line.ZIndex = 5
+    line.Parent = ScreenGui
 
-    -- Линия (Frame)
-    local lineFrame = Instance.new("Frame")
-    lineFrame.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
-    lineFrame.BorderSizePixel = 0
-    lineFrame.BackgroundTransparency = 0.4
-    lineFrame.Visible = false
-    lineFrame.ZIndex = 10
-    lineFrame.Parent = EspGui
+    local box = Instance.new("Frame")
+    box.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+    box.BackgroundTransparency = 0.7
+    box.BorderSizePixel = 2
+    box.BorderColor3 = Color3.fromRGB(0, 200, 255)
+    box.Visible = false
+    box.ZIndex = 5
+    box.Parent = ScreenGui
 
-    -- Бокс (Frame с рамкой)
-    local boxFrame = Instance.new("Frame")
-    boxFrame.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
-    boxFrame.BackgroundTransparency = 0.6
-    boxFrame.BorderSizePixel = 2
-    boxFrame.BorderColor3 = Color3.fromRGB(0, 162, 255)
-    boxFrame.Visible = false
-    boxFrame.ZIndex = 10
-    boxFrame.Parent = EspGui
-
-    espData.Line = lineFrame
-    espData.Box = boxFrame
-    ESP_Cache[player] = espData
+    ESP_Objects[player] = {Line = line, Box = box}
 end
 
 -- Очистка ESP
-local function clearESPData(player)
-    if ESP_Cache[player] then
+local function clearESP(player)
+    if ESP_Objects[player] then
         pcall(function()
-            if ESP_Cache[player].Line then ESP_Cache[player].Line:Destroy() end
-            if ESP_Cache[player].Box then ESP_Cache[player].Box:Destroy() end
+            ESP_Objects[player].Line:Destroy()
+            ESP_Objects[player].Box:Destroy()
         end)
-        ESP_Cache[player] = nil
+        ESP_Objects[player] = nil
     end
 end
 
--- Обновление ESP (вызывается каждый кадр)
+-- Обновление ESP (каждый кадр)
 local function updateESP()
-    local screenSize = Camera.ViewportSize
-    local center = Vector2.new(screenSize.X / 2, screenSize.Y / 2)
+    local viewport = Camera.ViewportSize
+    local center = Vector2.new(viewport.X / 2, viewport.Y / 2)
 
-    for player, data in pairs(ESP_Cache) do
+    for player, data in pairs(ESP_Objects) do
         local char = player.Character
-        local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
-        if char and humanoid and hrp and humanoid.Health > 0 and player ~= LocalPlayer then
+        if char and hum and hrp and hum.Health > 0 and player ~= LocalPlayer then
             local isEnemy = (player.Team ~= LocalPlayer.Team or player.Team == nil)
-            local showLine = Settings.EspLines and isEnemy
-            local showBox = Settings.EspCharms and isEnemy
+            local showLine = Settings.EspLine and isEnemy
+            local showBox = Settings.EspBox and isEnemy
 
-            local vector, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-            local screenPos = Vector2.new(vector.X, vector.Y)
+            local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+            local screenPos = Vector2.new(pos.X, pos.Y)
 
             -- Линия
             if showLine and data.Line then
@@ -631,102 +389,113 @@ end
 
 -- Подписка на игроков
 local function onPlayerAdded(player)
-    player.CharacterAdded:Connect(function(char)
-        createESPObjects(player)
+    player.CharacterAdded:Connect(function()
+        createESP(player)
     end)
     player.CharacterRemoving:Connect(function()
-        clearESPData(player)
+        clearESP(player)
     end)
-    if player.Character then
-        createESPObjects(player)
-    end
+    if player.Character then createESP(player) end
 end
 
 Players.PlayerAdded:Connect(onPlayerAdded)
-Players.PlayerRemoving:Connect(clearESPData)
-for _, p in ipairs(Players:GetPlayers()) do
-    onPlayerAdded(p)
+Players.PlayerRemoving:Connect(clearESP)
+for _, p in ipairs(Players:GetPlayers()) do onPlayerAdded(p) end
+
+-- ==============================================
+--  AIMBOT + FLICKBOT + TRIGGERBOT + SILENT AIM
+-- ==============================================
+
+-- Основная функция наведения (используется для аимбота и флика)
+local function aimAt(targetPart)
+    if not targetPart then return end
+    pcall(function()
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPart.Position)
+    end)
 end
 
--- Flick-Snap
+-- Обработчик нажатия для фликбота (вызывается при выстреле)
 UserInputService.InputBegan:Connect(function(input, processed)
-    if processed or not Settings.FlickMode then return end
+    if processed then return end
+    -- Для мобильных: касание экрана (кнопка стрельбы)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        if Settings.Flickbot then
+            local target = getClosestEnemy(Settings.FlickFOV)
+            if target then aimAt(target) end
+        end
+        -- Triggerbot при касании (если наведён на врага)
+        if Settings.Triggerbot then
+            task.wait(0.05) -- небольшая задержка для стабильности
+            triggerbot()
+        end
+    end
+    -- Для ПК: клик мыши
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        local target = getClosestPlayer(Settings.FlickFOV)
-        if target then
-            task.delay(Settings.FlickDelay, function()
-                pcall(function()
-                    if target and target.Parent then
-                        local humanoid = target.Parent:FindFirstChildOfClass("Humanoid")
-                        if humanoid and humanoid.Health > 0 then
-                            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
-                        end
-                    end
-                end)
-            end)
+        if Settings.Flickbot then
+            local target = getClosestEnemy(Settings.FlickFOV)
+            if target then aimAt(target) end
+        end
+        if Settings.Triggerbot then
+            task.wait(0.05)
+            triggerbot()
         end
     end
 end)
 
--- [[ ГЛАВНЫЙ ЦИКЛ ]] --
-RunService.RenderStepped:Connect(function()
-    local nowClock = os.clock()
-    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-
-    -- FOV круги (Drawing)
+-- Triggerbot (автовыстрел при наведении)
+function triggerbot()
+    if not Settings.Triggerbot then return end
+    if not Mouse or not Mouse.Target then return end
     pcall(function()
-        if Settings.ShowAimFOV and Aim_Circle then
-            Aim_Circle.Position = screenCenter
-            Aim_Circle.Radius = Settings.AimFOV
-            Aim_Circle.Visible = true
-        elseif Aim_Circle then
-            Aim_Circle.Visible = false
-        end
-        if Settings.ShowFlickFOV and Flick_Circle then
-            Flick_Circle.Position = screenCenter
-            Flick_Circle.Radius = Settings.FlickFOV
-            Flick_Circle.Visible = true
-        elseif Flick_Circle then
-            Flick_Circle.Visible = false
+        local target = Mouse.Target
+        local char = target.Parent
+        while char and not char:IsA("Model") do char = char.Parent end
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local player = Players:GetPlayerFromCharacter(char)
+        if hum and hum.Health > 0 and player and player ~= LocalPlayer then
+            if player.Team ~= LocalPlayer.Team or player.Team == nil then
+                local now = os.clock()
+                if now - lastShotTime >= triggerCooldown then
+                    lastShotTime = now
+                    shoot()
+                end
+            end
         end
     end)
+end
 
-    -- Аимбот
-    if Settings.AimbotEnabled and not Settings.FlickMode then
-        local target = getClosestPlayer(Settings.AimFOV)
-        if target then
-            pcall(function()
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
-            end)
-        end
-    end
+-- ==============================================
+--  ГЛАВНЫЙ ЦИКЛ (RenderStepped)
+-- ==============================================
+RunService.RenderStepped:Connect(function()
+    -- Обновляем центр экрана
+    screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
-    -- Запуск триггербота, релоада и бхопа
-    runTriggerbot()
-    handleInstantReload()
-    handleBunnyHop()
+    -- BHop
+    handleBHop()
 
-    -- Обновление ESP
+    -- ESP
     updateESP()
 
-    -- Монитор производительности
-    if Settings.PerfMonitor then
-        table.insert(fpsTable, nowClock)
-        while #fpsTable > 0 and fpsTable[1] < nowClock - 1 do
-            table.remove(fpsTable, 1)
-        end
-        local curFps = #fpsTable
-        local curPing = 0
-        pcall(function()
-            local pingStat = Stats.Network.ServerStatsItem["Data Ping"]
-            if pingStat then
-                curPing = math.floor(pingStat:GetValue())
+    -- Aimbot (постоянное наведение, если включён)
+    if Settings.Aimbot then
+        local target = getClosestEnemy(Settings.AimbotFOV)
+        if target then
+            if Settings.SilentAim then
+                -- Silent aim: мгновенный флик без задержки
+                aimAt(target)
+            else
+                -- Плавный аим (можно через Tween или просто мгновенно)
+                aimAt(target)
             end
-        end)
-        local curMem = "0.0"
-        pcall(function()
-            curMem = string.format("%.1f", Stats:GetTotalMemoryUsageMb())
-        end)
-        PerfText.Text = string.format("⚡ PERFORMANCE\n\nFPS: %d\nPING: %d ms\nMEM: %s MB", curFps, curPing, curMem)
+        end
+    end
+
+    -- Triggerbot (если не обработан в InputBegan, продублируем для надёжности)
+    if Settings.Triggerbot then
+        triggerbot()
     end
 end)
+
+print("✅ FLICK ULTIMATE LOADED! (Mobile/Delta)")
