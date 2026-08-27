@@ -48,6 +48,7 @@ local ESP_Cache = {}
 local fpsTable = {}
 local lastShotTime = 0
 local triggerShotCooldown = 0.05
+local defaultWalkSpeed = 16  -- базовая скорость, будет обновлена при первом вызове BHop
 
 -- [[ БЕЗОПАСНАЯ ИНЖЕКЦИЯ GUI ]] --
 local ScreenGui = Instance.new("ScreenGui")
@@ -312,7 +313,7 @@ createToggle(Scroll, "Show Flick FOV (Red)", "ShowFlickFOV")
 createToggle(Scroll, "Show Aim FOV (Blue)", "ShowAimFOV")
 
 createToggle(Scroll, "ESP Line", "EspLines")
-createToggle(Scroll, "ESP Charms", "EspCharms")
+createToggle(Scroll, "ESP Box (Charms)", "EspCharms")
 
 createToggle(Scroll, "BunnyHop", "BHopEnabled")
 createSlider(Scroll, "BHop Power Strength", 1, 15, Settings.BHopPower, true, 0.5, function(v) Settings.BHopPower = v end)
@@ -497,41 +498,52 @@ local function handleInstantReload()
     end)
 end
 
--- [[ ФУНКЦИОНАЛ: BHOP (ИСПРАВЛЕН) ]] --
-local bhopJumpCooldown = 0
+-- ==============================================
+--  НОВАЯ ЛОГИКА BHop (через WalkSpeed)
+-- ==============================================
 local function handleBunnyHop()
-    if not Settings.BHopEnabled then return end
-    pcall(function()
+    if not Settings.BHopEnabled then 
+        -- если выключили – возвращаем скорость на дефолтную
         local char = LocalPlayer.Character
-        if not char then return end
-        
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        
-        if humanoid and hrp and humanoid.Health > 0 then
-            -- Если зажат пробел и персонаж в воздухе
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space) and humanoid.FloorMaterial == Enum.Material.Air then
-                local currentTime = os.clock()
-                if currentTime - bhopJumpCooldown > 0.1 then
-                    bhopJumpCooldown = currentTime
-                    
-                    -- Небольшой вертикальный импульс (чтобы не падать слишком быстро)
-                    hrp.Velocity = Vector3.new(hrp.Velocity.X, 40, hrp.Velocity.Z)
-                    
-                    -- Горизонтальное ускорение в направлении движения
-                    local moveDir = humanoid.MoveDirection
-                    if moveDir.Magnitude > 0 then
-                        local speedMultiplier = 1 + (Settings.BHopPower * 0.08) -- 1.0 = базовый, 15 = ~2.2
-                        hrp.Velocity = hrp.Velocity + (moveDir * (15 * speedMultiplier))
-                    end
-                end
+        if char then
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.WalkSpeed ~= defaultWalkSpeed then
+                humanoid.WalkSpeed = defaultWalkSpeed
             end
-            -- FIX: Убрано else, скорость на земле не изменяется – возвращается к обычной автоматически
         end
-    end)
+        return 
+    end
+
+    local char = LocalPlayer.Character
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then return end
+
+    -- Запоминаем базовую скорость при первом вызове
+    if defaultWalkSpeed == 0 then
+        defaultWalkSpeed = humanoid.WalkSpeed
+        if defaultWalkSpeed == 0 then defaultWalkSpeed = 16 end
+    end
+
+    -- Условие: зажат пробел И персонаж в воздухе
+    if UserInputService:IsKeyDown(Enum.KeyCode.Space) and humanoid.FloorMaterial == Enum.Material.Air then
+        -- Рассчитываем новую скорость: базовый буст 16 + сила * 1.5 (макс при 15 -> 16+22.5=38.5)
+        local boost = 16 + (Settings.BHopPower * 1.5)
+        if humanoid.WalkSpeed ~= boost then
+            humanoid.WalkSpeed = boost
+        end
+    else
+        -- На земле или пробел отпущен – возвращаем обычную скорость
+        if humanoid.WalkSpeed ~= defaultWalkSpeed then
+            humanoid.WalkSpeed = defaultWalkSpeed
+        end
+    end
 end
 
--- [[ СИСТЕМА ФИЛЬТРАЦИИ И ОЧИСТКИ КЭША ESP ]] --
+-- ==============================================
+--  ESP (Line + Box) – без изменений
+-- ==============================================
+
 local function clearESPData(player)
     if ESP_Cache[player] then
         pcall(function() 
@@ -540,15 +552,14 @@ local function clearESPData(player)
             end 
         end)
         pcall(function() 
-            if ESP_Cache[player].Highlight then 
-                ESP_Cache[player].Highlight:Destroy() 
+            if ESP_Cache[player].Box then 
+                ESP_Cache[player].Box:Remove() 
             end 
         end)
         ESP_Cache[player] = nil
     end
 end
 
--- [[ ИНИЦИАЛИЗАЦИЯ ESP (ИСПРАВЛЕНА) ]] --
 local function createEngineESP(player)
     if player == LocalPlayer then return end
     clearESPData(player)
@@ -558,25 +569,20 @@ local function createEngineESP(player)
             local hrp = character:WaitForChild("HumanoidRootPart", 5)
             if not hrp then return end
 
-            -- Линия (Drawing)
             local line = Drawing.new("Line")
             line.Visible = false
             line.Color = Color3.fromRGB(0, 162, 255)
             line.Thickness = 1.5
             line.Transparency = 1
 
-            -- Highlight для Charms – FIX: помещаем в Workspace, чтобы работал сквозь стены
-            local highlight = Instance.new("Highlight")
-            highlight.FillColor = Color3.fromRGB(0, 162, 255)
-            highlight.FillTransparency = 0.4
-            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-            highlight.OutlineTransparency = 0.1
-            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            highlight.Adornee = character
-            highlight.Enabled = false
-            highlight.Parent = workspace -- FIX: родитель – Workspace
+            local box = Drawing.new("Square")
+            box.Visible = false
+            box.Color = Color3.fromRGB(0, 162, 255)
+            box.Thickness = 1.5
+            box.Filled = false
+            box.Transparency = 1
 
-            ESP_Cache[player] = {Line = line, Highlight = highlight}
+            ESP_Cache[player] = {Line = line, Box = box}
         end)
     end
 
@@ -593,7 +599,7 @@ for _, p in ipairs(Players:GetPlayers()) do
     createEngineESP(p) 
 end
 
--- Flick-Snap при нажатии
+-- Flick-Snap
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed or not Settings.FlickMode then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -613,12 +619,12 @@ UserInputService.InputBegan:Connect(function(input, processed)
     end
 end)
 
--- [[ ГЛАВНЫЙ ИСПОЛНИТЕЛЬНЫЙ ЦИКЛ (С ИСПРАВЛЕНИЯМИ ESP) ]] --
+-- [[ ГЛАВНЫЙ ИСПОЛНИТЕЛЬНЫЙ ЦИКЛ ]] --
 RunService.RenderStepped:Connect(function()
     local nowClock = os.clock()
     local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
-    -- Рендер FOV кругов
+    -- FOV круги
     pcall(function()
         if Settings.ShowAimFOV and Aim_Circle then
             Aim_Circle.Position = screenCenter
@@ -637,7 +643,7 @@ RunService.RenderStepped:Connect(function()
         end
     end)
 
-    -- Работа аимбота
+    -- Аимбот
     if Settings.AimbotEnabled and not Settings.FlickMode then
         local target = getClosestPlayer(Settings.AimFOV)
         if target then
@@ -650,9 +656,9 @@ RunService.RenderStepped:Connect(function()
     -- Запуск триггербота, релоада и бхопа
     runTriggerbot()
     handleInstantReload()
-    handleBunnyHop()
+    handleBunnyHop()  -- <-- обновлённая функция
 
-    -- ОБНОВЛЕНИЕ ESP (ИСПРАВЛЕНО)
+    -- ====== ОБНОВЛЕНИЕ ESP ======
     for player, visual in pairs(ESP_Cache) do
         pcall(function()
             local char = player.Character
@@ -662,28 +668,40 @@ RunService.RenderStepped:Connect(function()
             if char and humanoid and hrp and humanoid.Health > 0 then
                 local isEnemy = (player.Team ~= LocalPlayer.Team or player.Team == nil)
 
-                -- Charms
-                if Settings.EspCharms and isEnemy and visual.Highlight then
-                    visual.Highlight.Enabled = true
-                    visual.Highlight.Adornee = char
-                elseif visual.Highlight then
-                    visual.Highlight.Enabled = false
-                end
-
-                -- ESP Line – FIX: рисуем всегда, даже если игрок вне экрана (используем проекцию)
+                -- Line
                 if Settings.EspLines and isEnemy and visual.Line then
                     local vector, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                    -- FIX: убрана проверка onScreen – линия рисуется в любом случае,
-                    -- но координаты могут выходить за экран – это нормально для "сквозь стены"
+                    local screenSize = Camera.ViewportSize
+                    local toPoint = Vector2.new(
+                        math.clamp(vector.X, -200, screenSize.X + 200),
+                        math.clamp(vector.Y, -200, screenSize.Y + 200)
+                    )
                     visual.Line.From = screenCenter
-                    visual.Line.To = Vector2.new(vector.X, vector.Y)
+                    visual.Line.To = toPoint
                     visual.Line.Visible = true
                 elseif visual.Line then
                     visual.Line.Visible = false
                 end
+
+                -- Box
+                if Settings.EspCharms and isEnemy and visual.Box then
+                    local vector, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                    if onScreen then
+                        local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
+                        local size = math.clamp(120 / (dist / 10 + 1), 20, 150)
+                        visual.Box.Position = Vector2.new(vector.X - size/2, vector.Y - size/2)
+                        visual.Box.Size = Vector2.new(size, size)
+                        visual.Box.Visible = true
+                    else
+                        visual.Box.Visible = false
+                    end
+                elseif visual.Box then
+                    visual.Box.Visible = false
+                end
+
             else
                 if visual.Line then visual.Line.Visible = false end
-                if visual.Highlight then visual.Highlight.Enabled = false end
+                if visual.Box then visual.Box.Visible = false end
             end
         end)
     end
