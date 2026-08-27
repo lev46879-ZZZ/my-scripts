@@ -70,19 +70,28 @@ LineOriginPart.Anchored = true
 LineOriginPart.Size = Vector3.new(0.1, 0.1, 0.1)
 LineOriginPart.Parent = workspace
 
--- [[ СКРЫТАЯ ЗАГРУЗКА ИНТЕРФЕЙСА БЕЗ ХУКОВ ]] --
+-- [[ БЕЗОПАСНАЯ ИНЖЕКЦИЯ ИНТЕРФЕЙСА ]] --
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = generateRandomName()
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Защита: обходим Byfron, маскируя UI под легитную часть PlayerGui
-local uiParent = LocalPlayer:WaitForChild("PlayerGui", 5)
-if uiParent then
-    ScreenGui.Parent = uiParent
-else
-    pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
+-- Стелс-метод под Delta: ищем защищенный контейнер, который античит не проверяет
+local function getSecureFolder()
+    local target = nil
+    -- Проверяем CoreGui через pcall, чтобы не вызвать ошибку
+    pcall(function()
+        if game:GetService("CoreGui") then
+            -- Маскируемся под внутреннюю служебную папку Delta
+            target = game:GetService("CoreGui"):FindFirstChildOfClass("Folder") or game:GetService("CoreGui")
+        end
+    end)
+    if not target then
+        target = LocalPlayer:WaitForChild("PlayerGui", 10)
+    end
+    return target
 end
+ScreenGui.Parent = getSecureFolder()
 
 local function makeDraggable(gui)
     local dragging, dragStart, startPos
@@ -134,7 +143,7 @@ makeDraggable(MainMenu)
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundColor3 = Color3.fromRGB(14, 18, 24)
-Title.Text = "  👑 NEVERLOSE.CC // NoLag v13"
+Title.Text = "  👑 NEVERLOSE.CC // Stealth v14"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Font = Enum.Font.GothamBold
@@ -246,13 +255,13 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
     local bgCorner = Instance.new("UICorner"); bgCorner.CornerRadius = UDim.new(0, 2); bgCorner.Parent = bg
 
     local fill = Instance.new("Frame")
-    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    fill.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
-    fill.Parent = bg
-    local fillCorner = Instance.new("UICorner"); fillCorner.CornerRadius = UDim.new(0, 2); fillCorner.Parent = fill
+fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+fill.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
+fill.Parent = bg
+local fillCorner = Instance.new("UICorner"); fillCorner.CornerRadius = UDim.new(0, 2); fillCorner.Parent = fill
 
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 10, 0, 10)
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0, 10, 0, 10)
 btn.Position = UDim2.new((default - min) / (max - min), -5, 0.5, -5)
 btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 btn.Text = ""
@@ -500,10 +509,14 @@ UserInputService.InputBegan:Connect(function(input, processed)
 if processed then return end
 if Settings.FlickMode and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1) then
 local target = getClosestPlayer(Settings.FlickFOV)
+local target = getClosestPlayer(Settings.FlickFOV)
 if target then
 task.delay(Settings.FlickDelay, function()
 if target and target.Parent and target.Parent:FindFirstChildOfClass("Humanoid") and target.Parent:FindFirstChildOfClass("Humanoid").Health > 0 then
 Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+end
+end)
+end
 end
 end)
 
