@@ -4,6 +4,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Stats = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
 
 -- [[ НАСТРОЙКИ ]] --
@@ -25,10 +26,9 @@ local Settings = {
     InstantReload = false,
     FPSUnlocker = false,
     PerfMonitor = false,
-    -- Новые настройки Neverlose Triggerbot:
     TriggerbotEnabled = false,
-    TriggerbotDelay = 0,     -- Задержка в сек. (0 = мгновенно)
-    TriggerbotHitchance = 100 -- Шанс попадания в %
+    TriggerbotDelay = 0,
+    TriggerbotHitchance = 100
 }
 
 local ESP_Cache = {}
@@ -36,9 +36,13 @@ local fpsTable = {}
 local NormalSpeed = 16
 local CurrentBHopSpeed = NormalSpeed
 
--- [[ АВТОНОМНАЯ ЗАГРУЗКА ИНТЕРФЕЙСА ]] --
+-- Переменные для контроля одиночного выстрела триггербота
+local lastTargetCharacter = nil
+local hasShotCurrentTarget = false
+
+-- [[ ИНТЕРФЕЙС ]] --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "NL_Flick_Private"
+ScreenGui.Name = "NL_Flick_V3_Final"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -63,13 +67,12 @@ local function makeDraggable(gui)
     end)
 end
 
--- Плавающая кнопка
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0, 50, 0, 50)
 ToggleButton.Position = UDim2.new(0.05, 0, 0.15, 0)
 ToggleButton.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
 ToggleButton.Text = "NL"
-ToggleButton.TextColor3 = Color3.fromRGB(0, 160, 255) -- Цвет Neverlose
+ToggleButton.TextColor3 = Color3.fromRGB(0, 160, 255)
 ToggleButton.Font = Enum.Font.GothamBold
 ToggleButton.TextSize = 13
 ToggleButton.Parent = ScreenGui
@@ -78,11 +81,10 @@ local TBCorner = Instance.new("UICorner"); TBCorner.CornerRadius = UDim.new(0, 2
 local TBBorder = Instance.new("UIStroke"); TBBorder.Color = Color3.fromRGB(0, 160, 255); TBBorder.Thickness = 1.5; TBBorder.Parent = ToggleButton
 makeDraggable(ToggleButton)
 
--- Главное меню
 local MainMenu = Instance.new("Frame")
 MainMenu.Size = UDim2.new(0, 260, 0, 480)
 MainMenu.Position = UDim2.new(0.5, -130, 0.5, -240)
-MainMenu.BackgroundColor3 = Color3.fromRGB(10, 12, 16) -- Темная тема NL
+MainMenu.BackgroundColor3 = Color3.fromRGB(10, 12, 16)
 MainMenu.Visible = false
 MainMenu.Parent = ScreenGui
 
@@ -100,14 +102,7 @@ Title.Font = Enum.Font.GothamBold
 Title.TextSize = 11
 Title.Parent = MainMenu
 
-local TitleGradient = Instance.new("UIGradient")
-TitleGradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 160, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 200))
-}
-TitleGradient.Parent = Title
 local TitleCorner = Instance.new("UICorner"); TitleCorner.CornerRadius = UDim.new(0, 8); TitleCorner.Parent = Title
-
 ToggleButton.MouseButton1Click:Connect(function() MainMenu.Visible = not MainMenu.Visible end)
 
 local Scroll = Instance.new("ScrollingFrame")
@@ -120,7 +115,6 @@ Scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 160, 255)
 Scroll.Parent = MainMenu
 local ContentLayout = Instance.new("UIListLayout"); ContentLayout.Padding = UDim.new(0, 6); ContentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; ContentLayout.Parent = Scroll
 
--- [[ ОВЕРЛЕЙ PERFORMANCE MONITOR ]] --
 local PerfFrame = Instance.new("Frame")
 PerfFrame.Size = UDim2.new(0, 140, 0, 75)
 PerfFrame.Position = UDim2.new(1, -150, 0, 10)
@@ -162,7 +156,6 @@ local function createToggle(parent, text, settingName, extraCallback)
     statusIndicator.Position = UDim2.new(1, -18, 0.5, -3)
     statusIndicator.BackgroundColor3 = Color3.fromRGB(255, 75, 75)
     statusIndicator.Parent = btn
-    local siCorner = Instance.new("UICorner"); siCorner.CornerRadius = UDim.new(0, 3); siCorner.Parent = statusIndicator
 
     local function updateVisuals()
         if Settings[settingName] then
@@ -222,113 +215,65 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
     btn.Text = ""
     btn.Parent = bg
     local btnCorner = Instance.new("UICorner"); btnCorner.CornerRadius = UDim.new(0, 5); btnCorner.Parent = btn
-    local btnStroke = Instance.new("UIStroke"); btnStroke.Color = Color3.fromRGB(0, 160, 255); btnStroke.Thickness = 1.2; btnStroke.Parent = btn
 
     local active = false
     bg.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then active = true end end)
     UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then active = false end end)
-UserInputService.InputChanged:Connect(function(i)
-if active and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-local x = math.clamp((i.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
-btn.Position = UDim2.new(x, -5, 0.5, -5)
-fill.Size = UDim2.new(x, 0, 1, 0)
-local val = min + (x * (max - min))
-if not isFloat then val = math.floor(val) end
-label.Text = text .. ": " .. string.format(isFloat and "%.2f" or "%d", val)
-callback(val)
-end
+    UserInputService.InputChanged:Connect(function(i)
+        if active and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+            local x = math.clamp((i.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
+            btn.Position = UDim2.new(x, -5, 0.5, -5)
+            fill.Size = UDim2.new(x, 0, 1, 0)
+            local val = min + (x * (max - min))
+            if not isFloat then val = math.floor(val) end
+            label.Text = text .. ": " .. string.format(isFloat and "%.2f" or "%d", val)
+            callback(val)
+        end
 end)
 end
 
--- Наполнение меню элементами
-local SectCombat = Instance.new("TextLabel")
-SectCombat.Size = UDim2.new(1, 0, 0, 16); SectCombat.BackgroundTransparency = 1; SectCombat.Text = "--- COMBAT SYSTEM ---"; SectCombat.TextColor3 = Color3.fromRGB(80, 100, 120); SectCombat.Font = Enum.Font.GothamBold; SectCombat.TextSize = 10; SectCombat.Parent = Scroll
-
+-- Наполнение меню
 createToggle(Scroll, "On-Shot Flickbot", "FlickMode")
 createToggle(Scroll, "Combat Aimbot", "AimbotEnabled")
-
--- КАТЕГОРИЯ ТРИГГЕРБОТА (NEW)
 createToggle(Scroll, "Neverlose Triggerbot", "TriggerbotEnabled")
 createSlider(Scroll, "Trigger Delay (ms)", 0, 500, Settings.TriggerbotDelay * 1000, false, function(v) Settings.TriggerbotDelay = v / 1000 end)
 createSlider(Scroll, "Trigger Hitchance", 10, 100, Settings.TriggerbotHitchance, false, function(v) Settings.TriggerbotHitchance = v end)
-
 createToggle(Scroll, "Wallcheck Bypass", "WallCheck")
-
-local SectionLabel = Instance.new("TextLabel")
-SectionLabel.Size = UDim2.new(1, 0, 0, 16); SectionLabel.BackgroundTransparency = 1; SectionLabel.Text = "--- FOV VISIBILITY ---"; SectionLabel.TextColor3 = Color3.fromRGB(80, 100, 120); SectionLabel.Font = Enum.Font.GothamBold; SectionLabel.TextSize = 10; SectionLabel.Parent = Scroll
-
 createToggle(Scroll, "Show Flick FOV (Red)", "ShowFlickFOV")
 createToggle(Scroll, "Show Aim FOV (Blue)", "ShowAimFOV")
-
-local SectionLabel2 = Instance.new("TextLabel")
-SectionLabel2.Size = UDim2.new(1, 0, 0, 16); SectionLabel2.BackgroundTransparency = 1; SectionLabel2.Text = "--- VISUALS & MISC ---"; SectionLabel2.TextColor3 = Color3.fromRGB(80, 100, 120); SectionLabel2.Font = Enum.Font.GothamBold; SectionLabel2.TextSize = 10; SectionLabel2.Parent = Scroll
-
 createToggle(Scroll, "Lite Lines (WH)", "EspLines")
 createToggle(Scroll, "Lite ESP Box", "EspBox")
 createToggle(Scroll, "Lite Charms", "EspCharms")
 createToggle(Scroll, "Smooth BunnyHop", "BHopEnabled")
-
-local SectionLabel3 = Instance.new("TextLabel")
-SectionLabel3.Size = UDim2.new(1, 0, 0, 16); SectionLabel3.BackgroundTransparency = 1; SectionLabel3.Text = "--- UTILITIES ---"; SectionLabel3.TextColor3 = Color3.fromRGB(80, 100, 120); SectionLabel3.Font = Enum.Font.GothamBold; SectionLabel3.TextSize = 10; SectionLabel3.Parent = Scroll
-
 createToggle(Scroll, "Instant Reload", "InstantReload")
-createToggle(Scroll, "FPS Unlocker (999 FPS)", "FPSUnlocker", function(state)
-if setfpscap then setfpscap(state and 999 or 60) end
-end)
-createToggle(Scroll, "Performance Monitor", "PerfMonitor", function(state)
-PerfFrame.Visible = state
-end)
+createToggle(Scroll, "FPS Unlocker (999 FPS)", "FPSUnlocker", function(state) if setfpscap then setfpscap(state and 999 or 60) end end)
+createToggle(Scroll, "Performance Monitor", "PerfMonitor", function(state) PerfFrame.Visible = state end)
 
 createSlider(Scroll, "Aim FOV", 10, 900, Settings.AimFOV, false, function(v) Settings.AimFOV = v end)
 createSlider(Scroll, "Flick FOV", 10, 900, Settings.FlickFOV, false, function(v) Settings.FlickFOV = v end)
 createSlider(Scroll, "Flick Delay", 0.01, 1.00, Settings.FlickDelay, true, function(v) Settings.FlickDelay = v end)
 createSlider(Scroll, "BHop Power", 1, 10, Settings.BHopPower, false, function(v) Settings.BHopPower = v end)
 
--- [[ БЕЗОПАСНАЯ ИНИЦИАЛИЗАЦИЯ КОЛЕЦ FOV ]] --
 local Aim_Circle, Flick_Circle
-
-local function initDrawingSafe()
-local success = pcall(function()
-Aim_Circle = Drawing.new("Circle")
-Aim_Circle.Visible = false; Aim_Circle.Thickness = 1; Aim_Circle.NumSides = 32; Aim_Circle.Filled = false; Aim_Circle.Color = Color3.fromRGB(0, 160, 255)
-
-Flick_Circle = Drawing.new("Circle")
-Flick_Circle.Visible = false; Flick_Circle.Thickness = 1; Flick_Circle.NumSides = 32; Flick_Circle.Filled = false; Flick_Circle.Color = Color3.fromRGB(255, 50, 50)
+pcall(function()
+Aim_Circle = Drawing.new("Circle"); Aim_Circle.Visible = false; Aim_Circle.Color = Color3.fromRGB(0, 160, 255)
+Flick_Circle = Drawing.new("Circle"); Flick_Circle.Visible = false; Flick_Circle.Color = Color3.fromRGB(255, 50, 50)
 end)
-if not success then
-local fakeCircle = {Visible = false, Position = Vector2.new(0,0), Radius = 0, Color = Color3.new(), Thickness = 0}
-Aim_Circle, Flick_Circle = fakeCircle, fakeCircle
-end
-end
-initDrawingSafe()
-
-local function checkWallVisibility(targetPart, character)
-if not Settings.WallCheck then return true end
-local partsObscuring = Camera:GetPartsObscuringTarget({targetPart.Position}, {LocalPlayer.Character, character, Camera})
-return #partsObscuring == 0
-end
 
 local function getClosestPlayer(currentFOV)
 local closestTarget = nil
 local minDistance = currentFOV + 1
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-
 for _, player in ipairs(Players:GetPlayers()) do
 if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
 local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
 local targetPart = player.Character:FindFirstChild(Settings.TargetPart)
-
 if humanoid and humanoid.Health > 0 and targetPart then
 local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
 if onScreen then
-local target2D = Vector2.new(screenPos.X, screenPos.Y)
-local distance = (target2D - screenCenter).Magnitude
-
+local distance = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
 if distance <= currentFOV and distance < minDistance then
-if checkWallVisibility(targetPart, player.Character) then
-minDistance = distance
-closestTarget = targetPart
-end
+minDistance = distance; closestTarget = targetPart
 end
 end
 end
@@ -337,47 +282,95 @@ end
 return closestTarget
 end
 
--- ЛОГИКА ТРИГГЕРБОТА В СТИЛЕ NEVERLOSE
+-- ПРОВЕРКА ВАЛИДНОСТИ ЦЕЛИ (ЖИВОЙ, ВРАГ, НАСТОЯЩИЙ ИГРОК)
+local function checkTarget(instance)
+if not instance then return nil end
+
+local char = instance.Parent
+if char:IsA("Accessory") or char:IsA("Tool") then char = char.Parent end
+
+local humanoid = char:FindFirstChildOfClass("Humanoid")
+local player = Players:GetPlayerFromCharacter(char)
+
+-- Жесткая проверка: здоровье > 0, персонаж не "мертв" по стейту, это не локальный игрок
+if humanoid and humanoid.Health > 0 and humanoid:GetState() ~= Enum.HumanoidStateType.Dead and player and player ~= LocalPlayer then
+-- Проверка на тимейтов
+if player.Team ~= LocalPlayer.Team or player.Team == nil then
+return char
+end
+end
+return nil
+end
+
+-- ПРОДВИНУТЫЙ ТРИГГЕРБОТ (БЕЗ СТЕН, БЕЗ МЕРТВЫХ, С ОДИНОЧНЫМ КЛИКОМ)
 local function runTriggerbot()
 if not Settings.TriggerbotEnabled then return end
 
--- Выполняем проверку шанса Hitchance
-if math.random(1, 100) > Settings.TriggerbotHitchance then return end
+local targetCharacter = nil
+local hitInstance = nil
 
--- Пускаем луч из центра камеры вперед
-local rayDirection = Camera.CFrame.LookVector * 1000
-local raycastParams = RaycastParams.new()
-raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-raycastParams.IgnoreWater = true
+-- 1. Сначала ищем цель через Mouse.Target
+if Mouse.Target then
+targetCharacter = checkTarget(Mouse.Target)
+if targetCharacter then hitInstance = Mouse.Target end
+end
 
-local raycastResult = workspace:Raycast(Camera.CFrame.Position, rayDirection, raycastParams)
+-- 2. Если Mouse.Target пустой, страхуем через Raycast по направлению взгляда
+if not targetCharacter then
+local rayParams = RaycastParams.new()
+rayParams.FilterType = Enum.RaycastFilterType.Exclude
+rayParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
 
-if raycastResult and raycastResult.Instance then
-local hitPart = raycastResult.Instance
-local potentialCharacter = hitPart.Parent
+local res = workspace:Raycast(Camera.CFrame.Position, Camera.CFrame.LookVector * 1000, rayParams)
+if res and res.Instance then
+targetCharacter = checkTarget(res.Instance)
+if targetCharacter then hitInstance = res.Instance end
+end
+end
 
--- Если попали в конечность/аксессуар, поднимаемся к модели персонажа
-if potentialCharacter:IsA("Accessory") then potentialCharacter = potentialCharacter.Parent end
+-- ЛОГИКА ПРОВЕРКИ СТЕН И ОДИНОЧНОГО КЛИКА
+if targetCharacter and hitInstance then
+-- Проверка на стены (Wall Check): пускаем точечный луч ровно в хитбокс, в который навелись
+local wallCheckParams = RaycastParams.new()
+wallCheckParams.FilterType = Enum.RaycastFilterType.Exclude
+-- Игнорируем себя, камеру и САМОГО врага, чтобы проверить нет ли СТЕН между нами
+wallCheckParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera, targetCharacter}
 
-local humanoid = potentialCharacter:FindFirstChildOfClass("Humanoid")
-local hitPlayer = Players:GetPlayerFromCharacter(potentialCharacter)
+local directionToHit = (hitInstance.Position - Camera.CFrame.Position)
+local wallCheckResult = workspace:Raycast(Camera.CFrame.Position, directionToHit, wallCheckParams)
 
--- Проверка на врага (живой, существует, не вы сами)
-if humanoid and humanoid.Health > 0 and hitPlayer and hitPlayer ~= LocalPlayer then
--- Проверка на команду (TeamCheck) для плейса Flick
-if hitPlayer.Team ~= LocalPlayer.Team or hitPlayer.Team == nil then
+-- Если луч встретил препятствие (стену) ДО игрока, отменяем выстрел
+if wallCheckResult and wallCheckResult.Instance then
+return
+end
 
--- Эмуляция клика мыши (Выстрел) с кастомной задержкой Neverlose
+-- Если мы перевелись на НОВОГО врага, сбрасываем статус выстрела
+if lastTargetCharacter ~= targetCharacter then
+lastTargetCharacter = targetCharacter
+hasShotCurrentTarget = false
+end
+
+-- Если на этого врага мы ЕЩЕ НЕ КЛИКАЛИ и прошел шанс Hitchance
+if not hasShotCurrentTarget then
+if math.random(1, 100) <= Settings.TriggerbotHitchance then
+hasShotCurrentTarget = true -- Блокируем повторные клики, пока прицел на нем
+
+if Settings.TriggerbotDelay > 0 then
 task.delay(Settings.TriggerbotDelay, function()
--- Перепроверяем, что цель все еще под прицелом перед фактическим выстрелом
-local currentCheck = workspace:Raycast(Camera.CFrame.Position, Camera.CFrame.LookVector * 1000, raycastParams)
-if currentCheck and currentCheck.Instance and currentCheck.Instance:IsDescendantOf(potentialCharacter) then
-mouse1click() -- Встроенная в Delta функция симуляции левого клика
+-- Дополнительная проверка: мы все еще целимся в него после задержки?
+if Mouse.Target and Mouse.Target:IsDescendantOf(targetCharacter) then
+pcall(function() mouse1click() end)
 end
 end)
+else
+pcall(function() mouse1click() end) -- Мгновенный 1 клик
 end
 end
+end
+else
+-- Если мы увели прицел с игрока, обнуляем цель. Теперь при следующем наведении скрипт сможет кликнуть снова.
+lastTargetCharacter = nil
+hasShotCurrentTarget = false
 end
 end
 
@@ -396,124 +389,56 @@ end
 end
 end)
 
-local function handleSmoothBHop()
-if not Settings.BHopEnabled then return end
-local character = LocalPlayer.Character
-local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-if humanoid then
-local currentState = humanoid:GetState()
-if (currentState == Enum.HumanoidStateType.Freefall or currentState == Enum.HumanoidStateType.Jumping) and humanoid.MoveDirection.Magnitude > 0 then
-CurrentBHopSpeed = math.clamp(CurrentBHopSpeed + (Settings.BHopPower * 0.3), NormalSpeed, NormalSpeed + (Settings.BHopPower * 5))
-humanoid.WalkSpeed = CurrentBHopSpeed
-else
-CurrentBHopSpeed = NormalSpeed; humanoid.WalkSpeed = NormalSpeed
-end
-end
-end
-
-local function handleInstantReload()
-if not Settings.InstantReload then return end
-local char = LocalPlayer.Character
-local backpack = LocalPlayer:FindFirstChild("Backpack")
-
-local function clearDelay(tool)
-if tool:IsA("Tool") then
-for _, obj in ipairs(tool:GetDescendants()) do
-if obj:IsA("NumberValue") or obj:IsA("IntValue") then
-if obj.Name:lower():find("reload") or obj.Name:lower():find("delay") then
-obj.Value = 0
-end
-end
-end
-end
-end
-
-if char then for _, t in ipairs(char:GetChildren()) do clearDelay(t) end end
-if backpack then for _, t in ipairs(backpack:GetChildren()) do clearDelay(t) end end
-end
-
--- [[ ОСНОВНОЙ РЕНДЕР ЦИКЛ ]] --
+-- РЕНДЕР ЦИКЛ
 local lastUpdate = 0
-RunService.RenderStepped:Connect(function(dt)
+RunService.RenderStepped:Connect(function()
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
-if Settings.ShowAimFOV and Aim_Circle then
-Aim_Circle.Position = screenCenter; Aim_Circle.Radius = Settings.AimFOV; Aim_Circle.Visible = true
-elseif Aim_Circle then Aim_Circle.Visible = false end
-
-if Settings.ShowFlickFOV and Flick_Circle then
-Flick_Circle.Position = screenCenter; Flick_Circle.Radius = Settings.FlickFOV; Flick_Circle.Visible = true
-elseif Flick_Circle then Flick_Circle.Visible = false end
+if Settings.ShowAimFOV and Aim_Circle then Aim_Circle.Position = screenCenter; Aim_Circle.Radius = Settings.AimFOV; Aim_Circle.Visible = true elseif Aim_Circle then Aim_Circle.Visible = false end
+if Settings.ShowFlickFOV and Flick_Circle then Flick_Circle.Position = screenCenter; Flick_Circle.Radius = Settings.FlickFOV; Flick_Circle.Visible = true elseif Flick_Circle then Flick_Circle.Visible = false end
 
 if Settings.AimbotEnabled and not Settings.FlickMode then
 local target = getClosestPlayer(Settings.AimFOV)
 if target then Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position) end
 end
 
-handleSmoothBHop()
-handleInstantReload()
-runTriggerbot() -- Вызов триггербота каждый кадр для максимальной точности
+-- Постоянный вызов триггербота
+runTriggerbot()
 
 if Settings.PerfMonitor then
 local now = os.clock()
 table.insert(fpsTable, now)
-while fpsTable and fpsTable < now - 1 do table.remove(fpsTable, 1) end
-local currentFps = #fpsTable
-local currentPing = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
-local currentMem = string.format("%.1f", Stats:GetTotalMemoryUsageMb())
-
-PerfText.Text = string.format("⚡ PERF MONITOR\n\nFPS: %d\nPING: %d ms\nMEM: %s MB", currentFps, currentPing, currentMem)
+while #fpsTable > 0 and fpsTable < now - 1 do table.remove(fpsTable, 1) end
+local curFps = #fpsTable
+local curPing = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+local curMem = string.format("%.1f", Stats:GetTotalMemoryUsageMb())
+PerfText.Text = string.format("⚡ PERF MONITOR\n\nFPS: %d\nPING: %d ms\nMEM: %s MB", curFps, curPing, curMem)
 end
 
-local now = os.clock()
-if now - lastUpdate < 0.025 then return end
-lastUpdate = now
+local nowTick = os.clock()
+if nowTick - lastUpdate < 0.025 then return end
+lastUpdate = nowTick
 
 for player, visual in pairs(ESP_Cache) do
-local character = player.Character
-local hrp = character and character:FindFirstChild("HumanoidRootPart")
-local head = character and character:FindFirstChild("Head")
-local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-
-if character and hrp and head and humanoid and humanoid.Health > 0 then
-local hrpPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-
-if Settings.EspBox and onScreen then
-local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-local legPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
-local height = math.abs(headPos.Y - legPos.Y)
-visual.Box.Size = Vector2.new(height / 1.5, height)
-visual.Box.Position = Vector2.new(hrpPos.X - (height / 1.5) / 2, hrpPos.Y - height / 2)
-visual.Box.Visible = true
-else visual.Box.Visible = false end
-
+local char = player.Character
+local hrp = char and char:FindFirstChild("HumanoidRootPart")
+local hum = char and char:FindFirstChildOfClass("Humanoid")
+if char and hrp and hum and hum.Health > 0 then
+local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
 if Settings.EspLines and onScreen then
-visual.Line.From = screenCenter; visual.Line.To = Vector2.new(hrpPos.X, hrpPos.Y); visual.Line.Visible = true
+visual.Line.From = screenCenter; visual.Line.To = Vector2.new(pos.X, pos.Y); visual.Line.Visible = true
 else visual.Line.Visible = false end
-
-if Settings.EspCharms then visual.Charms.Parent = character; visual.Charms.Enabled = true
-else visual.Charms.Enabled = false end
 else
-visual.Box.Visible = false; visual.Line.Visible = false; visual.Charms.Enabled = false
+if visual.Line then visual.Line.Visible = false end
 end
 end
 end)
 
 local function createESP(player)
 if ESP_Cache[player] then return end
-local box = Drawing.new("Square"); box.Color = Color3.fromRGB(0, 160, 255); box.Thickness = 1; box.Filled = false; box.Visible = false
 local line = Drawing.new("Line"); line.Color = Color3.fromRGB(0, 160, 255); line.Thickness = 1; line.Visible = false
-local charms = Instance.new("Highlight"); charms.FillColor = Color3.fromRGB(0, 160, 255); charms.FillTransparency = 0.6; charms.OutlineTransparency = 0.5; charms.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; charms.Enabled = false
-ESP_Cache[player] = {Box = box, Line = line, Charms = charms}
+ESP_Cache[player] = {Line = line}
 end
-
-local function removeESP(player)
-if ESP_Cache[player] then
-ESP_Cache[player].Box:Remove(); ESP_Cache[player].Line:Remove()
-if ESP_Cache[player].Charms then pcall(function() ESP_Cache[player].Charms:Destroy() end) end
-ESP_Cache[player] = nil
-end
-end
-
-Players.PlayerAdded:Connect(createESP); Players.PlayerRemoving:Connect(removeESP)
+Players.PlayerAdded:Connect(createESP)
+Players.PlayerRemoving:Connect(function(p) if ESP_Cache[p] then ESP_Cache[p].Line:Remove(); ESP_Cache[p] = nil end end)
 for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then createESP(p) end end
