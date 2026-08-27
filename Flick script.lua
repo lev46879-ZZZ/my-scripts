@@ -1,19 +1,17 @@
 -- ==============================================
 --  FLICK ULTIMATE | NEVERLOSE STYLE
---  Оптимизирован для Delta Mobile
---  Функций: 40+
+--  Простое меню, 40+ функций
+--  Для Delta Mobile
 -- ==============================================
 
--- [[ СЕРВИСЫ ]] --
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local Camera = workspace.CurrentCamera
 
--- [[ НАСТРОЙКИ ]] --
+-- Настройки
 local Settings = {
     -- Aimbot
     Aimbot = false,
@@ -55,7 +53,7 @@ local Settings = {
     NoSlowdown = false,
 }
 
--- [[ ПЕРЕМЕННЫЕ ]] --
+-- Переменные
 local ESP_Objects = {}
 local defaultWalkSpeed = 0
 local defaultJumpPower = 50
@@ -65,9 +63,10 @@ local screenCenter = Vector2.new()
 local flyConnection = nil
 local noclipConnection = nil
 local fullBrightConnection = nil
+local menuOpen = false
 
 -- ==============================================
---  GUI (NEVERLOSE STYLE)
+--  СОЗДАНИЕ ГРАФИЧЕСКОГО ИНТЕРФЕЙСА (ПРОСТОЙ И НАДЁЖНЫЙ)
 -- ==============================================
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -75,41 +74,43 @@ ScreenGui.Name = "Neverlose"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Кнопка открытия
-local MenuButton = Instance.new("ImageButton")
-MenuButton.Size = UDim2.new(0, 55, 0, 55)
+-- Кнопка открытия меню (простой TextButton)
+local MenuButton = Instance.new("TextButton")
+MenuButton.Size = UDim2.new(0, 60, 0, 60)
 MenuButton.Position = UDim2.new(0.02, 0, 0.3, 0)
 MenuButton.BackgroundColor3 = Color3.fromRGB(15, 18, 28)
-MenuButton.Image = "rbxassetid://6031091211"
-MenuButton.ImageColor3 = Color3.fromRGB(0, 170, 255)
+MenuButton.Text = "⚡"
+MenuButton.TextColor3 = Color3.fromRGB(0, 170, 255)
+MenuButton.TextSize = 24
+MenuButton.Font = Enum.Font.GothamBold
 MenuButton.Parent = ScreenGui
-Instance.new("UICorner", MenuButton).CornerRadius = UDim.new(1, 0)
+Instance.new("UICorner", MenuButton).CornerRadius = UDim.new(0, 30)
 
--- Основное окно
+-- Основное меню (Frame)
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 340, 0, 480)
-MainFrame.Position = UDim2.new(0.5, -170, 0.5, -240)
+MainFrame.Size = UDim2.new(0, 300, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
 MainFrame.BackgroundColor3 = Color3.fromRGB(8, 10, 18)
 MainFrame.Visible = false
 MainFrame.Parent = ScreenGui
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
 -- Заголовок
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundColor3 = Color3.fromRGB(12, 16, 26)
 Title.Text = "  NEVERLOSE // FLICK"
 Title.TextColor3 = Color3.fromRGB(0, 170, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
+Title.TextSize = 14
 Title.Parent = MainFrame
-Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 8)
 
--- Вкладки
+-- Контейнер вкладок (простые кнопки)
 local TabContainer = Instance.new("Frame")
 TabContainer.Size = UDim2.new(1, 0, 0, 30)
-TabContainer.Position = UDim2.new(0, 0, 0, 40)
+TabContainer.Position = UDim2.new(0, 0, 0, 35)
 TabContainer.BackgroundColor3 = Color3.fromRGB(12, 16, 26)
 TabContainer.Parent = MainFrame
 
@@ -132,12 +133,12 @@ for i, tabName in ipairs(tabs) do
     end)
 end
 
--- Скролл
+-- Скроллинг-контейнер
 local Scroll = Instance.new("ScrollingFrame")
-Scroll.Size = UDim2.new(1, -10, 1, -80)
-Scroll.Position = UDim2.new(0, 5, 0, 70)
+Scroll.Size = UDim2.new(1, -10, 1, -70)
+Scroll.Position = UDim2.new(0, 5, 0, 65)
 Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 1000)
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 800)
 Scroll.ScrollBarThickness = 3
 Scroll.Parent = MainFrame
 
@@ -145,15 +146,14 @@ local UIList = Instance.new("UIListLayout", Scroll)
 UIList.Padding = UDim.new(0, 6)
 UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
--- Функции элементов
+-- Функции для создания элементов
 local function clearScroll()
     for _, child in ipairs(Scroll:GetChildren()) do
         if child ~= UIList then child:Destroy() end
     end
 end
 
-local function createToggle(text, setting, parent)
-    parent = parent or Scroll
+local function createToggle(text, setting)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -10, 0, 36)
     btn.BackgroundColor3 = Color3.fromRGB(18, 22, 34)
@@ -162,7 +162,7 @@ local function createToggle(text, setting, parent)
     btn.TextXAlignment = Enum.TextXAlignment.Left
     btn.Font = Enum.Font.GothamMedium
     btn.TextSize = 13
-    btn.Parent = parent
+    btn.Parent = Scroll
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
 
     local indicator = Instance.new("Frame", btn)
@@ -180,12 +180,11 @@ local function createToggle(text, setting, parent)
     end)
 end
 
-local function createSlider(text, setting, min, max, default, callback, parent)
-    parent = parent or Scroll
+local function createSlider(text, setting, min, max, default, callback)
     local container = Instance.new("Frame")
     container.Size = UDim2.new(1, -10, 0, 46)
     container.BackgroundTransparency = 1
-    container.Parent = parent
+    container.Parent = Scroll
 
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 0, 18)
@@ -246,8 +245,7 @@ local function createSlider(text, setting, min, max, default, callback, parent)
     end)
 end
 
-local function createCategory(text, parent)
-    parent = parent or Scroll
+local function createCategory(text)
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, -10, 0, 26)
     label.BackgroundColor3 = Color3.fromRGB(12, 16, 26)
@@ -256,61 +254,59 @@ local function createCategory(text, parent)
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Font = Enum.Font.GothamBold
     label.TextSize = 13
-    label.Parent = parent
+    label.Parent = Scroll
     Instance.new("UICorner", label).CornerRadius = UDim.new(0, 4)
 end
 
 function updateScroll()
     clearScroll()
     if currentTab == "Aimbot" then
-        createCategory("🔫 AIMBOT", Scroll)
-        createToggle("Aimbot", "Aimbot", Scroll)
-        createSlider("FOV", "AimbotFOV", 30, 300, 150, nil, Scroll)
-        createSlider("Smooth", "AimbotSmooth", 0, 1, 0.1, nil, Scroll)
-        createToggle("Wall Check", "WallCheck", Scroll)
-        createToggle("Silent Aim", "SilentAim", Scroll)
-        createToggle("Triggerbot", "Triggerbot", Scroll)
-        createToggle("Flickbot", "Flickbot", Scroll)
-        createSlider("Flick FOV", "FlickFOV", 30, 300, 200, nil, Scroll)
-        createToggle("Auto Shoot", "AutoShoot", Scroll)
-        createToggle("No Recoil", "NoRecoil", Scroll)
-
+        createCategory("🔫 AIMBOT")
+        createToggle("Aimbot", "Aimbot")
+        createSlider("FOV", "AimbotFOV", 30, 300, 150)
+        createSlider("Smooth", "AimbotSmooth", 0, 1, 0.1)
+        createToggle("Wall Check", "WallCheck")
+        createToggle("Silent Aim", "SilentAim")
+        createToggle("Triggerbot", "Triggerbot")
+        createToggle("Flickbot", "Flickbot")
+        createSlider("Flick FOV", "FlickFOV", 30, 300, 200)
+        createToggle("Auto Shoot", "AutoShoot")
+        createToggle("No Recoil", "NoRecoil")
     elseif currentTab == "Visuals" then
-        createCategory("👁️ VISUALS", Scroll)
-        createToggle("ESP Box", "ESP_Box", Scroll)
-        createToggle("ESP Line", "ESP_Line", Scroll)
-        createToggle("ESP Name", "ESP_Name", Scroll)
-        createToggle("ESP Health", "ESP_Health", Scroll)
-        createToggle("ESP Distance", "ESP_Distance", Scroll)
-        createToggle("ESP Tracer", "ESP_Tracer", Scroll)
-        createToggle("Crosshair", "Crosshair", Scroll)
-        createToggle("Full Bright", "FullBright", Scroll)
-        createToggle("No Fog", "NoFog", Scroll)
-        createToggle("Chams (Highlight)", "Chams", Scroll)
-
+        createCategory("👁️ VISUALS")
+        createToggle("ESP Box", "ESP_Box")
+        createToggle("ESP Line", "ESP_Line")
+        createToggle("ESP Name", "ESP_Name")
+        createToggle("ESP Health", "ESP_Health")
+        createToggle("ESP Distance", "ESP_Distance")
+        createToggle("ESP Tracer", "ESP_Tracer")
+        createToggle("Crosshair", "Crosshair")
+        createToggle("Full Bright", "FullBright")
+        createToggle("No Fog", "NoFog")
+        createToggle("Chams", "Chams")
     elseif currentTab == "Movement" then
-        createCategory("🏃 MOVEMENT", Scroll)
-        createToggle("Bunny Hop", "BHop", Scroll)
-        createSlider("BHOP Power", "BHopPower", 1, 15, 1, nil, Scroll)
-        createToggle("Fly", "Fly", Scroll)
-        createSlider("Fly Speed", "FlySpeed", 10, 200, 50, nil, Scroll)
-        createToggle("Noclip", "Noclip", Scroll)
-        createToggle("Speed", "Speed", Scroll)
-        createSlider("Speed Value", "SpeedValue", 16, 120, 32, nil, Scroll)
-        createToggle("Jump Power", "JumpPower", Scroll)
-        createSlider("Jump Power", "JumpPowerValue", 30, 150, 50, nil, Scroll)
-
+        createCategory("🏃 MOVEMENT")
+        createToggle("Bunny Hop", "BHop")
+        createSlider("BHOP Power", "BHopPower", 1, 15, 1)
+        createToggle("Fly", "Fly")
+        createSlider("Fly Speed", "FlySpeed", 10, 200, 50)
+        createToggle("Noclip", "Noclip")
+        createToggle("Speed", "Speed")
+        createSlider("Speed Value", "SpeedValue", 16, 120, 32)
+        createToggle("Jump Power", "JumpPower")
+        createSlider("Jump Power", "JumpPowerValue", 30, 150, 50)
     elseif currentTab == "Misc" then
-        createCategory("🔧 MISC", Scroll)
-        createToggle("Infinite Ammo", "InfiniteAmmo", Scroll)
-        createToggle("No Reload", "NoReload", Scroll)
-        createToggle("Instant Heal", "InstantHeal", Scroll)
-        createToggle("Anti Knock", "AntiKnock", Scroll)
-        createToggle("No Slowdown", "NoSlowdown", Scroll)
+        createCategory("🔧 MISC")
+        createToggle("Infinite Ammo", "InfiniteAmmo")
+        createToggle("No Reload", "NoReload")
+        createToggle("Instant Heal", "InstantHeal")
+        createToggle("Anti Knock", "AntiKnock")
+        createToggle("No Slowdown", "NoSlowdown")
     end
 end
 
 updateScroll()
+
 MenuButton.MouseButton1Click:Connect(function()
     MainFrame.Visible = not MainFrame.Visible
 end)
@@ -427,7 +423,7 @@ local function handleFlickbot()
     end
 end
 
--- No Recoil (просто сбрасываем смещение камеры)
+-- No Recoil
 local function handleNoRecoil()
     if not Settings.NoRecoil then return end
     local cameraPart = workspace.CurrentCamera
@@ -444,12 +440,9 @@ local function createESP(player)
     if player == LocalPlayer then return end
     if ESP_Objects[player] then
         pcall(function()
-            ESP_Objects[player].Box:Destroy()
-            ESP_Objects[player].Line:Destroy()
-            ESP_Objects[player].Name:Destroy()
-            ESP_Objects[player].Health:Destroy()
-            ESP_Objects[player].Distance:Destroy()
-            ESP_Objects[player].Tracer:Destroy()
+            for _, obj in pairs(ESP_Objects[player]) do
+                if obj then obj:Destroy() end
+            end
         end)
         ESP_Objects[player] = nil
     end
@@ -513,12 +506,9 @@ end
 local function clearESP(player)
     if ESP_Objects[player] then
         pcall(function()
-            ESP_Objects[player].Box:Destroy()
-            ESP_Objects[player].Line:Destroy()
-            ESP_Objects[player].Name:Destroy()
-            ESP_Objects[player].Health:Destroy()
-            ESP_Objects[player].Distance:Destroy()
-            ESP_Objects[player].Tracer:Destroy()
+            for _, obj in pairs(ESP_Objects[player]) do
+                if obj then obj:Destroy() end
+            end
         end)
         ESP_Objects[player] = nil
     end
@@ -552,7 +542,7 @@ local function updateESP()
                 data.Box.Visible = false
             end
 
-            -- Line (от центра к игроку)
+            -- Line
             if Settings.ESP_Line and data.Line then
                 data.Line.Visible = true
                 local delta = screenPos - center
@@ -613,9 +603,7 @@ local function updateESP()
             elseif data.Tracer then
                 data.Tracer.Visible = false
             end
-
         else
-            -- Скрываем всё
             if data.Box then data.Box.Visible = false end
             if data.Line then data.Line.Visible = false end
             if data.Name then data.Name.Visible = false end
@@ -768,7 +756,7 @@ local function handleJumpPower()
 end
 
 -- ==============================================
---  ВИЗУАЛЬНЫЕ ЭФФЕКТЫ (Crosshair, FullBright, NoFog)
+--  ВИЗУАЛЬНЫЕ ЭФФЕКТЫ (Crosshair, FullBright, NoFog, Chams)
 -- ==============================================
 
 -- Crosshair
@@ -835,7 +823,7 @@ local function handleNoFog()
     end
 end
 
--- Chams (Highlight)
+-- Chams
 local function handleChams()
     local char = LocalPlayer.Character
     if not char then return end
@@ -855,10 +843,10 @@ local function handleChams()
 end
 
 -- ==============================================
---  MISC (Infinite Ammo, No Reload, etc.)
+--  MISC (Infinite Ammo, No Reload, Heal, Anti Knock, No Slowdown)
 -- ==============================================
 
--- Infinite Ammo & No Reload (ищем оружие и меняем значения)
+-- Weapon Mods
 local function handleWeaponMods()
     if not Settings.InfiniteAmmo and not Settings.NoReload then return end
     local char = LocalPlayer.Character
@@ -949,15 +937,19 @@ RunService.RenderStepped:Connect(function()
     handleNoSlowdown()
 end)
 
--- Обработчик выстрела для Flickbot
+-- Flickbot по нажатию (для мобильных)
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         if Settings.Flickbot then
             handleFlickbot()
         end
+        if Settings.Triggerbot then
+            task.wait(0.05)
+            handleTriggerbot()
+        end
     end
 end)
 
 print("✅ NEVERLOSE // FLICK LOADED (40+ functions)")
-print("📱 Optimized for Delta Mobile | Style by Neverlose CS2")
+print("📱 Меню появляется по кнопке ⚡ в левом верхнем углу")
