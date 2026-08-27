@@ -1,4 +1,4 @@
--- [[ СИСТЕМА ЗАЩИТЫ ОТ АНТИЧИТА И ОБХОДА МЕТАТАБЛИЦ ]] --
+-- [[ СИСТЕМА НЕВИДИМОГО НАИМЕНОВАНИЯ ]] --
 local MathRandom = math.random
 local function generateRandomName()
     local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -8,20 +8,6 @@ local function generateRandomName()
         name = name .. string.sub(chars, randIdx, randIdx)
     end
     return name
-end
-
--- Обход проверки CoreGui со стороны игры (Metatable Hooking)
-local rawmt = getrawmetatable and getrawmetatable(game)
-if rawmt and setreadonly then
-    setreadonly(rawmt, false)
-    local oldIndex = rawmt.__index
-    rawmt.__index = newcclosure(function(self, key)
-        if not checkcaller() and (self == game:GetService("CoreGui") or self:IsDescendantOf(game:GetService("CoreGui"))) then
-            return nil -- Для игры нашего UI просто не существует в CoreGui
-        end
-        return oldIndex(self, key)
-    end)
-    setreadonly(rawmt, true)
 end
 
 -- [[ СЕРВИСЫ ROBLOX ]] --
@@ -37,12 +23,13 @@ local Camera = workspace.CurrentCamera
 local Settings = {
     AimbotEnabled = false,
     FlickMode = false,
-    WallCheck = false, -- Влияет ТОЛЬКО на Аимбот и Фликбот
+    WallCheck = false,
     AimFOV = 120,
     FlickFOV = 180,
     FlickDelay = 0.01,
     TargetPart = "Head",
     EspLines = false,
+    EspBox = false,
     BHopEnabled = false,
     BHopPower = 1,
     ShowAimFOV = false,
@@ -52,7 +39,9 @@ local Settings = {
     PerfMonitor = false,
     TriggerbotEnabled = false,
     TriggerbotDelay = 0,
-    TriggerbotHitchance = 100
+    TriggerbotHitchance = 100,
+    LocalWings = false,
+    LocalHat = false
 }
 
 -- [[ КЭШ И ПЕРЕМЕННЫЕ ХРАНЕНИЯ ]] --
@@ -61,30 +50,38 @@ local fpsTable = {}
 local NormalSpeed = 16
 local CurrentBHopSpeed = NormalSpeed
 
--- Переменные контроля повторных выстрелов триггера
 local lastTargetCharacter = nil
 local lastShotTime = 0
 local triggerShotCooldown = 0.12
 
+local lastCombatUpdate = 0
+local lastEspUpdate = 0
+local lastMemoryClean = 0
+
+local CurrentWingsPart = nil
+local CurrentHatPart = nil
+
 -- Создание скрытой точки-источника для 3D линий
 local LineOriginPart = Instance.new("Part")
-LineOriginPart.Name = generateRandomName() -- Защита: случайное имя детали
+LineOriginPart.Name = generateRandomName()
 LineOriginPart.Transparency = 1
 LineOriginPart.CanCollide = false
 LineOriginPart.Anchored = true
 LineOriginPart.Size = Vector3.new(0.1, 0.1, 0.1)
 LineOriginPart.Parent = workspace
 
--- [[ ИНИЦИАЛИЗАЦИЯ СКРЫТОГО UI ]] --
+-- [[ СКРЫТАЯ ЗАГРУЗКА ИНТЕРФЕЙСА БЕЗ ХУКОВ ]] --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = generateRandomName() -- Защита: имя GUI всегда уникально
+ScreenGui.Name = generateRandomName()
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Безопасная загрузка интерфейса (если CoreGui заблокирован, уходим в PlayerGui)
-local uiParentSuccess = pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
-if not uiParentSuccess or not ScreenGui.Parent then 
-    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui", 5) 
+-- Защита: обходим Byfron, маскируя UI под легитную часть PlayerGui
+local uiParent = LocalPlayer:WaitForChild("PlayerGui", 5)
+if uiParent then
+    ScreenGui.Parent = uiParent
+else
+    pcall(function() ScreenGui.Parent = game:GetService("CoreGui") end)
 end
 
 local function makeDraggable(gui)
@@ -137,7 +134,7 @@ makeDraggable(MainMenu)
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundColor3 = Color3.fromRGB(14, 18, 24)
-Title.Text = "  👑 NEVERLOSE.CC // Protected"
+Title.Text = "  👑 NEVERLOSE.CC // NoLag v13"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Font = Enum.Font.GothamBold
@@ -151,13 +148,12 @@ local Scroll = Instance.new("ScrollingFrame")
 Scroll.Size = UDim2.new(1, -16, 1, -45)
 Scroll.Position = UDim2.new(0, 8, 0, 40)
 Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 920)
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 960)
 Scroll.ScrollBarThickness = 3
 Scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 162, 255)
 Scroll.Parent = MainMenu
 local ContentLayout = Instance.new("UIListLayout"); ContentLayout.Padding = UDim.new(0, 6); ContentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; ContentLayout.Parent = Scroll
 
--- Монитор производительности
 local PerfFrame = Instance.new("Frame")
 PerfFrame.Name = generateRandomName()
 PerfFrame.Size = UDim2.new(0, 140, 0, 75)
@@ -244,24 +240,23 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
 
     local bg = Instance.new("Frame")
     bg.Size = UDim2.new(1, 0, 0, 4)
-bg.Position = UDim2.new(0, 0, 0, 20)
-bg.BackgroundColor3 = Color3.fromRGB(25, 30, 40)
-bg.Parent = container
-local bgCorner = Instance.new("UICorner"); bgCorner.CornerRadius = UDim.new(0, 2); bgCorner.Parent = bg
+    bg.Position = UDim2.new(0, 0, 0, 20)
+    bg.BackgroundColor3 = Color3.fromRGB(25, 30, 40)
+    bg.Parent = container
+    local bgCorner = Instance.new("UICorner"); bgCorner.CornerRadius = UDim.new(0, 2); bgCorner.Parent = bg
 
-local fill = Instance.new("Frame")
-fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-fill.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
-fill.Parent = bg
-local fillCorner = Instance.new("UICorner"); fillCorner.CornerRadius = UDim.new(0, 2); fillCorner.Parent = fill
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
+    fill.Parent = bg
+    local fillCorner = Instance.new("UICorner"); fillCorner.CornerRadius = UDim.new(0, 2); fillCorner.Parent = fill
 
-local btn = Instance.new("TextButton")
-btn.Size = UDim2.new(0, 10, 0, 10)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 10, 0, 10)
 btn.Position = UDim2.new((default - min) / (max - min), -5, 0.5, -5)
 btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 btn.Text = ""
 btn.Parent = bg
-local btnCorner = Instance.new("UICorner"); btnCorner.CornerRadius = UDim.new(0, 5); btnCorner.Parent = btn
 
 local active = false
 bg.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then active = true end end)
@@ -279,7 +274,7 @@ end
 end)
 end
 
--- Наполнение меню
+-- Сборка меню
 createToggle(Scroll, "On-Shot Flickbot", "FlickMode")
 createToggle(Scroll, "Combat Aimbot", "AimbotEnabled")
 createToggle(Scroll, "Neverlose Triggerbot", "TriggerbotEnabled")
@@ -292,6 +287,12 @@ createToggle(Scroll, "Show Aim FOV (Blue)", "ShowAimFOV")
 createToggle(Scroll, "Engine ESP Lines", "EspLines", function(state)
 for _, visual in pairs(ESP_Cache) do if visual.Beam then visual.Beam.Enabled = state end end
 end)
+createToggle(Scroll, "Engine ESP Box", "EspBox", function(state)
+for _, visual in pairs(ESP_Cache) do if visual.Box then visual.Box.Visible = state end end
+end)
+
+createToggle(Scroll, "Local Angel Wings (Back)", "LocalWings", function(s) if not s and CurrentWingsPart then CurrentWingsPart:Destroy(); CurrentWingsPart = nil end end)
+createToggle(Scroll, "Local Golden Halo (Head)", "LocalHat", function(s) if not s and CurrentHatPart then CurrentHatPart:Destroy(); CurrentHatPart = nil end end)
 
 createToggle(Scroll, "Smooth BunnyHop", "BHopEnabled")
 createToggle(Scroll, "Instant Reload", "InstantReload")
@@ -303,14 +304,13 @@ createSlider(Scroll, "Flick FOV", 10, 900, Settings.FlickFOV, false, function(v)
 createSlider(Scroll, "Flick Delay", 0.01, 1.00, Settings.FlickDelay, true, function(v) Settings.FlickDelay = v end)
 createSlider(Scroll, "BHop Power", 1, 10, Settings.BHopPower, false, function(v) Settings.BHopPower = v end)
 
--- Инициализация FOV колец
 local Aim_Circle, Flick_Circle
 pcall(function()
 Aim_Circle = Drawing.new("Circle"); Aim_Circle.Visible = false; Aim_Circle.Color = Color3.fromRGB(0, 162, 255); Aim_Circle.Thickness = 1
 Flick_Circle = Drawing.new("Circle"); Flick_Circle.Visible = false; Flick_Circle.Color = Color3.fromRGB(255, 50, 50); Flick_Circle.Thickness = 1
 end)
 
--- [[ УНИВЕРСАЛЬНАЯ ПРОВЕРКА СТЕН (RAYCAST С ОБХОДОМ) ]] --
+-- [[ КЕШИРОВАННАЯ ОПТИМИЗИРОВАННАЯ ПРОВЕРКА СТЕН ]] --
 local function checkWallVisibility(targetPart, enemyCharacter, forceCheck)
 if not Settings.WallCheck and not forceCheck then return true end
 if not targetPart or not enemyCharacter then return false end
@@ -325,27 +325,22 @@ raycastParams.IgnoreWater = true
 
 local result = workspace:Raycast(origin, direction, raycastParams)
 if result and result.Instance then
-if result.Instance:IsDescendantOf(enemyCharacter) then
-return true
-else
-return false
-end
+return result.Instance:IsDescendantOf(enemyCharacter)
 end
 return true
 end
 
--- Безопасный кликер для обхода Byfron (Virtual Input Симуляция с задержкой)
+-- Безопасный кликер
 local function secureDeltaClick()
 pcall(function()
 if mouse1click then
--- Микро-рандомизация задержки клика, чтобы симулировать человеческий тап
-task.wait(MathRandom(1, 5) / 1000)
+task.wait(MathRandom(1, 3) / 1000)
 mouse1click()
 end
 end)
 end
 
--- Поиск цели для Аима
+-- Поиск цели
 local function getClosestPlayer(currentFOV)
 local closestTarget = nil
 local minDistance = currentFOV + 1
@@ -388,7 +383,7 @@ end
 return nil, nil, nil
 end
 
--- [[ ЧИСТЫЙ ТРИГГЕР С ЗАЖИМОМ И ОБХОДОМ ЛОГОВ ]] --
+-- [[ ЧИСТЫЙ ТРИГГЕРБОТ ]] --
 local function runTriggerbot()
 if not Settings.TriggerbotEnabled then return end
 
@@ -413,7 +408,6 @@ lastTargetCharacter = targetCharacter
 lastShotTime = 0
 end
 
--- Стреляет снова, если враг не убит и прицел на нём
 if enemyHumanoid.Health > 0 and (currentTime - lastShotTime >= triggerShotCooldown) then
 if MathRandom(1, 100) <= Settings.TriggerbotHitchance then
 lastShotTime = currentTime
@@ -436,6 +430,71 @@ lastTargetCharacter = nil
 end
 end
 
+-- [[ СТАБИЛЬНАЯ КОСМЕТИКА ]] --
+local function applyLocalCosmetics()
+local char = LocalPlayer.Character
+if not char then return end
+
+if CurrentWingsPart then CurrentWingsPart:Destroy(); CurrentWingsPart = nil end
+if CurrentHatPart then CurrentHatPart:Destroy(); CurrentHatPart = nil end
+
+local torso = char:WaitForChild("UpperTorso", 2) or char:WaitForChild("Torso", 2)
+local head = char:WaitForChild("Head", 2)
+if not torso or not head then return end
+
+if Settings.LocalWings then
+CurrentWingsPart = Instance.new("Part")
+CurrentWingsPart.Name = generateRandomName()
+CurrentWingsPart.CanCollide = false
+CurrentWingsPart.Massless = true
+CurrentWingsPart.Size = Vector3.new(0.1, 0.1, 0.1)
+CurrentWingsPart.Transparency = 1
+CurrentWingsPart.Parent = char
+
+local mesh = Instance.new("SpecialMesh")
+mesh.MeshId = "rbxassetid://15535311025"
+mesh.TextureId = "rbxassetid://15535310860"
+mesh.Scale = Vector3.new(4, 4, 4)
+mesh.Parent = CurrentWingsPart
+
+local weld = Instance.new("Weld")
+weld.Part0 = CurrentWingsPart; weld.Part1 = torso
+weld.C0 = CFrame.new(0, -0.5, 1.1) * CFrame.Angles(0, math.rad(180), 0)
+weld.Parent = CurrentWingsPart
+end
+
+if Settings.LocalHat then
+CurrentHatPart = Instance.new("Part")
+CurrentHatPart.Name = generateRandomName()
+CurrentHatPart.CanCollide = false
+CurrentHatPart.Massless = true
+CurrentHatPart.Size = Vector3.new(0.1, 0.1, 0.1)
+CurrentHatPart.Transparency = 1
+CurrentHatPart.Parent = char
+
+local mesh = Instance.new("SpecialMesh")
+mesh.MeshId = "rbxassetid://11413813978"
+mesh.TextureId = "rbxassetid://11413812836"
+mesh.Scale = Vector3.new(2.5, 2.5, 2.5)
+mesh.Parent = CurrentHatPart
+
+local weld = Instance.new("Weld")
+weld.Part0 = CurrentHatPart; weld.Part1 = head
+weld.C0 = CFrame.new(0, -1.2, 0)
+weld.Parent = CurrentHatPart
+end
+end
+
+LocalPlayer.CharacterAdded:Connect(function()
+task.wait(1)
+if Settings.LocalWings or Settings.LocalHat then applyLocalCosmetics() end
+end)
+
+Scroll.ChildAdded:Connect(function()
+task.wait(0.1)
+applyLocalCosmetics()
+end)
+
 -- Flick-Snap
 UserInputService.InputBegan:Connect(function(input, processed)
 if processed then return end
@@ -445,9 +504,6 @@ if target then
 task.delay(Settings.FlickDelay, function()
 if target and target.Parent and target.Parent:FindFirstChildOfClass("Humanoid") and target.Parent:FindFirstChildOfClass("Humanoid").Health > 0 then
 Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
-end
-end)
-end
 end
 end)
 
@@ -470,13 +526,21 @@ local beam = Instance.new("Beam")
 beam.Name = generateRandomName()
 beam.Attachment0 = localAttachment
 beam.Attachment1 = targetAttachment
-beam.Width0 = 0.05; beam.Width1 = 0.05
+beam.Width0 = 0.04; beam.Width1 = 0.04
 beam.Color = ColorSequence.new(Color3.fromRGB(0, 162, 255))
 beam.FaceCamera = true; beam.LightEmission = 1; beam.LightInfluence = 0
 beam.Enabled = Settings.EspLines
 beam.Parent = hrp
 
-ESP_Cache[player] = {Beam = beam, AttL = localAttachment, AttT = targetAttachment}
+local boxAdornment = Instance.new("BoxHandleAdornment")
+boxAdornment.Name = generateRandomName()
+boxAdornment.Size = Vector3.new(4, 5.5, 3.5)
+boxAdornment.Color3 = Color3.fromRGB(0, 162, 255)
+boxAdornment.Transparency = 0.75; boxAdornment.AlwaysOnTop = true; boxAdornment.ZIndex = 5
+boxAdornment.Adornee = hrp; boxAdornment.Visible = Settings.EspBox
+boxAdornment.Parent = ScreenGui
+
+ESP_Cache[player] = {Beam = beam, AttL = localAttachment, AttT = targetAttachment, Box = boxAdornment}
 end
 if player.Character then task.spawn(setupVisuals, player.Character) end
 player.CharacterAdded:Connect(function(char) task.spawn(setupVisuals, char) end)
@@ -488,6 +552,7 @@ pcall(function()
 if ESP_Cache[player].Beam then ESP_Cache[player].Beam:Destroy() end
 if ESP_Cache[player].AttL then ESP_Cache[player].AttL:Destroy() end
 if ESP_Cache[player].AttT then ESP_Cache[player].AttT:Destroy() end
+if ESP_Cache[player].Box then ESP_Cache[player].Box:Destroy() end
 end)
 ESP_Cache[player] = nil
 end
@@ -514,8 +579,10 @@ Players.PlayerAdded:Connect(createEngineESP)
 Players.PlayerRemoving:Connect(removeEngineESP)
 for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then createEngineESP(p) end end
 
--- [[ ГЛАВНЫЙ ЦИКЛ РЕНДЕРА ]] --
+-- [[ ГЛАВНЫЙ ОПТИМИЗИРОВАННЫЙ ЦИКЛ РЕНДЕРА ]] --
 RunService.RenderStepped:Connect(function()
+local nowClock = os.clock()
+
 if LineOriginPart then LineOriginPart.CFrame = Camera.CFrame * CFrame.new(0, -2, -2) end
 
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -524,6 +591,10 @@ if Settings.ShowAimFOV and Aim_Circle then Aim_Circle.Position = screenCenter; A
 if Settings.ShowFlickFOV and Flick_Circle then Flick_Circle.Position = screenCenter; Flick_Circle.Radius = Settings.FlickFOV; Flick_Circle.Visible = true else Flick_Circle.Visible = false end
 end)
 
+-- ОГРАНИЧИТЕЛЬ (30 FPS): Боевой блок
+if nowClock - lastCombatUpdate >= 0.033 then
+lastCombatUpdate = nowClock
+
 if Settings.AimbotEnabled and not Settings.FlickMode then
 local target = getClosestPlayer(Settings.AimFOV)
 if target then Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position) end
@@ -531,25 +602,40 @@ end
 
 runTriggerbot()
 handleInstantReload()
+end
 
+-- ОГРАНИЧИТЕЛЬ (15 FPS): Обновление ESP
+if nowClock - lastEspUpdate >= 0.066 then
+lastEspUpdate = nowClock
+
+for player, visual in pairs(ESP_Cache) do
+local char = player.Character
+local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+if char and humanoid and humanoid.Health > 0 then
+local isEnemy = (player.Team ~= LocalPlayer.Team or player.Team == nil)
+if visual.Beam then visual.Beam.Enabled = Settings.EspLines and isEnemy end
+if visual.Box then visual.Box.Visible = Settings.EspBox and isEnemy end
+else
+if visual.Beam then visual.Beam.Enabled = false end
+if visual.Box then visual.Box.Visible = false end
+end
+end
+end
+
+-- ОГРАНИЧИТЕЛЬ (Каждые 3 секунды): Глубокая очистка кэша памяти
+if nowClock - lastMemoryClean >= 3.0 then
+lastMemoryClean = nowClock
+pcall(function() collectgarbage("step", 100) end)
+end
+
+-- Оверлей производительности
 if Settings.PerfMonitor then
-local now = os.clock()
-table.insert(fpsTable, now)
-while #fpsTable > 0 and fpsTable < now - 1 do table.remove(fpsTable, 1) end
+table.insert(fpsTable, nowClock)
+while #fpsTable > 0 and fpsTable < nowClock - 1 do table.remove(fpsTable, 1) end
 local curFps = #fpsTable
 local curPing = 0
 pcall(function() curPing = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
 local curMem = string.format("%.1f", Stats:GetTotalMemoryUsageMb())
 PerfText.Text = string.format("⚡ PERF MONITOR\n\nFPS: %d\nPING: %d ms\nMEM: %s MB", curFps, curPing, curMem)
-end
-
-for player, visual in pairs(ESP_Cache) do
-local char = player.Character
-local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-if char and humanoid and humanoid.Health > 0 and Settings.EspLines then
-visual.Beam.Enabled = (player.Team ~= LocalPlayer.Team or player.Team == nil)
-else
-if visual.Beam then visual.Beam.Enabled = false end
-end
 end
 end)
