@@ -30,9 +30,9 @@ local Settings = {
     FlickDelay = 0.01,
     TargetPart = "Head",
     EspLines = false,
-    EspBox = false,
+    EspCharms = false,
     BHopEnabled = false,
-    BHopPower = 5,
+    BHopPower = 1.0, -- От 1 до 15 (шаг 0.5 контролируется слайдером)
     ShowAimFOV = false,
     ShowFlickFOV = false,
     InstantReload = false,
@@ -40,31 +40,14 @@ local Settings = {
     PerfMonitor = false,
     TriggerbotEnabled = false,
     TriggerbotDelay = 0,
-    TriggerbotHitchance = 100,
-    LocalWings = false,
-    LocalHat = false
+    TriggerbotHitchance = 100
 }
 
 -- [[ КЭШ И СЛУЖЕБНЫЕ ПЕРЕМЕННЫЕ ]] --
 local ESP_Cache = {}
 local fpsTable = {}
-local lastTargetCharacter = nil
 local lastShotTime = 0
-local triggerShotCooldown = 0.05
-local CurrentWingsPart = nil
-local CurrentHatPart = nil
-
--- Создание стабильного источника для ESP линий (пересоздается при удалении)
-local LineOriginPart = workspace:FindFirstChild("NL_Stealth_Origin")
-if not LineOriginPart then
-    LineOriginPart = Instance.new("Part")
-    LineOriginPart.Name = "NL_Stealth_Origin"
-    LineOriginPart.Transparency = 1
-    LineOriginPart.CanCollide = false
-    LineOriginPart.Anchored = true
-    LineOriginPart.Size = Vector3.new(0.1, 0.1, 0.1)
-    LineOriginPart.Parent = workspace
-end
+local triggerShotCooldown = 0.01 -- Максимально быстрый отклик
 
 -- [[ БЕЗОПАСНАЯ ИНЖЕКЦИЯ GUI ]] --
 local ScreenGui = Instance.new("ScreenGui")
@@ -96,7 +79,7 @@ local function makeDraggable(gui)
     UserInputService.InputChanged:Connect(function(input)
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
-            TweenService:Create(gui, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            TweenService:Create(gui, TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
             }):Play()
         end
@@ -108,7 +91,7 @@ local function makeDraggable(gui)
     end)
 end
 
--- [[ ЛЮКСОВЫЙ ИНТЕРФЕЙС NEVERLOSE ]] --
+-- Плавающая кнопка
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0, 55, 0, 55)
 ToggleButton.Position = UDim2.new(0.05, 0, 0.2, 0)
@@ -139,31 +122,26 @@ MenuBorder.Color = Color3.fromRGB(25, 30, 45)
 MenuBorder.Thickness = 1.5
 makeDraggable(MainMenu)
 
--- Шапка меню с градиентом
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(12, 16, 24)
-Title.Text = "   NEVERLOSE.CC // Premium Stealth v15"
+Title.Text = "   NEVERLOSE.CC // Premium Custom v16"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 12
 Title.Parent = MainMenu
-
-local TitleCorner = Instance.new("UICorner", Title)
-TitleCorner.CornerRadius = UDim.new(0, 12)
+Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 12)
 
 ToggleButton.MouseButton1Click:Connect(function()
     MainMenu.Visible = not MainMenu.Visible
-    local targetTrans = MainMenu.Visible and 0 or 1
 end)
 
--- Скролл-контейнер для элементов
 local Scroll = Instance.new("ScrollingFrame")
 Scroll.Size = UDim2.new(1, -16, 1, -50)
 Scroll.Position = UDim2.new(0, 8, 0, 45)
 Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 1100)
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 1000)
 Scroll.ScrollBarThickness = 4
 Scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 162, 255)
 Scroll.Parent = MainMenu
@@ -195,7 +173,7 @@ PerfText.TextXAlignment = Enum.TextXAlignment.Left
 PerfText.TextYAlignment = Enum.TextYAlignment.Top
 PerfText.Parent = PerfFrame
 
--- [[ КОНСТРУКТОРЫ ЭЛЕМЕНТОВ С ПЛАВНОЙ АНИМАЦИЕЙ ]] --
+-- [[ КОНСТРУКТОРЫ ЭЛЕМЕНТОВ ]] --
 local function createToggle(parent, text, settingName, extraCallback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -4, 0, 36)
@@ -225,9 +203,9 @@ local function createToggle(parent, text, settingName, extraCallback)
         local targetText = Settings[settingName] and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 160, 180)
 
         if animate then
-            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = targetBg, TextColor3 = targetText}):Play()
-            TweenService:Create(btnBorder, TweenInfo.new(0.15), {Color = targetBorder}):Play()
-            TweenService:Create(indicator, TweenInfo.new(0.15), {BackgroundColor3 = targetInd}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = targetBg, TextColor3 = targetText}):Play()
+            TweenService:Create(btnBorder, TweenInfo.new(0.12), {Color = targetBorder}):Play()
+            TweenService:Create(indicator, TweenInfo.new(0.12), {BackgroundColor3 = targetInd}):Play()
         else
             btn.BackgroundColor3 = targetBg
             btn.TextColor3 = targetText
@@ -244,7 +222,7 @@ local function createToggle(parent, text, settingName, extraCallback)
     updateVisuals(false)
 end
 
-local function createSlider(parent, text, min, max, default, isFloat, callback)
+local function createSlider(parent, text, min, max, default, isFloat, step, callback)
     local container = Instance.new("Frame")
     container.Size = UDim2.new(1, -4, 0, 44)
     container.BackgroundTransparency = 1
@@ -265,29 +243,38 @@ local function createSlider(parent, text, min, max, default, isFloat, callback)
     bg.Position = UDim2.new(0, 10, 0, 24)
     bg.BackgroundColor3 = Color3.fromRGB(25, 30, 45)
     bg.Parent = container
-Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 3)
+    Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 3)
 
-local fill = Instance.new("Frame", bg)
-fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-fill.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
-Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 3)
+    local fill = Instance.new("Frame", bg)
+    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 3)
 
-local sliderBtn = Instance.new("TextButton", bg)
-sliderBtn.Size = UDim2.new(0, 12, 0, 12)
-sliderBtn.Position = UDim2.new((default - min) / (max - min), -6, 0.5, -6)
-sliderBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-sliderBtn.Text = ""
-Instance.new("UICorner", sliderBtn).CornerRadius = UDim.new(0, 6)
+    local sliderBtn = Instance.new("TextButton", bg)
+    sliderBtn.Size = UDim2.new(0, 12, 0, 12)
+    sliderBtn.Position = UDim2.new((default - min) / (max - min), -6, 0.5, -6)
+    sliderBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    sliderBtn.Text = ""
+    Instance.new("UICorner", sliderBtn).CornerRadius = UDim.new(0, 6)
 
-local active = false
-local function updateSlider(inputPosition)
+    local active = false
+    local function updateSlider(inputPosition)
 local x = math.clamp((inputPosition.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
-sliderBtn.Position = UDim2.new(x, -6, 0.5, -6)
-fill.Size = UDim2.new(x, 0, 1, 0)
-local val = min + (x * (max - min))
-if not isFloat then val = math.floor(val) end
-label.Text = " " .. text .. ": " .. string.format(isFloat and "%.2f" or "%d", val)
-pcall(callback, val)
+local rawVal = min + (x * (max - min))
+
+if step then
+rawVal = math.round(rawVal / step) * step
+elseif not isFloat then
+rawVal = math.floor(rawVal)
+end
+rawVal = math.clamp(rawVal, min, max)
+
+local visualX = (rawVal - min) / (max - min)
+sliderBtn.Position = UDim2.new(visualX, -6, 0.5, -6)
+fill.Size = UDim2.new(visualX, 0, 1, 0)
+
+label.Text = " " .. text .. ": " .. string.format(isFloat and "%.1f" or "%d", rawVal)
+pcall(callback, rawVal)
 end
 
 bg.InputBegan:Connect(function(i)
@@ -301,37 +288,31 @@ if active and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInpu
 end)
 end
 
--- [[ НАПОЛНЕНИЕ МЕНЮ ФУНКЦИЯМИ ]] --
+-- [[ НАПОЛНЕНИЕ МЕНЮ (БЕЗ КОСМЕТИКИ) ]] --
 createToggle(Scroll, "On-Shot Flickbot", "FlickMode")
 createToggle(Scroll, "Combat Aimbot", "AimbotEnabled")
-createToggle(Scroll, "Neverlose Triggerbot", "TriggerbotEnabled")
-createSlider(Scroll, "Trigger Delay (ms)", 0, 500, Settings.TriggerbotDelay * 1000, false, function(v) Settings.TriggerbotDelay = v / 1000 end)
-createSlider(Scroll, "Trigger Hitchance", 10, 100, Settings.TriggerbotHitchance, false, function(v) Settings.TriggerbotHitchance = v end)
+createToggle(Scroll, "Triggerbot", "TriggerbotEnabled")
+createSlider(Scroll, "Trigger Delay (ms)", 0, 500, Settings.TriggerbotDelay * 1000, false, nil, function(v) Settings.TriggerbotDelay = v / 1000 end)
+createSlider(Scroll, "Trigger Hitchance", 10, 100, Settings.TriggerbotHitchance, false, nil, function(v) Settings.TriggerbotHitchance = v end)
 createToggle(Scroll, "Aim/Flick Wallcheck", "WallCheck")
 createToggle(Scroll, "Show Flick FOV (Red)", "ShowFlickFOV")
 createToggle(Scroll, "Show Aim FOV (Blue)", "ShowAimFOV")
 
-createToggle(Scroll, "Engine ESP Lines", "EspLines", function(state)
-for _, visual in pairs(ESP_Cache) do if visual.Beam then visual.Beam.Enabled = state end end
-end)
-createToggle(Scroll, "Engine ESP Box", "EspBox", function(state)
-for _, visual in pairs(ESP_Cache) do if visual.Box then visual.Box.Visible = state end end
-end)
+createToggle(Scroll, "Esp line(v)", "EspLines")
+createToggle(Scroll, "ESP Charms", "EspCharms")
 
-createToggle(Scroll, "Local Angel Wings (Back)", "LocalWings", function(s) if not s and CurrentWingsPart then CurrentWingsPart:Destroy(); CurrentWingsPart = nil end end)
-createToggle(Scroll, "Local Golden Halo (Head)", "LocalHat", function(s) if not s and CurrentHatPart then CurrentHatPart:Destroy(); CurrentHatPart = nil end end)
+createToggle(Scroll, "BunnyHop", "BHopEnabled")
+createSlider(Scroll, "BHop Power Strength", 1, 15, Settings.BHopPower, true, 0.5, function(v) Settings.BHopPower = v end)
 
-createToggle(Scroll, "Legit BunnyHop", "BHopEnabled")
 createToggle(Scroll, "Instant Reload (Universal)", "InstantReload")
 createToggle(Scroll, "FPS Unlocker (999 FPS)", "FPSUnlocker", function(state) if setfpscap then setfpscap(state and 999 or 60) end end)
 createToggle(Scroll, "Performance Monitor", "PerfMonitor", function(state) PerfFrame.Visible = state end)
 
-createSlider(Scroll, "Aim FOV", 10, 900, Settings.AimFOV, false, function(v) Settings.AimFOV = v end)
-createSlider(Scroll, "Flick FOV", 10, 900, Settings.FlickFOV, false, function(v) Settings.FlickFOV = v end)
-createSlider(Scroll, "Flick Delay", 0.01, 1.00, Settings.FlickDelay, true, function(v) Settings.FlickDelay = v end)
-createSlider(Scroll, "BHop Power Boost", 1, 50, Settings.BHopPower, false, function(v) Settings.BHopPower = v end)
+createSlider(Scroll, "Aim FOV", 10, 900, Settings.AimFOV, false, nil, function(v) Settings.AimFOV = v end)
+createSlider(Scroll, "Flick FOV", 10, 900, Settings.FlickFOV, false, nil, function(v) Settings.FlickFOV = v end)
+createSlider(Scroll, "Flick Delay", 0.01, 1.00, Settings.FlickDelay, true, nil, function(v) Settings.FlickDelay = v end)
 
--- Кольца FOV
+-- FOV Кольца
 local Aim_Circle, Flick_Circle
 pcall(function()
 Aim_Circle = Drawing.new("Circle"); Aim_Circle.Visible = false; Aim_Circle.Color = Color3.fromRGB(0, 162, 255); Aim_Circle.Thickness = 1.5
@@ -355,12 +336,13 @@ end
 return true
 end
 
--- Безопасный эмулятор клика под Delta
+-- Улучшенный симулятор клика / выстрела
 local function secureDeltaClick()
 pcall(function()
 if mouse1click then
-task.wait(MathRandom(1, 3) / 1000)
 mouse1click()
+elseif mouse1press and mouse1release then
+mouse1press(); task.wait(0.001); mouse1release()
 end
 end)
 end
@@ -426,29 +408,25 @@ end
 end)
 end
 
--- [[ ФУНКЦИОНАЛ: МГНОВЕННАЯ ПЕРЕЗАРЯДКА (ПЕРЕПИСАНА С НУЛЯ) ]] --
+-- [[ ФУНКЦИОНАЛ: МГНОВЕННАЯ ПЕРЕЗАРЯДКА ]] --
 local function handleInstantReload()
 if not Settings.InstantReload then return end
 pcall(function()
 local char = LocalPlayer.Character
-local items = {}
-if char then for _, v in ipairs(char:GetChildren()) do table.insert(items, v) end end
+local targetTools = {}
+if char then for _, v in ipairs(char:GetChildren()) do if v:IsA("Tool") then table.insert(targetTools, v) end end end
 if LocalPlayer:FindFirstChild("Backpack") then
-for _, v in ipairs(LocalPlayer.Backpack:GetChildren()) do table.insert(items, v) end
+for _, v in ipairs(LocalPlayer.Backpack:GetChildren()) do if v:IsA("Tool") then table.insert(targetTools, v) end end
 end
 
-for _, tool in ipairs(items) do
-if tool:IsA("Tool") then
--- Полностью удаляем задержки между выстрелами и анимации перезарядки в конфигурациях оружия
+for _, tool in ipairs(targetTools) do
 for _, obj in ipairs(tool:GetDescendants()) do
 if obj:IsA("NumberValue") or obj:IsA("IntValue") then
-local n = obj.Name:lower()
-if n:find("reload") or n:find("delay") or n:find("cooldown") or n:find("recovery") then
--- Ставим минимальное рабочее значение, чтобы скрипт оружия не ломался в 0
-obj.Value = 0.001
-elseif n:find("ammo") or n:find("clip") or n:find("mag") then
-if obj.Value < 50 then obj.Value = 999 end -- Бесконечные патроны, если поддерживается игрой
-end
+local name = obj.Name:lower()
+if name:find("reload") or name:find("delay") or name:find("cooldown") or name:find("time") or name:find("duration") then
+obj.Value = 0.0001
+elseif name:find("ammo") or name:find("clip") or name:find("mag") then
+if obj.Value < 30 then obj.Value = 250 end
 end
 end
 end
@@ -456,7 +434,7 @@ end
 end)
 end
 
--- [[ ФУНКЦИОНАЛ: ПРАВИЛЬНЫЙ BUNNYHOP ]] --
+-- [[ ФУНКЦИОНАЛ: ПРАВИЛЬНЫЙ BHOP ]] --
 local function handleBunnyHop()
 if not Settings.BHopEnabled then return end
 pcall(function()
@@ -465,76 +443,74 @@ local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
 if humanoid and hrp and humanoid.Health > 0 then
--- Проверяем, держит ли игрок зажатым пробел и находится ли на земле
 if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
 if humanoid.FloorMaterial ~= Enum.Material.Air then
-hrp.Velocity = Vector3.new(hrp.Velocity.X, 35 + Settings.BHopPower, hrp.Velocity.Z)
--- Дополнительный пинок вперед по направлению движения игрока
+-- Прыжок с ускорением в зависимости от слайдера (сила 1 = дефолт, 15 = максимум)
+local basePower = 14 * Settings.BHopPower
+hrp.Velocity = Vector3.new(hrp.Velocity.X, 32 + (Settings.BHopPower * 2.5), hrp.Velocity.Z)
+
 if humanoid.MoveDirection.Magnitude > 0 then
-hrp.Velocity = hrp.Velocity + (humanoid.MoveDirection * Settings.BHopPower)
+hrp.Velocity = hrp.Velocity + (humanoid.MoveDirection * basePower)
 end
+end
+else
+-- Если пробел отпущен и игрок приземлился — моментальный сброс скорости до обычной
+if humanoid.FloorMaterial ~= Enum.Material.Air then
+local currentVel = hrp.Velocity
+hrp.Velocity = Vector3.new(currentVel.X * 0.5, currentVel.Y, currentVel.Z * 0.5)
 end
 end
 end
 end)
 end
 
--- [[ ФУНКЦИОНАЛ: СТАБИЛЬНАЯ КОСМЕТИКА ]] --
-local function applyLocalCosmetics()
-local char = LocalPlayer.Character
-if not char then return end
+-- [[ СИСТЕМА ФИЛЬТРАЦИИ И ОЧИСТКИ КЭША ESP ]] --
+local function clearESPData(player)
+if ESP_Cache[player] then
+pcall(function() ESP_Cache[player].Line:Destroy() end)
+pcall(function() ESP_Cache[player].Highlight:Destroy() end)
+ESP_Cache[player] = nil
+end
+end
+
+-- [[ ИНИЦИАЛИЗАЦИЯ 2D ЛИНИЙ И СУПЕР CHARMS ]] --
+local function createEngineESP(player)
+if player == LocalPlayer then return end
+clearESPData(player)
+
+local function setupVisuals(character)
 pcall(function()
-if CurrentWingsPart then CurrentWingsPart:Destroy(); CurrentWingsPart = nil end
-if CurrentHatPart then CurrentHatPart:Destroy(); CurrentHatPart = nil end
+local hrp = character:WaitForChild("HumanoidRootPart", 10)
+if not hrp then return end
 
-local torso = char:WaitForChild("UpperTorso", 2) or char:WaitForChild("Torso", 2)
-local head = char:WaitForChild("Head", 2)
-if not torso or not head then return end
+-- Инициализация 2D Линии (Drawing API)
+local line = Drawing.new("Line")
+line.Visible = false
+line.Color = Color3.fromRGB(0, 162, 255)
+line.Thickness = 1.5
 
-if Settings.LocalWings then
-CurrentWingsPart = Instance.new("Part")
-CurrentWingsPart.Name = generateRandomName()
-CurrentWingsPart.CanCollide = false
-CurrentWingsPart.Massless = true
-CurrentWingsPart.Size = Vector3.new(0.1, 0.1, 0.1)
-CurrentWingsPart.Transparency = 1
-CurrentWingsPart.Parent = char
+-- Инициализация Настоящих Charms (Highlight)
+local highlight = Instance.new("Highlight")
+highlight.FillColor = Color3.fromRGB(0, 162, 255)
+highlight.FillTransparency = 0.4
+highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+highlight.OutlineTransparency = 0.1
+highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+highlight.Adornee = character
+highlight.Enabled = false
+highlight.Parent = ScreenGui
 
-local mesh = Instance.new("SpecialMesh", CurrentWingsPart)
-mesh.MeshId = "rbxassetid://15535311025"
-mesh.TextureId = "rbxassetid://15535310860"
-mesh.Scale = Vector3.new(4, 4, 4)
-
-local weld = Instance.new("Weld", CurrentWingsPart)
-weld.Part0 = CurrentWingsPart; weld.Part1 = torso
-weld.C0 = CFrame.new(0, -0.5, 1.1) * CFrame.Angles(0, math.rad(180), 0)
-end
-
-if Settings.LocalHat then
-CurrentHatPart = Instance.new("Part")
-CurrentHatPart.Name = generateRandomName()
-CurrentHatPart.CanCollide = false
-CurrentHatPart.Massless = true
-CurrentHatPart.Size = Vector3.new(0.1, 0.1, 0.1)
-CurrentHatPart.Transparency = 1
-CurrentHatPart.Parent = char
-
-local mesh = Instance.new("SpecialMesh", CurrentHatPart)
-mesh.MeshId = "rbxassetid://11413813978"
-mesh.TextureId = "rbxassetid://11413812836"
-mesh.Scale = Vector3.new(2.5, 2.5, 2.5)
-
-local weld = Instance.new("Weld", CurrentHatPart)
-weld.Part0 = CurrentHatPart; weld.Part1 = head
-weld.C0 = CFrame.new(0, -1.2, 0)
-end
+ESP_Cache[player] = {Line = line, Highlight = highlight}
 end)
 end
 
-LocalPlayer.CharacterAdded:Connect(function()
-task.wait(1.5)
-applyLocalCosmetics()
-end)
+if player.Character then setupVisuals(player.Character) end
+player.CharacterAdded:Connect(setupVisuals)
+end
+
+Players.PlayerAdded:Connect(createEngineESP)
+Players.PlayerRemoving:Connect(clearESPData)
+for _, p in ipairs(Players:GetPlayers()) do createEngineESP(p) end
 
 -- Flick-Snap при нажатии
 UserInputService.InputBegan:Connect(function(input, processed)
@@ -553,73 +529,12 @@ end
 end
 end)
 
--- [[ ПОЛНОСТЬЮ ПЕРЕРАБОТАННЫЙ ENGINE ESP ]] --
-local function createEngineESP(player)
-if player == LocalPlayer then return end
-
-local function setupVisuals(character)
-pcall(function()
--- Сначала очищаем старый ESP если он был
-if ESP_Cache[player] then
-pcall(function() ESP_Cache[player].Box:Destroy() end)
-pcall(function() ESP_Cache[player].Beam:Destroy() end)
-end
-
-local hrp = character:WaitForChild("HumanoidRootPart", 10)
-if not hrp then return end
-
-local targetAttachment = Instance.new("Attachment", hrp)
-local localAttachment = Instance.new("Attachment", LineOriginPart)
-
-local beam = Instance.new("Beam", hrp)
-beam.Attachment0 = localAttachment
-beam.Attachment1 = targetAttachment
-beam.Width0 = 0.05; beam.Width1 = 0.05
-beam.Color = ColorSequence.new(Color3.fromRGB(0, 162, 255))
-beam.FaceCamera = true
-beam.Enabled = Settings.EspLines
-
-local boxAdornment = Instance.new("BoxHandleAdornment")
-boxAdornment.Size = Vector3.new(3.8, 5.2, 2.5)
-boxAdornment.Color3 = Color3.fromRGB(0, 162, 255)
-boxAdornment.Transparency = 0.7
-boxAdornment.AlwaysOnTop = true
-boxAdornment.ZIndex = 10
-boxAdornment.Adornee = hrp
-boxAdornment.Parent = ScreenGui
-boxAdornment.Visible = Settings.EspBox
-
-ESP_Cache[player] = {Beam = beam, Box = boxAdornment, AttL = localAttachment, AttT = targetAttachment}
-end)
-end
-
-if player.Character then setupVisuals(player.Character) end
-player.CharacterAdded:Connect(setupVisuals)
-end
-
-local function removeEngineESP(player)
-if ESP_Cache[player] then
-pcall(function() ESP_Cache[player].Beam:Destroy() end)
-pcall(function() ESP_Cache[player].Box:Destroy() end)
-pcall(function() ESP_Cache[player].AttL:Destroy() end)
-pcall(function() ESP_Cache[player].AttT:Destroy() end)
-ESP_Cache[player] = nil
-end
-end
-
-Players.PlayerAdded:Connect(createEngineESP)
-Players.PlayerRemoving:Connect(removeEngineESP)
-for _, p in ipairs(Players:GetPlayers()) do createEngineESP(p) end
-
--- [[ ГЛАВНЫЙ БЕСКОНЕЧНЫЙ ЦИКЛ (МАКСИМАЛЬНЫЙ ПРИОРИТЕТ) ]] --
+-- [[ ГЛАВНЫЙ ИСПОЛНИТЕЛЬНЫЙ ЦИКЛ (БЕЗ ЗАДЕРЖЕК КАДРОВ) ]] --
 RunService.RenderStepped:Connect(function()
 local nowClock = os.clock()
-
--- Центрируем скрытую точку линий ESP перед камерой
-if LineOriginPart then LineOriginPart.CFrame = Camera.CFrame * CFrame.new(0, -3, -2) end
-
--- Отрисовка FOV колец кругов
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+-- Рендер FOV кругов
 pcall(function()
 if Settings.ShowAimFOV and Aim_Circle then
 Aim_Circle.Position = screenCenter; Aim_Circle.Radius = Settings.AimFOV; Aim_Circle.Visible = true
@@ -630,7 +545,7 @@ Flick_Circle.Position = screenCenter; Flick_Circle.Radius = Settings.FlickFOV; F
 else Flick_Circle.Visible = false end
 end)
 
--- ВЫПОЛНЕНИЕ ВСЕХ БОЕВЫХ И ДВИГАТЕЛЬНЫХ ФУНКЦИЙ НА КАЖДОМ КАДРЕ (БЕЗ ОГРАНИЧЕНИЙ)
+-- Работа аимбота и триггера
 if Settings.AimbotEnabled and not Settings.FlickMode then
 local target = getClosestPlayer(Settings.AimFOV)
 if target then Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position) end
@@ -640,27 +555,48 @@ runTriggerbot()
 handleInstantReload()
 handleBunnyHop()
 
--- Динамическое обновление состояний ESP для живых врагов
+-- ДИНАМИЧЕСКИЙ ОБСЧЕТ 2D ЛИНИЙ ОТ ЦЕНТРА ЭКРАНА И CHARMS
 for player, visual in pairs(ESP_Cache) do
 pcall(function()
 local char = player.Character
 local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-if char and humanoid and humanoid.Health > 0 and player.Character:FindFirstChild("HumanoidRootPart") then
+local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+if char and humanoid and hrp and humanoid.Health > 0 then
 local isEnemy = (player.Team ~= LocalPlayer.Team or player.Team == nil)
-visual.Beam.Enabled = Settings.EspLines and isEnemy
-visual.Box.Visible = Settings.EspBox and isEnemy
-visual.Box.Adornee = player.Character.HumanoidRootPart
+
+-- Логика Charms (Chams)
+if Settings.EspCharms and isEnemy then
+visual.Highlight.Enabled = true
+visual.Highlight.Adornee = char
 else
-visual.Beam.Enabled = false
-visual.Box.Visible = false
+visual.Highlight.Enabled = false
+end
+
+-- Логика Линий от центра экрана
+if Settings.EspLines and isEnemy then
+local vector, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+if onScreen then
+visual.Line.From = screenCenter
+visual.Line.To = Vector2.new(vector.X, vector.Y)
+visual.Line.Visible = true
+else
+visual.Line.Visible = false
+end
+else
+visual.Line.Visible = false
+end
+else
+visual.Line.Visible = false
+visual.Highlight.Enabled = false
 end
 end)
 end
 
--- Оверлей производительности
+-- Монитор производительности
 if Settings.PerfMonitor then
 table.insert(fpsTable, nowClock)
-while #fpsTable > 0 and fpsTable[1] < nowClock - 1 do table.remove(fpsTable, 1) end
+while #fpsTable > 0 and fpsTable < nowClock - 1 do table.remove(fpsTable, 1) end
 local curFps = #fpsTable
 local curPing = 0
 pcall(function() curPing = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
