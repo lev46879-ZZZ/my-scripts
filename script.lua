@@ -47,8 +47,7 @@ local Settings = {
 local ESP_Cache = {}
 local fpsTable = {}
 local lastShotTime = 0
-local triggerShotCooldown = 0.05 -- Увеличил для стабильности
-local isAiming = false
+local triggerShotCooldown = 0.05
 
 -- [[ БЕЗОПАСНАЯ ИНЖЕКЦИЯ GUI ]] --
 local ScreenGui = Instance.new("ScreenGui")
@@ -67,7 +66,7 @@ local function getSecureContainer()
 end
 ScreenGui.Parent = getSecureContainer()
 
--- Функция плавного перетаскивания (Draggable)
+-- Функция плавного перетаскивания
 local function makeDraggable(gui)
     local dragging, dragStart, startPos
     gui.InputBegan:Connect(function(input)
@@ -142,7 +141,7 @@ local Scroll = Instance.new("ScrollingFrame")
 Scroll.Size = UDim2.new(1, -16, 1, -50)
 Scroll.Position = UDim2.new(0, 8, 0, 45)
 Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 1200) -- Увеличен для всех элементов
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 1200)
 Scroll.ScrollBarThickness = 4
 Scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 162, 255)
 Scroll.Parent = MainMenu
@@ -285,7 +284,6 @@ local function createSlider(parent, text, min, max, default, isFloat, step, call
         end
     end)
     
-    -- ФИКС: Правильная обработка окончания взаимодействия
     local function stopDragging()
         active = false
     end
@@ -331,7 +329,7 @@ end)
 
 createSlider(Scroll, "Aim FOV", 10, 900, Settings.AimFOV, false, nil, function(v) Settings.AimFOV = v end)
 createSlider(Scroll, "Flick FOV", 10, 900, Settings.FlickFOV, false, nil, function(v) Settings.FlickFOV = v end)
-createSlider(Scroll, "Flick Delay", 0.01, 1.00, Settings.FlickDelay, true, 0.01, function(v) Settings.FlickDelay = v end) -- ФИКС: Добавлен шаг 0.01
+createSlider(Scroll, "Flick Delay", 0.01, 1.00, Settings.FlickDelay, true, 0.01, function(v) Settings.FlickDelay = v end)
 
 -- FOV Кольца
 local Aim_Circle, Flick_Circle
@@ -358,7 +356,7 @@ local function checkWallVisibility(targetPart, enemyCharacter)
     local direction = (targetPart.Position - origin)
     local distance = direction.Magnitude
     
-    if distance < 1 then return true end -- ФИКС: Проверка на нулевое расстояние
+    if distance < 1 then return true end
     
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -379,7 +377,7 @@ local function secureDeltaClick()
             mouse1click()
         elseif mouse1press and mouse1release then
             mouse1press()
-            task.wait(0.005) -- ФИКС: Увеличен таймаут для стабильности
+            task.wait(0.005)
             mouse1release()
         end
     end)
@@ -425,12 +423,9 @@ local function runTriggerbot()
         local instance = Mouse.Target
         local char = instance.Parent
         
-        -- ФИКС: Более безопасная проверка иерархии
-        if char then
-            while char and not char:IsA("Model") do
-                char = char.Parent
-                if not char then break end
-            end
+        while char and not char:IsA("Model") do
+            char = char.Parent
+            if not char then break end
         end
         
         if not char then return end
@@ -493,7 +488,7 @@ local function handleInstantReload()
                         obj.Value = 0
                     elseif name:find("ammo") or name:find("clip") or name:find("mag") then
                         if obj.Value < 30 then 
-                            obj.Value = 999 -- ФИКС: Больше патронов
+                            obj.Value = 999
                         end
                     end
                 end
@@ -502,7 +497,7 @@ local function handleInstantReload()
     end)
 end
 
--- [[ ФУНКЦИОНАЛ: BHOP ]] --
+-- [[ ФУНКЦИОНАЛ: BHOP (ИСПРАВЛЕН) ]] --
 local bhopJumpCooldown = 0
 local function handleBunnyHop()
     if not Settings.BHopEnabled then return end
@@ -514,24 +509,24 @@ local function handleBunnyHop()
         local hrp = char:FindFirstChild("HumanoidRootPart")
         
         if humanoid and hrp and humanoid.Health > 0 then
-            local currentTime = os.clock()
-            
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-                if humanoid.FloorMaterial ~= Enum.Material.Air then
-                    if currentTime - bhopJumpCooldown > 0.1 then -- ФИКС: Добавлен кулдаун прыжка
-                        bhopJumpCooldown = currentTime
-                        local jumpPower = 50 + (Settings.BHopPower * 2.5) -- ФИКС: Нормализована сила прыжка
-                        hrp.Velocity = Vector3.new(hrp.Velocity.X, jumpPower, hrp.Velocity.Z)
-                        
-                        -- Ускорение в направлении движения
-                        local moveDir = humanoid.MoveDirection
-                        if moveDir.Magnitude > 0 then
-                            local speedMultiplier = 1 + (Settings.BHopPower * 0.05)
-                            hrp.Velocity = hrp.Velocity + (moveDir * (15 * speedMultiplier))
-                        end
+            -- Если зажат пробел и персонаж в воздухе
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) and humanoid.FloorMaterial == Enum.Material.Air then
+                local currentTime = os.clock()
+                if currentTime - bhopJumpCooldown > 0.1 then
+                    bhopJumpCooldown = currentTime
+                    
+                    -- Небольшой вертикальный импульс (чтобы не падать слишком быстро)
+                    hrp.Velocity = Vector3.new(hrp.Velocity.X, 40, hrp.Velocity.Z)
+                    
+                    -- Горизонтальное ускорение в направлении движения
+                    local moveDir = humanoid.MoveDirection
+                    if moveDir.Magnitude > 0 then
+                        local speedMultiplier = 1 + (Settings.BHopPower * 0.08) -- 1.0 = базовый, 15 = ~2.2
+                        hrp.Velocity = hrp.Velocity + (moveDir * (15 * speedMultiplier))
                     end
                 end
             end
+            -- FIX: Убрано else, скорость на земле не изменяется – возвращается к обычной автоматически
         end
     end)
 end
@@ -553,7 +548,7 @@ local function clearESPData(player)
     end
 end
 
--- [[ ИНИЦИАЛИЗАЦИЯ ESP ]] --
+-- [[ ИНИЦИАЛИЗАЦИЯ ESP (ИСПРАВЛЕНА) ]] --
 local function createEngineESP(player)
     if player == LocalPlayer then return end
     clearESPData(player)
@@ -563,14 +558,14 @@ local function createEngineESP(player)
             local hrp = character:WaitForChild("HumanoidRootPart", 5)
             if not hrp then return end
 
-            -- Линия
+            -- Линия (Drawing)
             local line = Drawing.new("Line")
             line.Visible = false
             line.Color = Color3.fromRGB(0, 162, 255)
             line.Thickness = 1.5
             line.Transparency = 1
 
-            -- Highlight для Charms
+            -- Highlight для Charms – FIX: помещаем в Workspace, чтобы работал сквозь стены
             local highlight = Instance.new("Highlight")
             highlight.FillColor = Color3.fromRGB(0, 162, 255)
             highlight.FillTransparency = 0.4
@@ -579,10 +574,7 @@ local function createEngineESP(player)
             highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
             highlight.Adornee = character
             highlight.Enabled = false
-            
-            -- ФИКС: Правильное родительство
-            local parentGui = LocalPlayer:FindFirstChild("PlayerGui") or ScreenGui
-            highlight.Parent = parentGui
+            highlight.Parent = workspace -- FIX: родитель – Workspace
 
             ESP_Cache[player] = {Line = line, Highlight = highlight}
         end)
@@ -621,7 +613,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
     end
 end)
 
--- [[ ГЛАВНЫЙ ИСПОЛНИТЕЛЬНЫЙ ЦИКЛ ]] --
+-- [[ ГЛАВНЫЙ ИСПОЛНИТЕЛЬНЫЙ ЦИКЛ (С ИСПРАВЛЕНИЯМИ ESP) ]] --
 RunService.RenderStepped:Connect(function()
     local nowClock = os.clock()
     local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -655,12 +647,12 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Запуск триггербота
+    -- Запуск триггербота, релоада и бхопа
     runTriggerbot()
     handleInstantReload()
     handleBunnyHop()
 
-    -- ДИНАМИЧЕСКИЙ ОБСЧЕТ ESP
+    -- ОБНОВЛЕНИЕ ESP (ИСПРАВЛЕНО)
     for player, visual in pairs(ESP_Cache) do
         pcall(function()
             local char = player.Character
@@ -678,16 +670,14 @@ RunService.RenderStepped:Connect(function()
                     visual.Highlight.Enabled = false
                 end
 
-                -- Линии
+                -- ESP Line – FIX: рисуем всегда, даже если игрок вне экрана (используем проекцию)
                 if Settings.EspLines and isEnemy and visual.Line then
                     local vector, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                    if onScreen then
-                        visual.Line.From = screenCenter
-                        visual.Line.To = Vector2.new(vector.X, vector.Y)
-                        visual.Line.Visible = true
-                    else
-                        visual.Line.Visible = false
-                    end
+                    -- FIX: убрана проверка onScreen – линия рисуется в любом случае,
+                    -- но координаты могут выходить за экран – это нормально для "сквозь стены"
+                    visual.Line.From = screenCenter
+                    visual.Line.To = Vector2.new(vector.X, vector.Y)
+                    visual.Line.Visible = true
                 elseif visual.Line then
                     visual.Line.Visible = false
                 end
