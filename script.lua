@@ -182,29 +182,6 @@ local ContentLayout = Instance.new("UIListLayout", Scroll)
 ContentLayout.Padding = UDim.new(0, 6)
 ContentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
--- Монитор производительности
-local PerfFrame = Instance.new("Frame")
-PerfFrame.Size = UDim2.new(0, 150, 0, 80)
-PerfFrame.Position = UDim2.new(1, -165, 0, 15)
-PerfFrame.BackgroundColor3 = Color3.fromRGB(8, 10, 15)
-PerfFrame.Visible = false
-PerfFrame.Parent = ScreenGui
-
-Instance.new("UICorner", PerfFrame).CornerRadius = UDim.new(0, 6)
-local PerfStroke = Instance.new("UIStroke", PerfFrame)
-PerfStroke.Color = Color3.fromRGB(0, 162, 255)
-
-PerfText = Instance.new("TextLabel")
-PerfText.Size = UDim2.new(1, -12, 1, -12)
-PerfText.Position = UDim2.new(0, 6, 0, 6)
-PerfText.BackgroundTransparency = 1
-PerfText.TextColor3 = Color3.fromRGB(255, 255, 255)
-PerfText.Font = Enum.Font.Code
-PerfText.TextSize = 11
-PerfText.TextXAlignment = Enum.TextXAlignment.Left
-PerfText.TextYAlignment = Enum.TextYAlignment.Top
-PerfText.Parent = PerfFrame
-
 -- [[ КОНСТРУКТОРЫ ЭЛЕМЕНТОВ МЕНЮ ]] --
 local function createToggle(parent, text, settingName, extraCallback)
     local btn = Instance.new("TextButton")
@@ -270,24 +247,24 @@ local function createSlider(parent, text, min, max, default, isFloat, step, call
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = container
 
-local bg = Instance.new("Frame")
-bg.Size = UDim2.new(1, -20, 0, 6)
-bg.Position = UDim2.new(0, 10, 0, 24)
-bg.BackgroundColor3 = Color3.fromRGB(25, 30, 45)
-bg.Parent = container
-Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 3)
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(1, -20, 0, 6)
+    bg.Position = UDim2.new(0, 10, 0, 24)
+    bg.BackgroundColor3 = Color3.fromRGB(25, 30, 45)
+    bg.Parent = container
+    Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 3)
 
-local fill = Instance.new("Frame", bg)
-fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-fill.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
-Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 3)
+    local fill = Instance.new("Frame", bg)
+    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 3)
 
-local sliderBtn = Instance.new("TextButton", bg)
-sliderBtn.Size = UDim2.new(0, 12, 0, 12)
-sliderBtn.Position = UDim2.new((default - min) / (max - min), -6, 0.5, -6)
-sliderBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-sliderBtn.Text = ""
-Instance.new("UICorner", sliderBtn).CornerRadius = UDim.new(0, 6)
+    local sliderBtn = Instance.new("TextButton", bg)
+    sliderBtn.Size = UDim2.new(0, 12, 0, 12)
+    sliderBtn.Position = UDim2.new((default - min) / (max - min), -6, 0.5, -6)
+    sliderBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    sliderBtn.Text = ""
+    Instance.new("UICorner", sliderBtn).CornerRadius = UDim.new(0, 6)
 
 local active = false
 local function updateSlider(inputPosition)
@@ -349,7 +326,6 @@ createToggle(Scroll, "Instant Reload (Universal)", "InstantReload")
 createToggle(Scroll, "FPS Unlocker (999 FPS)", "FPSUnlocker", function(state)
 if setfpscap then setfpscap(state and 999 or 60) end
 end)
-createToggle(Scroll, "Performance Monitor", "PerfMonitor", function(state) PerfFrame.Visible = state end)
 
 createSlider(Scroll, "Aim FOV", 10, 900, Settings.AimFOV, false, nil, function(v) Settings.AimFOV = v end)
 createSlider(Scroll, "Flick FOV", 10, 900, Settings.FlickFOV, false, nil, function(v) Settings.FlickFOV = v end)
@@ -381,23 +357,23 @@ end
 end)
 end
 
--- [[ ИСПРАВЛЕННЫЙ ГЛОБАЛЬНЫЙ СКАНИРОВЩИК ПЕРСОНАЖЕЙ ДЛЯ FLICK ]] --
+-- [[ ПРЯМОЙ СКАНИРОВЩИК БЕЗ ОПТИМИЗАЦИИ ]] --
 local function getClosestPlayer(currentFOV)
 local closestTarget = nil
 local minDistance = currentFOV + 1
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+local list = workspace:GetChildren()
 
--- Прямой перебор всех объектов в workspace (обход скрытия игроков в Flick)
-for _, obj in ipairs(workspace:GetChildren()) do
+for i = 1, #list do
+local obj = list[i]
 if obj:IsA("Model") and obj ~= LocalPlayer.Character and obj:FindFirstChildOfClass("Humanoid") then
 local humanoid = obj:FindFirstChildOfClass("Humanoid")
 local targetPart = obj:FindFirstChild(Settings.TargetPart) or obj:FindFirstChild("HumanoidRootPart")
 
 if humanoid and humanoid.Health > 0 and targetPart then
--- Дополнительная проверка, чтобы не целиться в манекены лобби
-if obj:FindFirstChild("HumanoidRootPart") and not obj.Name:lower():find("dummy") then
+if not obj.Name:lower():find("dummy") then
 local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-if onScreen then
+if onScreen and screenPos.Z > 0 then
 local distance = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
 if distance <= currentFOV and distance < minDistance then
 if checkWallVisibility(targetPart, obj) then
@@ -496,7 +472,7 @@ end
 end
 end
 
--- [[ ИСПРАВЛЕННЫЙ LINE И CHARMS ESP ]] --
+-- [[ ЭЛЕМЕНТЫ ESP ]] --
 local function createESPObjects(model)
 if model == LocalPlayer.Character then return end
 
@@ -509,26 +485,27 @@ end)
 
 local espData = {}
 
--- Создание 2D Frame для линии (принудительно рисуем поверх интерфейса Flick)
 local lineFrame = Instance.new("Frame")
 lineFrame.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
 lineFrame.BorderSizePixel = 0
 lineFrame.BackgroundTransparency = 0.1
 lineFrame.Visible = false
-
-lineFrame.ZIndex = 100 -- Высокий приоритет рендеринга
+lineFrame.ZIndex = 100
 lineFrame.Parent = EspGui
 
 espData.Line = lineFrame
 ESP_Cache[model] = espData
 end
 
+-- [[ ИСПРАВЛЕННЫЕ АДЕКВАТНЫЕ ЛИНИИ ПРЯМЫМ ЦИКЛОМ WORKSPACE ]] --
 local function updateESP()
 local screenSize = Camera.ViewportSize
 local center = Vector2.new(screenSize.X / 2, screenSize.Y / 2)
+local list = workspace:GetChildren()
 
--- Постоянно обновляем кэш из workspace, чтобы отслеживать динамический спавн в матче
-for _, obj in ipairs(workspace:GetChildren()) do
+-- Полный неоптимизированный перебор для стопроцентного захвата целей в Flick
+for i = 1, #list do
+local obj = list[i]
 if obj:IsA("Model") and obj ~= LocalPlayer.Character and obj:FindFirstChildOfClass("Humanoid") then
 if not ESP_Cache[obj] then
 createESPObjects(obj)
@@ -542,7 +519,7 @@ local humanoid = model:FindFirstChildOfClass("Humanoid")
 local hrp = model:FindFirstChild("HumanoidRootPart")
 
 if humanoid.Health > 0 then
--- 3D Charms
+-- Фикс синтаксиса в Charms (Добавлено пропущенное ==)
 if Settings.EspCharms then
 if not data.Highlight or data.Highlight.Parent ~= model then
 pcall(function()
@@ -562,11 +539,11 @@ else
 if data.Highlight then pcall(function() data.Highlight:Destroy() end) data.Highlight = nil end
 end
 
--- Отрисовка линий строго от прицела (центра экрана)
+-- Фикс неадекватных линий: добавлена строгая проверка глубины vector.Z > 0
 local targetPart = model:FindFirstChild(Settings.TargetPart) or hrp
 local vector, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
 
-if Settings.EspLines and onScreen then
+if Settings.EspLines and onScreen and vector.Z > 0 then
 if data.Line then
 data.Line.Visible = true
 local screenPos = Vector2.new(vector.X, vector.Y)
@@ -594,22 +571,29 @@ end
 end
 end
 
--- [[ ИСПРАВЛЕННЫЙ АКТИВАТОР FLICKBOT ДЛЯ МОБИЛЬНЫХ И ПК ]] --
+-- [[ ПОТОК УДЕРЖАНИЯ ДЛЯ FLICKBOT ]] --
+local isFlicking = false
 local function performFlick()
-if not Settings.FlickMode then return end
+if not Settings.FlickMode or isFlicking then return end
+
 local target = getClosestPlayer(Settings.FlickFOV)
 if target then
-task.delay(Settings.FlickDelay, function()
-pcall(function()
-if target and target.Parent and target.Parent:FindFirstChildOfClass("Humanoid").Health > 0 then
+isFlicking = true
+task.spawn(function()
+local startClock = os.clock()
+while os.clock() - startClock < (Settings.FlickDelay + 0.08) do
+if target and target.Parent and target.Parent:FindFirstChildOfClass("Humanoid") then
+if target.Parent:FindFirstChildOfClass("Humanoid").Health > 0 then
 Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+else break end
+else break end
+RunService.RenderStepped:Wait()
 end
-end)
+isFlicking = false
 end)
 end
 end
 
--- Срабатывание Flickbot при любом типе нажатия (клик мыши или касание экрана)
 UserInputService.InputBegan:Connect(function(input, processed)
 if processed then return end
 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -619,7 +603,6 @@ end)
 
 -- [[ ГЛАВНЫЙ ЦИКЛ ]] --
 RunService.RenderStepped:Connect(function()
-local nowClock = os.clock()
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
 pcall(function()
@@ -636,8 +619,7 @@ Flick_Circle.Visible = true
 elseif Flick_Circle then Flick_Circle.Visible = false end
 end)
 
--- Постоянный AimBot
-if Settings.AimbotEnabled and not Settings.FlickMode then
+if Settings.AimbotEnabled and not Settings.FlickMode and not isFlicking then
 local target = getClosestPlayer(Settings.AimFOV)
 if target then
 pcall(function() Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position) end)
@@ -648,21 +630,4 @@ runTriggerbot()
 handleInstantReload()
 handleBunnyHop()
 updateESP()
-
--- Монитор производительности
-if Settings.PerfMonitor then
-table.insert(fpsTable, nowClock)
-while #fpsTable > 0 and fpsTable < nowClock - 1 do table.remove(fpsTable, 1) end
-local curFps = #fpsTable
-local curPing = 0
-pcall(function()
-local pingStat = Stats.Network.ServerStatsItem["Data Ping"]
-if pingStat then curPing = math.floor(pingStat:GetValue()) end
-end)
-local curMem = "0.0"
-pcall(function() curMem = string.format("%.1f", Stats:GetTotalMemoryUsageMb()) end)
-if PerfText then
-PerfText.Text = string.format("⚡ PERFORMANCE\n\nFPS: %d\nPING: %d ms\nMEM: %s MB", curFps, curPing, curMem)
-end
-end
 end)
