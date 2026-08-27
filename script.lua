@@ -381,25 +381,29 @@ end
 end)
 end
 
+-- [[ ИСПРАВЛЕННЫЙ ГЛОБАЛЬНЫЙ СКАНИРОВЩИК ПЕРСОНАЖЕЙ ДЛЯ FLICK ]] --
 local function getClosestPlayer(currentFOV)
 local closestTarget = nil
 local minDistance = currentFOV + 1
 local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-local players = Players:GetPlayers()
-for i = 1, #players do
-local player = players[i]
-if player ~= LocalPlayer and player.Character then
-local char = player.Character
-local humanoid = char:FindFirstChildOfClass("Humanoid")
-local targetPart = char:FindFirstChild(Settings.TargetPart) or char:FindFirstChild("HumanoidRootPart")
+
+-- Прямой перебор всех объектов в workspace (обход скрытия игроков в Flick)
+for _, obj in ipairs(workspace:GetChildren()) do
+if obj:IsA("Model") and obj ~= LocalPlayer.Character and obj:FindFirstChildOfClass("Humanoid") then
+local humanoid = obj:FindFirstChildOfClass("Humanoid")
+local targetPart = obj:FindFirstChild(Settings.TargetPart) or obj:FindFirstChild("HumanoidRootPart")
+
 if humanoid and humanoid.Health > 0 and targetPart then
+-- Дополнительная проверка, чтобы не целиться в манекены лобби
+if obj:FindFirstChild("HumanoidRootPart") and not obj.Name:lower():find("dummy") then
 local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
 if onScreen then
 local distance = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
 if distance <= currentFOV and distance < minDistance then
-if checkWallVisibility(targetPart, char) then
+if checkWallVisibility(targetPart, obj) then
 minDistance = distance
 closestTarget = targetPart
+end
 end
 end
 end
@@ -422,8 +426,7 @@ if not char then break end
 end
 if not char then return end
 local humanoid = char:FindFirstChildOfClass("Humanoid")
-local player = Players:GetPlayerFromCharacter(char)
-if humanoid and humanoid.Health > 0 and player and player ~= LocalPlayer then
+if humanoid and humanoid.Health > 0 and char ~= LocalPlayer.Character then
 if checkWallVisibility(instance, char) then
 local currentTime = os.clock()
 if currentTime - lastShotTime >= triggerShotCooldown then
@@ -471,7 +474,7 @@ end
 end)
 end
 
--- [[ АДАПТИВНЫЙ ВЕКТОРНЫЙ BHOP ДЛЯ FLICK ]] --
+-- [[ АДАПТИВНЫЙ ВЕКТОРНЫЙ BHOP ]] --
 local function handleBunnyHop()
 if not Settings.BHopEnabled then return end
 local char = LocalPlayer.Character
@@ -493,75 +496,76 @@ end
 end
 end
 
--- [[ ДИНАМИЧЕСКИЙ ESP ПОД СТРУКТУРУ КАРТЫ FLICK ]] --
-local function createESPObjects(player)
-if player == LocalPlayer then return end
+-- [[ ИСПРАВЛЕННЫЙ LINE И CHARMS ESP ]] --
+local function createESPObjects(model)
+if model == LocalPlayer.Character then return end
 
 pcall(function()
-if ESP_Cache[player] then
-if ESP_Cache[player].Line then ESP_Cache[player].Line:Destroy() end
-if ESP_Cache[player].Highlight then ESP_Cache[player].Highlight:Destroy() end
+if ESP_Cache[model] then
+if ESP_Cache[model].Line then ESP_Cache[model].Line:Destroy() end
+if ESP_Cache[model].Highlight then ESP_Cache[model].Highlight:Destroy() end
 end
 end)
 
 local espData = {}
 
+-- Создание 2D Frame для линии (принудительно рисуем поверх интерфейса Flick)
 local lineFrame = Instance.new("Frame")
 lineFrame.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
 lineFrame.BorderSizePixel = 0
-lineFrame.BackgroundTransparency = 0.2
+lineFrame.BackgroundTransparency = 0.1
 lineFrame.Visible = false
-lineFrame.ZIndex = 10
+
+lineFrame.ZIndex = 100 -- Высокий приоритет рендеринга
 lineFrame.Parent = EspGui
 
 espData.Line = lineFrame
-ESP_Cache[player] = espData
-end
-
-local function clearESPData(player)
-if ESP_Cache[player] then
-pcall(function()
-if ESP_Cache[player].Line then ESP_Cache[player].Line:Destroy() end
-if ESP_Cache[player].Highlight then ESP_Cache[player].Highlight:Destroy() end
-end)
-ESP_Cache[player] = nil
-end
+ESP_Cache[model] = espData
 end
 
 local function updateESP()
 local screenSize = Camera.ViewportSize
 local center = Vector2.new(screenSize.X / 2, screenSize.Y / 2)
 
-for player, data in pairs(ESP_Cache) do
-local char = player.Character
-local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-local hrp = char and char:FindFirstChild("HumanoidRootPart")
+-- Постоянно обновляем кэш из workspace, чтобы отслеживать динамический спавн в матче
+for _, obj in ipairs(workspace:GetChildren()) do
+if obj:IsA("Model") and obj ~= LocalPlayer.Character and obj:FindFirstChildOfClass("Humanoid") then
+if not ESP_Cache[obj] then
+createESPObjects(obj)
+end
+end
+end
 
-if char and humanoid and hrp and humanoid.Health > 0 and player ~= LocalPlayer then
+for model, data in pairs(ESP_Cache) do
+if model and model.Parent == workspace and model:FindFirstChildOfClass("Humanoid") and model:FindFirstChild("HumanoidRootPart") then
+local humanoid = model:FindFirstChildOfClass("Humanoid")
+local hrp = model:FindFirstChild("HumanoidRootPart")
 
+if humanoid.Health > 0 then
+-- 3D Charms
 if Settings.EspCharms then
-if not data.Highlight or data.Highlight.Parent ~= char then
+if not data.Highlight or data.Highlight.Parent ~= model then
 pcall(function()
 if data.Highlight then data.Highlight:Destroy() end
 local box = Instance.new("BoxHandleAdornment")
-box.Size = Vector3.new(4, 6, 4)
+box.Size = Vector3.new(3.8, 5.5, 3.8)
 box.Color3 = Color3.fromRGB(0, 162, 255)
 box.Transparency = 0.5
 box.AlwaysOnTop = true
-box.ZIndex = 5
+box.ZIndex = 10
 box.Adornee = hrp
-box.Parent = char
+box.Parent = model
 data.Highlight = box
 end)
 end
 else
-if data.Highlight then
-pcall(function() data.Highlight:Destroy() end)
-data.Highlight = nil
-end
+if data.Highlight then pcall(function() data.Highlight:Destroy() end) data.Highlight = nil end
 end
 
-local vector, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+-- Отрисовка линий строго от прицела (центра экрана)
+local targetPart = model:FindFirstChild(Settings.TargetPart) or hrp
+local vector, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+
 if Settings.EspLines and onScreen then
 if data.Line then
 data.Line.Visible = true
@@ -580,46 +584,36 @@ if data.Line then data.Line.Visible = false end
 end
 else
 if data.Line then data.Line.Visible = false end
-if data.Highlight then
-pcall(function() data.Highlight:Destroy() end)
-data.Highlight = nil
+if data.Highlight then pcall(function() data.Highlight:Destroy() end) data.Highlight = nil end
 end
+else
+if data.Line then data.Line.Visible = false end
+if data.Highlight then pcall(function() data.Highlight:Destroy() end) data.Highlight = nil end
+ESP_Cache[model] = nil
 end
 end
 end
 
-local function setupPlayerListeners(player)
-player.CharacterAdded:Connect(function()
-task.wait(0.3)
-createESPObjects(player)
-end)
-player.CharacterRemoving:Connect(function()
-clearESPData(player)
-end)
-if player.Character then createESPObjects(player) end
-end
-
-Players.PlayerAdded:Connect(setupPlayerListeners)
-Players.PlayerRemoving:Connect(clearESPData)
-for _, p in ipairs(Players:GetPlayers()) do setupPlayerListeners(p) end
-
--- Flick-Snap
-UserInputService.InputBegan:Connect(function(input, processed)
-if processed or not Settings.FlickMode then return end
-if input.UserInputType == Enum.UserInputType.MouseButton1 then
+-- [[ ИСПРАВЛЕННЫЙ АКТИВАТОР FLICKBOT ДЛЯ МОБИЛЬНЫХ И ПК ]] --
+local function performFlick()
+if not Settings.FlickMode then return end
 local target = getClosestPlayer(Settings.FlickFOV)
 if target then
 task.delay(Settings.FlickDelay, function()
 pcall(function()
-if target and target.Parent then
-local humanoid = target.Parent:FindFirstChildOfClass("Humanoid")
-if humanoid and humanoid.Health > 0 then
+if target and target.Parent and target.Parent:FindFirstChildOfClass("Humanoid").Health > 0 then
 Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
 end
-end
 end)
 end)
 end
+end
+
+-- Срабатывание Flickbot при любом типе нажатия (клик мыши или касание экрана)
+UserInputService.InputBegan:Connect(function(input, processed)
+if processed then return end
+if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+performFlick()
 end
 end)
 
@@ -642,6 +636,7 @@ Flick_Circle.Visible = true
 elseif Flick_Circle then Flick_Circle.Visible = false end
 end)
 
+-- Постоянный AimBot
 if Settings.AimbotEnabled and not Settings.FlickMode then
 local target = getClosestPlayer(Settings.AimFOV)
 if target then
@@ -654,12 +649,10 @@ handleInstantReload()
 handleBunnyHop()
 updateESP()
 
--- Монитор производительности (ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ БЛОК)
+-- Монитор производительности
 if Settings.PerfMonitor then
 table.insert(fpsTable, nowClock)
-while #fpsTable > 0 and fpsTable[1] < nowClock - 1 do
-table.remove(fpsTable, 1)
-end
+while #fpsTable > 0 and fpsTable < nowClock - 1 do table.remove(fpsTable, 1) end
 local curFps = #fpsTable
 local curPing = 0
 pcall(function()
@@ -667,12 +660,9 @@ local pingStat = Stats.Network.ServerStatsItem["Data Ping"]
 if pingStat then curPing = math.floor(pingStat:GetValue()) end
 end)
 local curMem = "0.0"
-pcall(function()
-curMem = string.format("%.1f", Stats:GetTotalMemoryUsageMb())
-end)
+pcall(function() curMem = string.format("%.1f", Stats:GetTotalMemoryUsageMb()) end)
 if PerfText then
 PerfText.Text = string.format("⚡ PERFORMANCE\n\nFPS: %d\nPING: %d ms\nMEM: %s MB", curFps, curPing, curMem)
 end
 end
 end)
-
