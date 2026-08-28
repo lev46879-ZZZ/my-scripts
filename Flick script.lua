@@ -1,955 +1,288 @@
--- ==============================================
---  FLICK ULTIMATE | NEVERLOSE STYLE
---  Простое меню, 40+ функций
---  Для Delta Mobile
--- ==============================================
+-- Flick Mode для Delta (мгновенный аимбот + перетаскиваемая кнопка + анимация меню)
+-- ВНИМАНИЕ: использование читов нарушает правила Roblox.
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
-local Camera = workspace.CurrentCamera
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local camera = workspace.CurrentCamera
 
 -- Настройки
-local Settings = {
-    -- Aimbot
-    Aimbot = false,
-    AimbotFOV = 150,
-    AimbotSmooth = 0.1,
-    WallCheck = false,
-    SilentAim = false,
-    Triggerbot = false,
-    Flickbot = false,
-    FlickFOV = 200,
-    AutoShoot = false,
-    NoRecoil = false,
-    -- Visuals
-    ESP_Box = false,
-    ESP_Line = false,
-    ESP_Name = false,
-    ESP_Health = false,
-    ESP_Distance = false,
-    ESP_Tracer = false,
-    Crosshair = false,
-    FullBright = false,
-    NoFog = false,
-    Chams = false,
-    -- Movement
+local settings = {
     BHop = false,
-    BHopPower = 1,
-    Fly = false,
-    FlySpeed = 50,
-    Noclip = false,
-    Speed = false,
-    SpeedValue = 32,
-    JumpPower = false,
-    JumpPowerValue = 50,
-    -- Misc
-    InfiniteAmmo = false,
-    NoReload = false,
-    InstantHeal = false,
-    AntiKnock = false,
-    NoSlowdown = false,
+    Aimbot = false,
+    WallCheck = true,
+    TeamCheck = true,
+    BHopPower = 5,
+    FOV = 100,
 }
 
--- Переменные
-local ESP_Objects = {}
-local defaultWalkSpeed = 0
-local defaultJumpPower = 50
-local lastShotTime = 0
-local triggerCooldown = 0.05
-local screenCenter = Vector2.new()
-local flyConnection = nil
-local noclipConnection = nil
-local fullBrightConnection = nil
-local menuOpen = false
+-- ===== GUI =====
+local screenGui = Instance.new("ScreenGui")
+screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- ==============================================
---  СОЗДАНИЕ ГРАФИЧЕСКОГО ИНТЕРФЕЙСА (ПРОСТОЙ И НАДЁЖНЫЙ)
--- ==============================================
+-- Перетаскиваемая кнопка
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 60, 0, 60)
+toggleButton.Position = UDim2.new(0, 20, 0, 100)  -- начальная позиция
+toggleButton.Text = "⚡"
+toggleButton.TextSize = 30
+toggleButton.BackgroundColor3 = Color3.new(0.15, 0.15, 0.25)
+toggleButton.TextColor3 = Color3.new(1, 1, 0)
+toggleButton.Parent = screenGui
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Neverlose"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+-- Перетаскивание кнопки
+local dragging = false
+local dragStartPos, dragStartMouse
 
--- Кнопка открытия меню (простой TextButton)
-local MenuButton = Instance.new("TextButton")
-MenuButton.Size = UDim2.new(0, 60, 0, 60)
-MenuButton.Position = UDim2.new(0.02, 0, 0.3, 0)
-MenuButton.BackgroundColor3 = Color3.fromRGB(15, 18, 28)
-MenuButton.Text = "⚡"
-MenuButton.TextColor3 = Color3.fromRGB(0, 170, 255)
-MenuButton.TextSize = 24
-MenuButton.Font = Enum.Font.GothamBold
-MenuButton.Parent = ScreenGui
-Instance.new("UICorner", MenuButton).CornerRadius = UDim.new(0, 30)
+toggleButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStartPos = toggleButton.Position
+        dragStartMouse = input.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
 
--- Основное меню (Frame)
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 300, 0, 400)
-MainFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
-MainFrame.BackgroundColor3 = Color3.fromRGB(8, 10, 18)
-MainFrame.Visible = false
-MainFrame.Parent = ScreenGui
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStartMouse
+        toggleButton.Position = UDim2.new(
+            dragStartPos.X.Scale, dragStartPos.X.Offset + delta.X,
+            dragStartPos.Y.Scale, dragStartPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- Меню с анимацией появления
+local menuFrame = Instance.new("Frame")
+menuFrame.Size = UDim2.new(0, 320, 0, 420)
+menuFrame.Position = UDim2.new(0.5, -160, 0.5, -210)
+menuFrame.BackgroundColor3 = Color3.new(0.08, 0.08, 0.12)
+menuFrame.BackgroundTransparency = 1  -- сначала прозрачное
+menuFrame.Visible = false
+menuFrame.Parent = screenGui
+
+-- Эффект "загрузчика" – плавное появление
+local function showMenu(show)
+    menuFrame.Visible = true
+    menuFrame.BackgroundTransparency = 1
+    menuFrame.Size = UDim2.new(0, 0, 0, 0)
+    menuFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    
+    local tweenService = game:GetService("TweenService")
+    local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local goal = {
+        BackgroundTransparency = 0.1,
+        Size = UDim2.new(0, 320, 0, 420),
+        Position = UDim2.new(0.5, -160, 0.5, -210)
+    }
+    local tween = tweenService:Create(menuFrame, tweenInfo, goal)
+    tween:Play()
+    tween.Completed:Wait()
+    if not show then
+        menuFrame.Visible = false
+    end
+end
 
 -- Заголовок
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.BackgroundColor3 = Color3.fromRGB(12, 16, 26)
-Title.Text = "  NEVERLOSE // FLICK"
-Title.TextColor3 = Color3.fromRGB(0, 170, 255)
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 14
-Title.Parent = MainFrame
-Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 8)
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 35)
+title.Text = "Flick Mode Settings"
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.new(1, 1, 1)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Parent = menuFrame
 
--- Контейнер вкладок (простые кнопки)
-local TabContainer = Instance.new("Frame")
-TabContainer.Size = UDim2.new(1, 0, 0, 30)
-TabContainer.Position = UDim2.new(0, 0, 0, 35)
-TabContainer.BackgroundColor3 = Color3.fromRGB(12, 16, 26)
-TabContainer.Parent = MainFrame
-
-local tabs = {"Aimbot", "Visuals", "Movement", "Misc"}
-local currentTab = "Aimbot"
-
-for i, tabName in ipairs(tabs) do
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.25, 0, 1, 0)
-    btn.Position = UDim2.new((i-1) * 0.25, 0, 0, 0)
-    btn.BackgroundTransparency = 1
-    btn.Text = tabName
-    btn.TextColor3 = Color3.fromRGB(150, 160, 180)
-    btn.Font = Enum.Font.GothamMedium
-    btn.TextSize = 12
-    btn.Parent = TabContainer
-    btn.MouseButton1Click:Connect(function()
-        currentTab = tabName
-        updateScroll()
-    end)
-end
-
--- Скроллинг-контейнер
-local Scroll = Instance.new("ScrollingFrame")
-Scroll.Size = UDim2.new(1, -10, 1, -70)
-Scroll.Position = UDim2.new(0, 5, 0, 65)
-Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 800)
-Scroll.ScrollBarThickness = 3
-Scroll.Parent = MainFrame
-
-local UIList = Instance.new("UIListLayout", Scroll)
-UIList.Padding = UDim.new(0, 6)
-UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
--- Функции для создания элементов
-local function clearScroll()
-    for _, child in ipairs(Scroll:GetChildren()) do
-        if child ~= UIList then child:Destroy() end
-    end
-end
-
-local function createToggle(text, setting)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -10, 0, 36)
-    btn.BackgroundColor3 = Color3.fromRGB(18, 22, 34)
-    btn.Text = "   " .. text
-    btn.TextColor3 = Color3.fromRGB(180, 190, 210)
-    btn.TextXAlignment = Enum.TextXAlignment.Left
-    btn.Font = Enum.Font.GothamMedium
-    btn.TextSize = 13
-    btn.Parent = Scroll
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-
-    local indicator = Instance.new("Frame", btn)
-    indicator.Size = UDim2.new(0, 14, 0, 14)
-    indicator.Position = UDim2.new(1, -22, 0.5, -7)
-    indicator.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-    Instance.new("UICorner", indicator).CornerRadius = UDim.new(0, 7)
-
-    btn.MouseButton1Click:Connect(function()
-        Settings[setting] = not Settings[setting]
-        local on = Settings[setting]
-        indicator.BackgroundColor3 = on and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(255, 60, 60)
-        btn.BackgroundColor3 = on and Color3.fromRGB(25, 40, 60) or Color3.fromRGB(18, 22, 34)
-        btn.TextColor3 = on and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 190, 210)
-    end)
-end
-
-local function createSlider(text, setting, min, max, default, callback)
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, -10, 0, 46)
-    container.BackgroundTransparency = 1
-    container.Parent = Scroll
+-- Вспомогательные функции для элементов
+local function createToggle(labelText, initial, callback, yPos)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 30)
+    frame.Position = UDim2.new(0, 0, 0, yPos)
+    frame.BackgroundTransparency = 1
+    frame.Parent = menuFrame
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 0, 18)
+    label.Size = UDim2.new(0.6, 0, 1, 0)
+    label.Text = labelText
     label.BackgroundTransparency = 1
-    label.Text = text .. ": " .. tostring(default)
-    label.TextColor3 = Color3.fromRGB(180, 190, 210)
-    label.Font = Enum.Font.GothamMedium
-    label.TextSize = 12
+    label.TextColor3 = Color3.new(1,1,1)
     label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = container
+    label.Parent = frame
 
-    local bg = Instance.new("Frame")
-    bg.Size = UDim2.new(1, -20, 0, 4)
-    bg.Position = UDim2.new(0, 10, 0, 26)
-    bg.BackgroundColor3 = Color3.fromRGB(40, 45, 60)
-    bg.Parent = container
-    Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 2)
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0, 50, 1, -4)
+    toggle.Position = UDim2.new(0.7, 0, 0, 2)
+    toggle.Text = initial and "ON" or "OFF"
+    toggle.BackgroundColor3 = initial and Color3.new(0, 0.8, 0) or Color3.new(0.8, 0, 0)
+    toggle.TextColor3 = Color3.new(1,1,1)
+    toggle.Parent = frame
 
-    local fill = Instance.new("Frame", bg)
-    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    fill.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
-    Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 2)
-
-    local thumb = Instance.new("TextButton", bg)
-    thumb.Size = UDim2.new(0, 14, 0, 14)
-    thumb.Position = UDim2.new((default - min) / (max - min), -7, 0.5, -7)
-    thumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    thumb.Text = ""
-    Instance.new("UICorner", thumb).CornerRadius = UDim.new(0, 7)
-
-    local active = false
-    local function update(inputPos)
-        local x = math.clamp((inputPos.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
-        local val = min + (x * (max - min))
-        val = math.round(val)
-        fill.Size = UDim2.new((val - min) / (max - min), 0, 1, 0)
-        thumb.Position = UDim2.new((val - min) / (max - min), -7, 0.5, -7)
-        label.Text = text .. ": " .. tostring(val)
-        Settings[setting] = val
-        if callback then callback(val) end
-    end
-
-    bg.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-            active = true
-            update(i.Position)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-            active = false
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(i)
-        if active and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-            update(i.Position)
-        end
+    toggle.MouseButton1Click:Connect(function()
+        local newState = not (toggle.Text == "ON")
+        toggle.Text = newState and "ON" or "OFF"
+        toggle.BackgroundColor3 = newState and Color3.new(0, 0.8, 0) or Color3.new(0.8, 0, 0)
+        callback(newState)
     end)
 end
 
-local function createCategory(text)
+local function createSlider(labelText, min, max, default, callback, yPos)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 30)
+    frame.Position = UDim2.new(0, 0, 0, yPos)
+    frame.BackgroundTransparency = 1
+    frame.Parent = menuFrame
+
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -10, 0, 26)
-    label.BackgroundColor3 = Color3.fromRGB(12, 16, 26)
-    label.Text = "  " .. text
-    label.TextColor3 = Color3.fromRGB(0, 180, 255)
+    label.Size = UDim2.new(0.5, 0, 1, 0)
+    label.Text = labelText .. ": " .. tostring(default)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.new(1,1,1)
     label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 13
-    label.Parent = Scroll
-    Instance.new("UICorner", label).CornerRadius = UDim.new(0, 4)
-end
+    label.Parent = frame
 
-function updateScroll()
-    clearScroll()
-    if currentTab == "Aimbot" then
-        createCategory("🔫 AIMBOT")
-        createToggle("Aimbot", "Aimbot")
-        createSlider("FOV", "AimbotFOV", 30, 300, 150)
-        createSlider("Smooth", "AimbotSmooth", 0, 1, 0.1)
-        createToggle("Wall Check", "WallCheck")
-        createToggle("Silent Aim", "SilentAim")
-        createToggle("Triggerbot", "Triggerbot")
-        createToggle("Flickbot", "Flickbot")
-        createSlider("Flick FOV", "FlickFOV", 30, 300, 200)
-        createToggle("Auto Shoot", "AutoShoot")
-        createToggle("No Recoil", "NoRecoil")
-    elseif currentTab == "Visuals" then
-        createCategory("👁️ VISUALS")
-        createToggle("ESP Box", "ESP_Box")
-        createToggle("ESP Line", "ESP_Line")
-        createToggle("ESP Name", "ESP_Name")
-        createToggle("ESP Health", "ESP_Health")
-        createToggle("ESP Distance", "ESP_Distance")
-        createToggle("ESP Tracer", "ESP_Tracer")
-        createToggle("Crosshair", "Crosshair")
-        createToggle("Full Bright", "FullBright")
-        createToggle("No Fog", "NoFog")
-        createToggle("Chams", "Chams")
-    elseif currentTab == "Movement" then
-        createCategory("🏃 MOVEMENT")
-        createToggle("Bunny Hop", "BHop")
-        createSlider("BHOP Power", "BHopPower", 1, 15, 1)
-        createToggle("Fly", "Fly")
-        createSlider("Fly Speed", "FlySpeed", 10, 200, 50)
-        createToggle("Noclip", "Noclip")
-        createToggle("Speed", "Speed")
-        createSlider("Speed Value", "SpeedValue", 16, 120, 32)
-        createToggle("Jump Power", "JumpPower")
-        createSlider("Jump Power", "JumpPowerValue", 30, 150, 50)
-    elseif currentTab == "Misc" then
-        createCategory("🔧 MISC")
-        createToggle("Infinite Ammo", "InfiniteAmmo")
-        createToggle("No Reload", "NoReload")
-        createToggle("Instant Heal", "InstantHeal")
-        createToggle("Anti Knock", "AntiKnock")
-        createToggle("No Slowdown", "NoSlowdown")
-    end
-end
+    local slider = Instance.new("TextBox")
+    slider.Size = UDim2.new(0.3, 0, 1, -4)
+    slider.Position = UDim2.new(0.65, 0, 0, 2)
+    slider.Text = tostring(default)
+    slider.BackgroundColor3 = Color3.new(0.3,0.3,0.3)
+    slider.TextColor3 = Color3.new(1,1,1)
+    slider.Parent = frame
 
-updateScroll()
-
-MenuButton.MouseButton1Click:Connect(function()
-    MainFrame.Visible = not MainFrame.Visible
-end)
-
--- ==============================================
---  ОСНОВНАЯ ЛОГИКА (ВСЕ ФУНКЦИИ)
--- ==============================================
-
--- Получение ближайшего врага
-local function getClosestEnemy(fov)
-    local bestTarget = nil
-    local bestDist = fov + 1
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            local char = player.Character
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            local part = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
-            if hum and hum.Health > 0 and part then
-                local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                if onScreen then
-                    local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                    if dist <= fov and dist < bestDist then
-                        if Settings.WallCheck then
-                            local origin = Camera.CFrame.Position
-                            local dir = part.Position - origin
-                            local ray = RaycastParams.new()
-                            ray.FilterType = Enum.RaycastFilterType.Exclude
-                            ray.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-                            local result = workspace:Raycast(origin, dir, ray)
-                            if result and result.Instance then
-                                if not result.Instance:IsDescendantOf(char) then
-                                    continue
-                                end
-                            end
-                        end
-                        bestDist = dist
-                        bestTarget = part
-                    end
-                end
+    slider.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            local num = tonumber(slider.Text)
+            if num then
+                num = math.clamp(num, min, max)
+                slider.Text = tostring(num)
+                callback(num)
+                label.Text = labelText .. ": " .. tostring(num)
+            else
+                slider.Text = tostring(default)
             end
         end
-    end
-    return bestTarget
-end
-
--- Симуляция выстрела
-local function shoot()
-    pcall(function()
-        if mouse1click then mouse1click() end
     end)
 end
 
--- Aimbot + Silent Aim
-local function handleAimbot()
-    if not Settings.Aimbot then return end
-    local target = getClosestEnemy(Settings.AimbotFOV)
-    if target then
-        local smooth = Settings.AimbotSmooth
-        if Settings.SilentAim then smooth = 0 end
-        local currentCF = Camera.CFrame
-        local targetCF = CFrame.new(currentCF.Position, target.Position)
-        if smooth > 0 then
-            Camera.CFrame = currentCF:Lerp(targetCF, smooth)
+-- Создаём элементы
+local yPos = 40
+createToggle("BHop", settings.BHop, function(v) settings.BHop = v end, yPos)
+yPos = yPos + 35
+createToggle("Aimbot", settings.Aimbot, function(v) settings.Aimbot = v end, yPos)
+yPos = yPos + 35
+createToggle("WallCheck", settings.WallCheck, function(v) settings.WallCheck = v end, yPos)
+yPos = yPos + 35
+createToggle("TeamCheck", settings.TeamCheck, function(v) settings.TeamCheck = v end, yPos)
+yPos = yPos + 35
+createSlider("BHop Power", 1, 10, settings.BHopPower, function(v) settings.BHopPower = v end, yPos)
+yPos = yPos + 35
+-- Можно добавить FOV слайдер, но для простоты опустим
+
+-- Кнопка закрытия
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 60, 0, 30)
+closeButton.Position = UDim2.new(1, -70, 0, 5)
+closeButton.Text = "Закрыть"
+closeButton.BackgroundColor3 = Color3.new(0.5,0,0)
+closeButton.TextColor3 = Color3.new(1,1,1)
+closeButton.Parent = menuFrame
+closeButton.MouseButton1Click:Connect(function()
+    menuFrame.Visible = false
+end)
+
+-- Открытие меню по кнопке (с анимацией)
+toggleButton.MouseButton1Click:Connect(function()
+    if menuFrame.Visible then
+        menuFrame.Visible = false
+    else
+        showMenu(true)
+    end
+end)
+
+-- Также открытие по Insert
+game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.Insert then
+        if menuFrame.Visible then
+            menuFrame.Visible = false
         else
-            Camera.CFrame = targetCF
+            showMenu(true)
         end
-        if Settings.AutoShoot then shoot() end
     end
-end
+end)
 
--- Triggerbot
-local function handleTriggerbot()
-    if not Settings.Triggerbot then return end
-    if not Mouse or not Mouse.Target then return end
-    pcall(function()
-        local target = Mouse.Target
-        local char = target.Parent
-        while char and not char:IsA("Model") do char = char.Parent end
-        if not char then return end
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        local player = Players:GetPlayerFromCharacter(char)
-        if hum and hum.Health > 0 and player and player ~= LocalPlayer then
-            if player.Team ~= LocalPlayer.Team or player.Team == nil then
-                if Settings.WallCheck then
-                    local origin = Camera.CFrame.Position
-                    local dir = target.Position - origin
-                    local ray = RaycastParams.new()
-                    ray.FilterType = Enum.RaycastFilterType.Exclude
-                    ray.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-                    local result = workspace:Raycast(origin, dir, ray)
-                    if result and result.Instance and not result.Instance:IsDescendantOf(char) then
-                        return
+-- ===== BHop (без изменений) =====
+local originalWalkSpeed = humanoid.WalkSpeed
+local isJumping = false
+
+humanoid.StateChanged:Connect(function(oldState, newState)
+    if newState == Enum.HumanoidStateType.Jumping then
+        isJumping = true
+        if settings.BHop then
+            humanoid.WalkSpeed = originalWalkSpeed + settings.BHopPower * 2
+        end
+    elseif newState == Enum.HumanoidStateType.Landed or newState == Enum.HumanoidStateType.Freefall then
+        isJumping = false
+        if settings.BHop then
+            humanoid.WalkSpeed = originalWalkSpeed
+        end
+    end
+end)
+
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoid = character:WaitForChild("Humanoid")
+    originalWalkSpeed = humanoid.WalkSpeed
+    isJumping = false
+end)
+
+-- ===== Мгновенный Aimbot (без Lerp) =====
+local function getClosestPlayer()
+    local closest = nil
+    local closestDist = math.huge
+    for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
+        if p ~= player and p.Character and p.Character:FindFirstChild("Head") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+            if settings.TeamCheck and p.Team == player.Team then continue end
+            local headPos = p.Character.Head.Position
+            local vector, onScreen = camera:WorldToScreenPoint(headPos)
+            if onScreen then
+                local dist = (headPos - camera.CFrame.Position).Magnitude
+                local screenCenter = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+                local screenPos = Vector2.new(vector.X, vector.Y)
+                if (screenPos - screenCenter).Magnitude < settings.FOV then
+                    if dist < closestDist then
+                        closestDist = dist
+                        closest = p
                     end
-                end
-                local now = os.clock()
-                if now - lastShotTime >= triggerCooldown then
-                    lastShotTime = now
-                    shoot()
                 end
             end
         end
-    end)
+    end
+    return closest
 end
 
--- Flickbot
-local function handleFlickbot()
-    if not Settings.Flickbot then return end
-    local target = getClosestEnemy(Settings.FlickFOV)
+local function isWallBetween(origin, target)
+    if not settings.WallCheck then return false end
+    local direction = (target - origin).Unit
+    local distance = (target - origin).Magnitude
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.FilterDescendantsInstances = {character}
+    return workspace:Raycast(origin, direction * distance, params) ~= nil
+end
+
+game:GetService("RunService").RenderStepped:Connect(function()
+    if not settings.Aimbot then return end
+    local target = getClosestPlayer()
     if target then
-        Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
-        shoot()
-    end
-end
-
--- No Recoil
-local function handleNoRecoil()
-    if not Settings.NoRecoil then return end
-    local cameraPart = workspace.CurrentCamera
-    if cameraPart then
-        cameraPart.CFrame = CFrame.new(cameraPart.CFrame.Position, cameraPart.CFrame.LookVector)
-    end
-end
-
--- ==============================================
---  ESP (ВСЕ ВИДЫ)
--- ==============================================
-
-local function createESP(player)
-    if player == LocalPlayer then return end
-    if ESP_Objects[player] then
-        pcall(function()
-            for _, obj in pairs(ESP_Objects[player]) do
-                if obj then obj:Destroy() end
-            end
-        end)
-        ESP_Objects[player] = nil
-    end
-
-    local box = Instance.new("Frame")
-    box.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
-    box.BackgroundTransparency = 0.7
-    box.BorderSizePixel = 2
-    box.BorderColor3 = Color3.fromRGB(0, 180, 255)
-    box.Visible = false
-    box.ZIndex = 5
-    box.Parent = ScreenGui
-
-    local line = Instance.new("Frame")
-    line.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
-    line.BorderSizePixel = 0
-    line.BackgroundTransparency = 0.3
-    line.Visible = false
-    line.ZIndex = 5
-    line.Parent = ScreenGui
-
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    nameLabel.Font = Enum.Font.GothamBold
-    nameLabel.TextSize = 12
-    nameLabel.Text = player.Name
-    nameLabel.Visible = false
-    nameLabel.ZIndex = 5
-    nameLabel.Parent = ScreenGui
-
-    local healthLabel = Instance.new("TextLabel")
-    healthLabel.BackgroundTransparency = 1
-    healthLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-    healthLabel.Font = Enum.Font.GothamBold
-    healthLabel.TextSize = 10
-    healthLabel.Visible = false
-    healthLabel.ZIndex = 5
-    healthLabel.Parent = ScreenGui
-
-    local distLabel = Instance.new("TextLabel")
-    distLabel.BackgroundTransparency = 1
-    distLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    distLabel.Font = Enum.Font.GothamMedium
-    distLabel.TextSize = 10
-    distLabel.Visible = false
-    distLabel.ZIndex = 5
-    distLabel.Parent = ScreenGui
-
-    local tracer = Instance.new("Frame")
-    tracer.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    tracer.BorderSizePixel = 0
-    tracer.BackgroundTransparency = 0.3
-    tracer.Visible = false
-    tracer.ZIndex = 5
-    tracer.Parent = ScreenGui
-
-    ESP_Objects[player] = {Box = box, Line = line, Name = nameLabel, Health = healthLabel, Distance = distLabel, Tracer = tracer}
-end
-
-local function clearESP(player)
-    if ESP_Objects[player] then
-        pcall(function()
-            for _, obj in pairs(ESP_Objects[player]) do
-                if obj then obj:Destroy() end
-            end
-        end)
-        ESP_Objects[player] = nil
-    end
-end
-
-local function updateESP()
-    local viewport = Camera.ViewportSize
-    local center = Vector2.new(viewport.X / 2, viewport.Y / 2)
-
-    for player, data in pairs(ESP_Objects) do
-        local char = player.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-
-        if char and hum and hrp and hum.Health > 0 and player ~= LocalPlayer then
-            local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-            local screenPos = Vector2.new(pos.X, pos.Y)
-            local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
-            local isEnemy = (player.Team ~= LocalPlayer.Team or player.Team == nil)
-
-            -- Box
-            if Settings.ESP_Box and data.Box and onScreen then
-                data.Box.Visible = true
-                local size = math.clamp(120 / (dist / 10 + 1), 20, 150)
-                data.Box.Size = UDim2.new(0, size, 0, size)
-                data.Box.Position = UDim2.new(0, screenPos.X - size/2, 0, screenPos.Y - size/2)
-                data.Box.AnchorPoint = Vector2.new(0, 0)
-                data.Box.BorderColor3 = isEnemy and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 180, 255)
-                data.Box.BackgroundColor3 = isEnemy and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 180, 255)
-            elseif data.Box then
-                data.Box.Visible = false
-            end
-
-            -- Line
-            if Settings.ESP_Line and data.Line then
-                data.Line.Visible = true
-                local delta = screenPos - center
-                local length = delta.Magnitude
-                local angle = math.atan2(delta.Y, delta.X)
-                data.Line.Position = UDim2.new(0, center.X, 0, center.Y)
-                data.Line.Size = UDim2.new(0, length, 0, 1.5)
-                data.Line.Rotation = math.deg(angle)
-                data.Line.AnchorPoint = Vector2.new(0, 0.5)
-                data.Line.BackgroundColor3 = isEnemy and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 180, 255)
-            elseif data.Line then
-                data.Line.Visible = false
-            end
-
-            -- Name
-            if Settings.ESP_Name and data.Name and onScreen then
-                data.Name.Visible = true
-                data.Name.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y - 30)
-                data.Name.AnchorPoint = Vector2.new(0.5, 0)
-                data.Name.TextColor3 = isEnemy and Color3.fromRGB(255, 80, 80) or Color3.fromRGB(80, 255, 80)
-            elseif data.Name then
-                data.Name.Visible = false
-            end
-
-            -- Health
-            if Settings.ESP_Health and data.Health and onScreen then
-                data.Health.Visible = true
-                data.Health.Text = math.floor(hum.Health) .. "/" .. math.floor(hum.MaxHealth)
-                data.Health.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y + 20)
-                data.Health.AnchorPoint = Vector2.new(0.5, 0)
-                local hpPercent = hum.Health / hum.MaxHealth
-                data.Health.TextColor3 = hpPercent > 0.5 and Color3.fromRGB(0, 255, 0) or hpPercent > 0.25 and Color3.fromRGB(255, 255, 0) or Color3.fromRGB(255, 0, 0)
-            elseif data.Health then
-                data.Health.Visible = false
-            end
-
-            -- Distance
-            if Settings.ESP_Distance and data.Distance and onScreen then
-                data.Distance.Visible = true
-                data.Distance.Text = math.floor(dist) .. " studs"
-                data.Distance.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y + 35)
-                data.Distance.AnchorPoint = Vector2.new(0.5, 0)
-            elseif data.Distance then
-                data.Distance.Visible = false
-            end
-
-            -- Tracer
-            if Settings.ESP_Tracer and data.Tracer then
-                data.Tracer.Visible = true
-                local delta = screenPos - center
-                local length = delta.Magnitude
-                local angle = math.atan2(delta.Y, delta.X)
-                data.Tracer.Position = UDim2.new(0, center.X, 0, center.Y)
-                data.Tracer.Size = UDim2.new(0, length, 0, 1)
-                data.Tracer.Rotation = math.deg(angle)
-                data.Tracer.AnchorPoint = Vector2.new(0, 0.5)
-                data.Tracer.BackgroundColor3 = isEnemy and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 180, 255)
-            elseif data.Tracer then
-                data.Tracer.Visible = false
-            end
-        else
-            if data.Box then data.Box.Visible = false end
-            if data.Line then data.Line.Visible = false end
-            if data.Name then data.Name.Visible = false end
-            if data.Health then data.Health.Visible = false end
-            if data.Distance then data.Distance.Visible = false end
-            if data.Tracer then data.Tracer.Visible = false end
-        end
-    end
-end
-
--- Подписка на игроков
-local function onPlayerAdded(player)
-    player.CharacterAdded:Connect(function()
-        createESP(player)
-    end)
-    player.CharacterRemoving:Connect(function()
-        clearESP(player)
-    end)
-    if player.Character then createESP(player) end
-end
-
-Players.PlayerAdded:Connect(onPlayerAdded)
-Players.PlayerRemoving:Connect(clearESP)
-for _, p in ipairs(Players:GetPlayers()) do onPlayerAdded(p) end
-
--- ==============================================
---  ДВИЖЕНИЕ (BHop, Fly, Noclip, Speed, Jump)
--- ==============================================
-
--- BHOP
-local function handleBHop()
-    if not Settings.BHop then
-        local char = LocalPlayer.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum and defaultWalkSpeed > 0 and hum.WalkSpeed ~= defaultWalkSpeed then
-                hum.WalkSpeed = defaultWalkSpeed
-            end
-        end
-        return
-    end
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum or hum.Health <= 0 then return end
-    if defaultWalkSpeed == 0 then
-        defaultWalkSpeed = hum.WalkSpeed
-        if defaultWalkSpeed == 0 then defaultWalkSpeed = 16 end
-    end
-    if UserInputService:IsKeyDown(Enum.KeyCode.Space) and hum.FloorMaterial == Enum.Material.Air then
-        local add = (Settings.BHopPower - 1) * (20 / 14)
-        local boost = defaultWalkSpeed + add
-        if hum.WalkSpeed ~= boost then hum.WalkSpeed = boost end
-    else
-        if hum.WalkSpeed ~= defaultWalkSpeed then hum.WalkSpeed = defaultWalkSpeed end
-    end
-end
-
--- Fly
-local function handleFly()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    if Settings.Fly then
-        if not flyConnection then
-            flyConnection = RunService.RenderStepped:Connect(function()
-                local speed = Settings.FlySpeed
-                local moveDir = Vector3.new()
-                if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Vector3.new(0, 0, -1) end
-                if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir + Vector3.new(0, 0, 1) end
-                if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir + Vector3.new(-1, 0, 0) end
-                if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + Vector3.new(1, 0, 0) end
-                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
-                if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir + Vector3.new(0, -1, 0) end
-                if moveDir.Magnitude > 0 then
-                    moveDir = moveDir.Unit * speed
-                end
-                hrp.Velocity = moveDir
-                if char:FindFirstChildOfClass("Humanoid") then
-                    char:FindFirstChildOfClass("Humanoid").PlatformStand = true
-                end
-            end)
-        end
-    else
-        if flyConnection then
-            flyConnection:Disconnect()
-            flyConnection = nil
-            if char:FindFirstChildOfClass("Humanoid") then
-                char:FindFirstChildOfClass("Humanoid").PlatformStand = false
-            end
-        end
-    end
-end
-
--- Noclip
-local function handleNoclip()
-    local char = LocalPlayer.Character
-    if not char then return end
-    if Settings.Noclip then
-        if not noclipConnection then
-            noclipConnection = RunService.RenderStepped:Connect(function()
-                for _, part in ipairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
-                end
-            end)
-        end
-    else
-        if noclipConnection then
-            noclipConnection:Disconnect()
-            noclipConnection = nil
-            for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = true
-                end
-            end
-        end
-    end
-end
-
--- Speed
-local function handleSpeed()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
-    if Settings.Speed then
-        hum.WalkSpeed = Settings.SpeedValue
-    else
-        if defaultWalkSpeed > 0 then
-            hum.WalkSpeed = defaultWalkSpeed
-        end
-    end
-end
-
--- Jump Power
-local function handleJumpPower()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
-    if Settings.JumpPower then
-        hum.JumpPower = Settings.JumpPowerValue
-    else
-        hum.JumpPower = defaultJumpPower
-    end
-end
-
--- ==============================================
---  ВИЗУАЛЬНЫЕ ЭФФЕКТЫ (Crosshair, FullBright, NoFog, Chams)
--- ==============================================
-
--- Crosshair
-local function handleCrosshair()
-    if not Settings.Crosshair then
-        local ch = ScreenGui:FindFirstChild("Crosshair")
-        if ch then ch:Destroy() end
-        return
-    end
-    local crosshair = ScreenGui:FindFirstChild("Crosshair")
-    if not crosshair then
-        crosshair = Instance.new("Frame")
-        crosshair.Name = "Crosshair"
-        crosshair.Size = UDim2.new(0, 20, 0, 20)
-        crosshair.Position = UDim2.new(0.5, -10, 0.5, -10)
-        crosshair.BackgroundTransparency = 1
-        crosshair.ZIndex = 10
-        crosshair.Parent = ScreenGui
-
-        for _, data in ipairs({
-            {Size = UDim2.new(0, 2, 0, 10), Pos = UDim2.new(0.5, -1, 0, 0)},
-            {Size = UDim2.new(0, 2, 0, 10), Pos = UDim2.new(0.5, -1, 0, 10)},
-            {Size = UDim2.new(0, 10, 0, 2), Pos = UDim2.new(0, 0, 0.5, -1)},
-            {Size = UDim2.new(0, 10, 0, 2), Pos = UDim2.new(0, 10, 0.5, -1)},
-        }) do
-            local part = Instance.new("Frame")
-            part.Size = data.Size
-            part.Position = data.Pos
-            part.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            part.BorderSizePixel = 0
-            part.Parent = crosshair
-        end
-    end
-end
-
--- FullBright
-local function handleFullBright()
-    local lighting = game:GetService("Lighting")
-    if Settings.FullBright then
-        if not fullBrightConnection then
-            fullBrightConnection = RunService.RenderStepped:Connect(function()
-                lighting.Brightness = 1
-                lighting.ClockTime = 12
-                lighting.FogEnd = 1000
-            end)
-        end
-    else
-        if fullBrightConnection then
-            fullBrightConnection:Disconnect()
-            fullBrightConnection = nil
-            lighting.Brightness = 0.5
-            lighting.ClockTime = 6
-            lighting.FogEnd = 200
-        end
-    end
-end
-
--- NoFog
-local function handleNoFog()
-    if Settings.NoFog then
-        game:GetService("Lighting").FogEnd = 1000
-    else
-        game:GetService("Lighting").FogEnd = 200
-    end
-end
-
--- Chams
-local function handleChams()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local highlight = char:FindFirstChild("Highlight")
-    if Settings.Chams then
-        if not highlight then
-            highlight = Instance.new("Highlight")
-            highlight.FillColor = Color3.fromRGB(0, 180, 255)
-            highlight.FillTransparency = 0.5
-            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            highlight.Parent = char
-        end
-    else
-        if highlight then highlight:Destroy() end
-    end
-end
-
--- ==============================================
---  MISC (Infinite Ammo, No Reload, Heal, Anti Knock, No Slowdown)
--- ==============================================
-
--- Weapon Mods
-local function handleWeaponMods()
-    if not Settings.InfiniteAmmo and not Settings.NoReload then return end
-    local char = LocalPlayer.Character
-    if not char then return end
-    for _, tool in ipairs(char:GetChildren()) do
-        if tool:IsA("Tool") then
-            for _, obj in ipairs(tool:GetDescendants()) do
-                if obj:IsA("NumberValue") or obj:IsA("IntValue") then
-                    local name = obj.Name:lower()
-                    if Settings.InfiniteAmmo and (name:find("ammo") or name:find("clip") or name:find("mag")) then
-                        obj.Value = 999
-                    end
-                    if Settings.NoReload and (name:find("reload") or name:find("cooldown") or name:find("delay")) then
-                        obj.Value = 0
-                    end
-                end
-            end
-        end
-    end
-end
-
--- Instant Heal
-local function handleInstantHeal()
-    if not Settings.InstantHeal then return end
-    local char = LocalPlayer.Character
-    if char then
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.Health = hum.MaxHealth end
-    end
-end
-
--- Anti Knock
-local function handleAntiKnock()
-    if not Settings.AntiKnock then return end
-    local char = LocalPlayer.Character
-    if char then
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            hrp.Velocity = Vector3.new(0, hrp.Velocity.Y, 0)
-        end
-    end
-end
-
--- No Slowdown
-local function handleNoSlowdown()
-    if not Settings.NoSlowdown then return end
-    local char = LocalPlayer.Character
-    if char then
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum and hum.WalkSpeed < 16 then
-            hum.WalkSpeed = 16
-        end
-    end
-end
-
--- ==============================================
---  ГЛАВНЫЙ ЦИКЛ
--- ==============================================
-RunService.RenderStepped:Connect(function()
-    screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-
-    -- Aimbot
-    handleAimbot()
-    handleTriggerbot()
-    handleFlickbot()
-    handleNoRecoil()
-
-    -- ESP
-    updateESP()
-
-    -- Movement
-    handleBHop()
-    handleFly()
-    handleNoclip()
-    handleSpeed()
-    handleJumpPower()
-
-    -- Visuals
-    handleCrosshair()
-    handleFullBright()
-    handleNoFog()
-    handleChams()
-
-    -- Misc
-    handleWeaponMods()
-    handleInstantHeal()
-    handleAntiKnock()
-    handleNoSlowdown()
-end)
-
--- Flickbot по нажатию (для мобильных)
-UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        if Settings.Flickbot then
-            handleFlickbot()
-        end
-        if Settings.Triggerbot then
-            task.wait(0.05)
-            handleTriggerbot()
+        local headPos = target.Character.Head.Position
+        if not isWallBetween(camera.CFrame.Position, headPos) then
+            -- Мгновенное наведение
+            camera.CFrame = CFrame.new(camera.CFrame.Position, headPos)
         end
     end
 end)
-
-print("✅ NEVERLOSE // FLICK LOADED (40+ functions)")
-print("📱 Меню появляется по кнопке ⚡ в левом верхнем углу")
