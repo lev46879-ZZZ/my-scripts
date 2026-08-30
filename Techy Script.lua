@@ -1,4 +1,4 @@
--- // Roblox Delta Script: Floating GUI + Aimbot + WallCheck + ESP
+-- // Roblox Delta Script: Floating GUI + Aimbot + WallCheck + ESP + FOV Circle
 -- // Для мобильных устройств
 
 -- Создаём глобальное окружение, чтобы переменные были доступны в разных потоках
@@ -17,27 +17,26 @@ env.AimbotEnabled = false
 env.FOV = 100                -- радиус FOV в пикселях (10-600)
 env.WallCheckEnabled = true  -- проверять стены
 env.ESPEnabled = true        -- показывать ESP
+env.ShowFOV = false          -- отображать круг FOV
 
 -- Функция определения врага (переопределите под свою игру при необходимости)
 local function IsEnemy(player)
     if player == LocalPlayer then return false end
-    -- Если есть команды, проверяем их
     if player.Team and LocalPlayer.Team then
         return player.Team ~= LocalPlayer.Team
     end
-    return true -- если команд нет, все остальные - враги
+    return true
 end
 
 -- ========== СОЗДАНИЕ ПЛАВАЮЩЕЙ КНОПКИ ==========
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Parent = game:GetService("CoreGui") -- или game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Кнопка
 local Button = Instance.new("TextButton")
 Button.Size = UDim2.new(0, 60, 0, 60)
-Button.Position = UDim2.new(0, 20, 0, 300) -- начальная позиция
+Button.Position = UDim2.new(0, 20, 0, 300)
 Button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 Button.BackgroundTransparency = 0.2
 Button.BorderSizePixel = 0
@@ -47,7 +46,7 @@ Button.Font = Enum.Font.SourceSansBold
 Button.TextSize = 14
 Button.Parent = ScreenGui
 
--- Делаем кнопку перетаскиваемой
+-- Перетаскивание кнопки
 local UIS = game:GetService("UserInputService")
 local dragging = false
 local dragStart = nil
@@ -75,17 +74,16 @@ end)
 
 -- ========== СОЗДАНИЕ ПЛАВАЮЩЕГО МЕНЮ ==========
 local Menu = Instance.new("Frame")
-Menu.Size = UDim2.new(0, 220, 0, 260)
-Menu.Position = UDim2.new(0.5, -110, 0.5, -130)
+Menu.Size = UDim2.new(0, 220, 0, 300)  -- увеличена высота для нового тумблера
+Menu.Position = UDim2.new(0.5, -110, 0.5, -150)
 Menu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Menu.BackgroundTransparency = 0.1
 Menu.BorderSizePixel = 0
-Menu.Visible = false -- скрыто до нажатия
+Menu.Visible = false
 Menu.Active = true
-Menu.Draggable = true -- можно перетаскивать за любую область фрейма
+Menu.Draggable = true
 Menu.Parent = ScreenGui
 
--- Заголовок меню
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
@@ -95,11 +93,11 @@ Title.Font = Enum.Font.SourceSansBold
 Title.TextSize = 18
 Title.Parent = Menu
 
--- Функция создания элемента интерфейса
-local function CreateToggle(text, default, callback)
+-- Функция создания тумблера
+local function CreateToggle(text, default, yOffset, callback)
     local ToggleFrame = Instance.new("Frame")
     ToggleFrame.Size = UDim2.new(1, -20, 0, 35)
-    ToggleFrame.Position = UDim2.new(0, 10, 0, 40)
+    ToggleFrame.Position = UDim2.new(0, 10, 0, yOffset)
     ToggleFrame.BackgroundTransparency = 1
     ToggleFrame.Parent = Menu
 
@@ -133,10 +131,10 @@ local function CreateToggle(text, default, callback)
     return ToggleFrame
 end
 
--- Слайдер для FOV
+-- Слайдер FOV
 local FOVLabel = Instance.new("TextLabel")
 FOVLabel.Size = UDim2.new(1, 0, 0, 20)
-FOVLabel.Position = UDim2.new(0, 10, 0, 160)
+FOVLabel.Position = UDim2.new(0, 10, 0, 200)
 FOVLabel.BackgroundTransparency = 1
 FOVLabel.Text = "FOV: " .. env.FOV
 FOVLabel.TextColor3 = Color3.new(1,1,1)
@@ -145,9 +143,9 @@ FOVLabel.TextSize = 14
 FOVLabel.TextXAlignment = Enum.TextXAlignment.Left
 FOVLabel.Parent = Menu
 
-local FOVSlider = Instance.new("TextBox") -- Используем TextBox как слайдер (проще для мобилки)
+local FOVSlider = Instance.new("TextBox")
 FOVSlider.Size = UDim2.new(0, 180, 0, 30)
-FOVSlider.Position = UDim2.new(0, 20, 0, 185)
+FOVSlider.Position = UDim2.new(0, 20, 0, 225)
 FOVSlider.BackgroundColor3 = Color3.fromRGB(50,50,50)
 FOVSlider.Text = tostring(env.FOV)
 FOVSlider.TextColor3 = Color3.new(1,1,1)
@@ -166,17 +164,20 @@ FOVSlider.FocusLost:Connect(function(enterPressed)
     end
 end)
 
--- Кнопки тумблеры
-local AimbotToggle = CreateToggle("Aimbot", false, function(value) env.AimbotEnabled = value end)
-AimbotToggle.Position = UDim2.new(0, 10, 0, 40)
+-- Тумблеры
+CreateToggle("Aimbot", false, 40, function(value) env.AimbotEnabled = value end)
+CreateToggle("WallCheck", true, 80, function(value) env.WallCheckEnabled = value end)
+CreateToggle("ESP", true, 120, function(value)
+    env.ESPEnabled = value
+    if value then
+        CreateESP()
+    else
+        ClearESP()
+    end
+end)
+CreateToggle("Show FOV", false, 160, function(value) env.ShowFOV = value end)
 
-local WallCheckToggle = CreateToggle("WallCheck", true, function(value) env.WallCheckEnabled = value end)
-WallCheckToggle.Position = UDim2.new(0, 10, 0, 80)
-
-local ESPToggle = CreateToggle("ESP", true, function(value) env.ESPEnabled = value end)
-ESPToggle.Position = UDim2.new(0, 10, 0, 120)
-
--- Кнопка закрытия меню
+-- Кнопка закрытия
 local CloseButton = Instance.new("TextButton")
 CloseButton.Size = UDim2.new(0, 60, 0, 25)
 CloseButton.Position = UDim2.new(1, -70, 0, 5)
@@ -188,12 +189,11 @@ CloseButton.TextSize = 12
 CloseButton.Parent = Menu
 CloseButton.MouseButton1Click:Connect(function() Menu.Visible = false end)
 
--- Показ/скрытие меню по кнопке
 Button.MouseButton1Click:Connect(function()
     Menu.Visible = not Menu.Visible
 end)
 
--- ========== ПОЛУЧЕНИЕ ИГРОКОВ ДЛЯ АИМБОТА И ESP ==========
+-- ========== ФУНКЦИИ ДЛЯ ПОЛУЧЕНИЯ ВРАГОВ ==========
 local function GetAliveEnemies()
     local enemies = {}
     for _, player in ipairs(Players:GetPlayers()) do
@@ -204,33 +204,31 @@ local function GetAliveEnemies()
     return enemies
 end
 
--- ========== WALLCHECK ФУНКЦИЯ (RAYCAST) ==========
+-- ========== WALLCHECK (RAYCAST) ==========
 local function IsVisible(targetPosition)
     if not env.WallCheckEnabled then return true end
     local character = LocalPlayer.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
     local origin = Camera.CFrame.Position
-    local direction = (targetPosition - origin).Unit * 500 -- дальность 500
+    local direction = (targetPosition - origin).Unit * 500
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-    raycastParams.FilterDescendantsInstances = {character} -- исключаем своего персонажа
+    raycastParams.FilterDescendantsInstances = {character}
     local result = workspace:Raycast(origin, direction, raycastParams)
     if result then
-        -- Проверяем, является ли цель частью вражеского персонажа
         local hitInstance = result.Instance
         local hitPlayer = Players:GetPlayerFromCharacter(hitInstance:FindFirstAncestorOfClass("Model"))
         if hitPlayer and IsEnemy(hitPlayer) then
-            return true -- попали во врага
+            return true
         else
-            return false -- попали в стену/другое
+            return false
         end
     end
-    return false -- ничего не попали (слишком далеко?)
+    return false
 end
 
 -- ========== АИМБОТ ==========
 local function GetClosestEnemyInFOV()
-    local mousePos = UserInputService:GetMouseLocation()
     local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     local closest = nil
     local minDist = env.FOV
@@ -241,12 +239,9 @@ local function GetClosestEnemyInFOV()
             local screenPos, onScreen = Camera:WorldToScreenPoint(part.Position)
             if onScreen then
                 local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-                if dist <= minDist then
-                    -- WallCheck
-                    if IsVisible(part.Position) then
-                        minDist = dist
-                        closest = player
-                    end
+                if dist <= minDist and IsVisible(part.Position) then
+                    minDist = dist
+                    closest = player
                 end
             end
         end
@@ -254,7 +249,6 @@ local function GetClosestEnemyInFOV()
     return closest
 end
 
--- Функция мгновенного поворота камеры на цель
 local function InstantAimbot(targetPlayer)
     if not targetPlayer or not targetPlayer.Character then return end
     local targetPart = targetPlayer.Character:FindFirstChild("Head") or targetPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -264,21 +258,23 @@ end
 
 -- ========== ESP ==========
 local espObjects = {}
-local function CreateESP()
-    -- Удаляем старые
+local function ClearESP()
     for _, obj in pairs(espObjects) do
         if obj.Remove then obj:Remove() end
     end
     espObjects = {}
+end
 
+local function CreateESP()
+    ClearESP()
     if not env.ESPEnabled then return end
 
     for _, player in ipairs(GetAliveEnemies()) do
         local character = player.Character
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
         local rootPart = character:FindFirstChild("HumanoidRootPart")
         local head = character:FindFirstChild("Head")
-        if rootPart and head then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if rootPart and head and humanoid then
             -- Box
             local box = Drawing.new("Square")
             box.Thickness = 2
@@ -299,7 +295,7 @@ local function CreateESP()
             nameTag.Visible = true
             table.insert(espObjects, nameTag)
 
-            -- Health bar background
+            -- Health background
             local healthBg = Drawing.new("Square")
             healthBg.Thickness = 1
             healthBg.Color = Color3.fromRGB(0,0,0)
@@ -319,6 +315,19 @@ local function CreateESP()
     end
 end
 
+-- ========== КРУГ FOV ==========
+local fovCircle = nil
+if Drawing.new then
+    pcall(function()
+        fovCircle = Drawing.new("Circle")
+        fovCircle.Thickness = 2
+        fovCircle.Color = Color3.fromRGB(0, 255, 255)
+        fovCircle.Filled = false
+        fovCircle.Transparency = 1
+        fovCircle.Visible = false
+    end)
+end
+
 -- ========== ГЛАВНЫЙ ЦИКЛ ==========
 RunService.RenderStepped:Connect(function()
     -- Аимбот
@@ -329,27 +338,35 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ESP (обновление позиций)
-    if env.ESPEnabled then
+    -- Отображение круга FOV
+    if fovCircle then
+        if env.ShowFOV and env.AimbotEnabled then
+            fovCircle.Visible = true
+            fovCircle.Radius = env.FOV
+            fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        else
+            fovCircle.Visible = false
+        end
+    end
+
+    -- Обновление ESP позиций
+    if env.ESPEnabled and #espObjects > 0 then
+        local enemies = GetAliveEnemies()
+        -- Простое обновление для существующих объектов (без динамического добавления/удаления)
+        -- Индексы сохраняются, если игроки не меняются. При изменении списка вызовите CreateESP()
         local index = 1
-        for _, player in ipairs(GetAliveEnemies()) do
+        for _, player in ipairs(enemies) do
             local character = player.Character
             local rootPart = character:FindFirstChild("HumanoidRootPart")
             local head = character:FindFirstChild("Head")
             local humanoid = character:FindFirstChildOfClass("Humanoid")
             if rootPart and head and humanoid then
-                -- Получаем позиции на экране
-                local rootScreenPos, rootVisible = Camera:WorldToScreenPoint(rootPart.Position)
-                local headScreenPos, headVisible = Camera:WorldToScreenPoint(head.Position + Vector3.new(0, 0.5, 0))
+                -- Исправление: нижняя точка = rootPart.Position - 3 (приблизительно ноги)
+                local footPos = rootPart.Position - Vector3.new(0, 3, 0)  -- подстройте под рост модели
+                local footScreenPos, footVisible = Camera:WorldToScreenPoint(footPos)
+                local headScreenPos, headVisible = Camera:WorldToScreenPoint(head.Position + Vector3.new(0, 0.3, 0))
 
-                if rootVisible and headVisible then
-                    -- Обновляем box (4 объекта Drawing могут обновляться по мере необходимости)
-                    -- Проще пересоздавать объекты каждый кадр? Нет, лучше обновлять свойства.
-                    -- Для простоты будем создавать заново каждые 1 секунду, а позиции обновлять каждый кадр
-                    -- Но это неэффективно. Вместо этого будем хранить ссылки и обновлять.
-                    -- Ввиду ограниченности примера, пересоздадим ESP объекты при каждом включении, а позиции обновлять через таблицу.
-
-                    -- Найдём соответствующие объекты (по индексу). Каждый игрок имеет 4 объекта: box, name, healthBg, healthBar
+                if footVisible and headVisible then
                     local baseIndex = (index - 1) * 4 + 1
                     if espObjects[baseIndex] then
                         local box = espObjects[baseIndex]
@@ -357,21 +374,20 @@ RunService.RenderStepped:Connect(function()
                         local healthBg = espObjects[baseIndex + 2]
                         local healthBar = espObjects[baseIndex + 3]
 
-                        -- Box
-                        local height = math.abs(rootScreenPos.Y - headScreenPos.Y)
+                        local height = math.abs(footScreenPos.Y - headScreenPos.Y)
                         local width = height * 0.6
-                        box.Position = Vector2.new(rootScreenPos.X - width/2, rootScreenPos.Y - height)
+
+                        box.Position = Vector2.new(footScreenPos.X - width/2, footScreenPos.Y - height)
                         box.Size = Vector2.new(width, height)
 
-                        -- Name
-                        nameTag.Position = Vector2.new(rootScreenPos.X, rootScreenPos.Y - height - 5)
+                        nameTag.Position = Vector2.new(footScreenPos.X, footScreenPos.Y - height - 15)
                         nameTag.Text = player.Name
 
-                        -- Health
                         local healthPercent = humanoid.Health / humanoid.MaxHealth
-                        healthBg.Position = Vector2.new(rootScreenPos.X - width/2 - 5, rootScreenPos.Y - height)
+                        healthBg.Position = Vector2.new(footScreenPos.X - width/2 - 5, footScreenPos.Y - height)
                         healthBg.Size = Vector2.new(3, height)
-                        healthBar.Position = Vector2.new(rootScreenPos.X - width/2 - 5, rootScreenPos.Y - height + height * (1 - healthPercent))
+
+                        healthBar.Position = Vector2.new(footScreenPos.X - width/2 - 5, footScreenPos.Y - height + height * (1 - healthPercent))
                         healthBar.Size = Vector2.new(3, height * healthPercent)
                         healthBar.Color = Color3.fromHSV(healthPercent * 0.33, 1, 1)
                     end
@@ -381,18 +397,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
-
--- Пересоздаём ESP объекты при изменении настройки
-env.ESPEnabledChanged = function()
-    if env.ESPEnabled then
-        CreateESP()
-    else
-        for _, obj in pairs(espObjects) do
-            if obj.Remove then obj:Remove() end
-        end
-        espObjects = {}
-    end
-end
 
 -- Начальное создание ESP
 CreateESP()
