@@ -1,5 +1,6 @@
 -- Delta Executor / Roblox Exploit Script
--- Flick Game Cheat Menu с Fly, Noclip, ESP, RageBot, AutoFarm, BHop
+-- Flick Game Cheat Menu (оптимизировано для мобильных устройств)
+-- Меню с прокруткой, настройки RageBot появляются корректно
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -7,12 +8,12 @@ local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- GUI
+-- Создаём ScreenGui в PlayerGui
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "DeltaCheatMenu"
-ScreenGui.Parent = game.CoreGui
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Draggable Button
+-- Плавающая кнопка
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0, 60, 0, 60)
 ToggleButton.Position = UDim2.new(0, 20, 0, 200)
@@ -24,12 +25,14 @@ ToggleButton.TextSize = 24
 ToggleButton.AutoButtonColor = false
 ToggleButton.Parent = ScreenGui
 
+-- Универсальное перетаскивание (мышь + тач)
 local function makeDraggable(obj)
     local dragging = false
     local dragStart = nil
     local startPos = nil
+
     obj.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
             startPos = obj.Position
@@ -40,25 +43,37 @@ local function makeDraggable(obj)
             end)
         end
     end)
+
     obj.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
-            obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
-                                     startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        if dragging then
+            local delta
+            if input.UserInputType == Enum.UserInputType.MouseMovement then
+                delta = input.Position - dragStart
+            elseif input.UserInputType == Enum.UserInputType.Touch then
+                delta = input.Delta
+            else
+                return
+            end
+            obj.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
         end
     end)
 end
 makeDraggable(ToggleButton)
 
--- Main Menu
+-- Основное меню (компактное, по центру)
 local MenuFrame = Instance.new("Frame")
-MenuFrame.Size = UDim2.new(0, 260, 0, 530)  -- увеличенная высота
-MenuFrame.Position = UDim2.new(0, 100, 0, 200)
+MenuFrame.Size = UDim2.new(0, 260, 0, 400) -- уменьшенная высота
+MenuFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+MenuFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 MenuFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MenuFrame.BorderSizePixel = 0
 MenuFrame.Visible = false
 MenuFrame.Parent = ScreenGui
 
+-- Заголовок
 local TitleBar = Instance.new("TextButton")
 TitleBar.Size = UDim2.new(1, 0, 0, 30)
 TitleBar.Position = UDim2.new(0, 0, 0, 0)
@@ -72,6 +87,7 @@ TitleBar.AutoButtonColor = false
 TitleBar.Parent = MenuFrame
 makeDraggable(TitleBar)
 
+-- Кнопка закрытия
 local CloseButton = Instance.new("TextButton")
 CloseButton.Size = UDim2.new(0, 30, 0, 30)
 CloseButton.Position = UDim2.new(1, -30, 0, 0)
@@ -83,12 +99,22 @@ CloseButton.TextSize = 14
 CloseButton.TextColor3 = Color3.new(1, 1, 1)
 CloseButton.AutoButtonColor = false
 CloseButton.Parent = TitleBar
-CloseButton.MouseButton1Click:Connect(function()
+CloseButton.Activated:Connect(function()
     MenuFrame.Visible = false
     ToggleButton.Visible = true
 end)
 
--- Функция для создания кнопки-переключателя
+-- ScrollingFrame для всех элементов
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(1, 0, 1, -30)
+ScrollFrame.Position = UDim2.new(0, 0, 0, 30)
+ScrollFrame.BackgroundTransparency = 1
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.ScrollBarThickness = 5
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 600) -- достаточная высота
+ScrollFrame.Parent = MenuFrame
+
+-- Функция создания кнопки внутри ScrollingFrame
 local function createToggleButton(parent, positionY, text)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -20, 0, 30)
@@ -119,9 +145,9 @@ local espEnabled = false
 local antiAimOptions = {"None", "Spin", "Jitter", "Backward", "Sideways", "Random"}
 local antiAimIndex = 1
 
--- --- Aimbot ---
-local AimbotToggle = createToggleButton(MenuFrame, 40, "Aimbot: OFF")
-AimbotToggle.MouseButton1Click:Connect(function()
+-- Создаём все кнопки последовательно
+local AimbotToggle = createToggleButton(ScrollFrame, 10, "Aimbot: OFF")
+AimbotToggle.Activated:Connect(function()
     aimbotEnabled = not aimbotEnabled
     AimbotToggle.Text = "Aimbot: " .. (aimbotEnabled and "ON" or "OFF")
     AimbotToggle.BackgroundColor3 = aimbotEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
@@ -129,29 +155,28 @@ AimbotToggle.MouseButton1Click:Connect(function()
         rageBotEnabled = false
         RageBotToggle.Text = "RageBot: OFF"
         RageBotToggle.BackgroundColor3 = Color3.fromRGB(80,80,80)
+        RageSettingsFrame.Visible = false
     end
 end)
 
--- --- WallCheck ---
-local WallCheckToggle = createToggleButton(MenuFrame, 80, "WallCheck: ON")
-WallCheckToggle.MouseButton1Click:Connect(function()
+local WallCheckToggle = createToggleButton(ScrollFrame, 45, "WallCheck: ON")
+WallCheckToggle.Activated:Connect(function()
     wallCheckEnabled = not wallCheckEnabled
     WallCheckToggle.Text = "WallCheck: " .. (wallCheckEnabled and "ON" or "OFF")
     WallCheckToggle.BackgroundColor3 = wallCheckEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
 end)
 
--- --- AutoFarm ---
-local AutoFarmToggle = createToggleButton(MenuFrame, 120, "AutoFarm: OFF")
-AutoFarmToggle.MouseButton1Click:Connect(function()
+local AutoFarmToggle = createToggleButton(ScrollFrame, 80, "AutoFarm: OFF")
+AutoFarmToggle.Activated:Connect(function()
     autoFarmEnabled = not autoFarmEnabled
     AutoFarmToggle.Text = "AutoFarm: " .. (autoFarmEnabled and "ON" or "OFF")
     AutoFarmToggle.BackgroundColor3 = autoFarmEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
     if autoFarmEnabled then task.spawn(autoFarmLoop) end
 end)
 
--- --- RageBot ---
-local RageBotToggle = createToggleButton(MenuFrame, 160, "RageBot: OFF")
-RageBotToggle.MouseButton1Click:Connect(function()
+-- RageBot
+local RageBotToggle = createToggleButton(ScrollFrame, 115, "RageBot: OFF")
+RageBotToggle.Activated:Connect(function()
     rageBotEnabled = not rageBotEnabled
     RageBotToggle.Text = "RageBot: " .. (rageBotEnabled and "ON" or "OFF")
     RageBotToggle.BackgroundColor3 = rageBotEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
@@ -163,31 +188,31 @@ RageBotToggle.MouseButton1Click:Connect(function()
     end
 end)
 
--- Настройки RageBot
+-- Панель настроек RageBot (внутри ScrollFrame, появляется ниже кнопки)
 local RageSettingsFrame = Instance.new("Frame")
 RageSettingsFrame.Size = UDim2.new(1, -20, 0, 130)
-RageSettingsFrame.Position = UDim2.new(0, 10, 0, 195)
+RageSettingsFrame.Position = UDim2.new(0, 10, 0, 150)
 RageSettingsFrame.BackgroundColor3 = Color3.fromRGB(45,45,45)
 RageSettingsFrame.BorderSizePixel = 0
 RageSettingsFrame.Visible = false
-RageSettingsFrame.Parent = MenuFrame
+RageSettingsFrame.Parent = ScrollFrame
 
 local FOVToggle = createToggleButton(RageSettingsFrame, 10, "FOV: OFF (360)")
-FOVToggle.MouseButton1Click:Connect(function()
+FOVToggle.Activated:Connect(function()
     fovEnabled = not fovEnabled
     FOVToggle.Text = "FOV: " .. (fovEnabled and "ON" or "OFF (360)")
     FOVToggle.BackgroundColor3 = fovEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
 end)
 
 local AutoShotToggle = createToggleButton(RageSettingsFrame, 40, "AutoShot: OFF")
-AutoShotToggle.MouseButton1Click:Connect(function()
+AutoShotToggle.Activated:Connect(function()
     autoShotEnabled = not autoShotEnabled
     AutoShotToggle.Text = "AutoShot: " .. (autoShotEnabled and "ON" or "OFF")
     AutoShotToggle.BackgroundColor3 = autoShotEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
 end)
 
 local AntiAimButton = createToggleButton(RageSettingsFrame, 70, "AntiAim: None")
-AntiAimButton.MouseButton1Click:Connect(function()
+AntiAimButton.Activated:Connect(function()
     antiAimIndex = antiAimIndex % #antiAimOptions + 1
     AntiAimButton.Text = "AntiAim: " .. antiAimOptions[antiAimIndex]
     AntiAimButton.BackgroundColor3 = antiAimIndex > 1 and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
@@ -203,9 +228,9 @@ RageInfoLabel.TextSize = 12
 RageInfoLabel.TextColor3 = Color3.new(1,1,1)
 RageInfoLabel.Parent = RageSettingsFrame
 
--- --- BHop ---
-local BHopToggle = createToggleButton(MenuFrame, 335, "BHop: OFF")
-BHopToggle.MouseButton1Click:Connect(function()
+-- Остальные кнопки
+local BHopToggle = createToggleButton(ScrollFrame, 290, "BHop: OFF")
+BHopToggle.Activated:Connect(function()
     bhopEnabled = not bhopEnabled
     BHopToggle.Text = "BHop: " .. (bhopEnabled and "ON" or "OFF")
     BHopToggle.BackgroundColor3 = bhopEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
@@ -215,47 +240,38 @@ BHopToggle.MouseButton1Click:Connect(function()
     end
 end)
 
--- --- Fly ---
-local FlyToggle = createToggleButton(MenuFrame, 375, "Fly: OFF")
-FlyToggle.MouseButton1Click:Connect(function()
+local FlyToggle = createToggleButton(ScrollFrame, 325, "Fly: OFF")
+FlyToggle.Activated:Connect(function()
     flyEnabled = not flyEnabled
     FlyToggle.Text = "Fly: " .. (flyEnabled and "ON" or "OFF")
     FlyToggle.BackgroundColor3 = flyEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
     if flyEnabled and LocalPlayer.Character then
         local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.PlatformStand = true
-        end
+        if humanoid then humanoid.PlatformStand = true end
     end
 end)
 
--- --- Noclip ---
-local NoclipToggle = createToggleButton(MenuFrame, 415, "Noclip: OFF")
-NoclipToggle.MouseButton1Click:Connect(function()
+local NoclipToggle = createToggleButton(ScrollFrame, 360, "Noclip: OFF")
+NoclipToggle.Activated:Connect(function()
     noclipEnabled = not noclipEnabled
     NoclipToggle.Text = "Noclip: " .. (noclipEnabled and "ON" or "OFF")
     NoclipToggle.BackgroundColor3 = noclipEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
     if not noclipEnabled then
-        -- восстановить коллизии
         local char = LocalPlayer.Character
         if char then
             for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = true
-                end
+                if part:IsA("BasePart") then part.CanCollide = true end
             end
         end
     end
 end)
 
--- --- ESP ---
-local ESPToggle = createToggleButton(MenuFrame, 455, "ESP: OFF")
-ESPToggle.MouseButton1Click:Connect(function()
+local ESPToggle = createToggleButton(ScrollFrame, 395, "ESP: OFF")
+ESPToggle.Activated:Connect(function()
     espEnabled = not espEnabled
     ESPToggle.Text = "ESP: " .. (espEnabled and "ON" or "OFF")
     ESPToggle.BackgroundColor3 = espEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
     if not espEnabled then
-        -- удалить все Highlight'ы
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character then
                 local highlight = player.Character:FindFirstChild("ESP_Highlight")
@@ -265,13 +281,13 @@ ESPToggle.MouseButton1Click:Connect(function()
     end
 end)
 
--- Главная кнопка
-ToggleButton.MouseButton1Click:Connect(function()
+-- Открытие/закрытие меню
+ToggleButton.Activated:Connect(function()
     MenuFrame.Visible = not MenuFrame.Visible
     ToggleButton.Visible = not MenuFrame.Visible
 end)
 
--- Вспомогательные функции
+-- Вспомогательные функции (не изменились)
 local function isWallBetween(origin, targetPos, ignoreList)
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -437,7 +453,7 @@ local function handleBHop()
     if not humanoid then return end
     local state = humanoid:GetState()
     if state == Enum.HumanoidStateType.Jumping or state == Enum.HumanoidStateType.Freefall then
-        humanoid.WalkSpeed = 24  -- увеличенная скорость в воздухе
+        humanoid.WalkSpeed = 24
     else
         humanoid.WalkSpeed = 16
     end
@@ -529,6 +545,6 @@ RunService.RenderStepped:Connect(function()
     handleESP()
 end)
 
--- Начальное состояние
+-- Стартовое состояние
 MenuFrame.Visible = false
 ToggleButton.Visible = true
