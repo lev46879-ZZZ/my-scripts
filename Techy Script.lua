@@ -1,7 +1,6 @@
--- // Roblox Delta Script: Floating GUI + Aimbot + WallCheck + ESP + FOV Circle
+-- // Roblox Delta Script: Floating GUI + Aimbot + WallCheck + ESP (исправлено)
 -- // Для мобильных устройств
 
--- Создаём глобальное окружение, чтобы переменные были доступны в разных потоках
 local env = getgenv() or shared
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -9,17 +8,17 @@ local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- Библиотека Drawing (доступна в большинстве эксплойтов)
+-- Библиотека Drawing
 local Drawing = Drawing or loadstring(game:HttpGet("https://raw.githubusercontent.com/Blissful4992/ESPs/main/Drawing.lua"))()
 
--- ========== НАСТРОЙКИ (по умолчанию) ==========
+-- ========== НАСТРОЙКИ ==========
 env.AimbotEnabled = false
-env.FOV = 100                -- радиус FOV в пикселях (10-600)
-env.WallCheckEnabled = true  -- проверять стены
-env.ESPEnabled = true        -- показывать ESP
-env.ShowFOV = false          -- отображать круг FOV
+env.FOV = 100
+env.WallCheckEnabled = true
+env.ESPEnabled = true
+env.ShowFOV = false
 
--- Функция определения врага (переопределите под свою игру при необходимости)
+-- Функция определения врага
 local function IsEnemy(player)
     if player == LocalPlayer then return false end
     if player.Team and LocalPlayer.Team then
@@ -28,7 +27,7 @@ local function IsEnemy(player)
     return true
 end
 
--- ========== СОЗДАНИЕ ПЛАВАЮЩЕЙ КНОПКИ ==========
+-- ========== ПЛАВАЮЩАЯ КНОПКА ==========
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
@@ -72,9 +71,9 @@ Button.InputChanged:Connect(function(input)
     end
 end)
 
--- ========== СОЗДАНИЕ ПЛАВАЮЩЕГО МЕНЮ ==========
+-- ========== ПЛАВАЮЩЕЕ МЕНЮ ==========
 local Menu = Instance.new("Frame")
-Menu.Size = UDim2.new(0, 220, 0, 300)  -- увеличена высота для нового тумблера
+Menu.Size = UDim2.new(0, 220, 0, 300)
 Menu.Position = UDim2.new(0.5, -110, 0.5, -150)
 Menu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Menu.BackgroundTransparency = 0.1
@@ -193,7 +192,7 @@ Button.MouseButton1Click:Connect(function()
     Menu.Visible = not Menu.Visible
 end)
 
--- ========== ФУНКЦИИ ДЛЯ ПОЛУЧЕНИЯ ВРАГОВ ==========
+-- ========== ПОЛУЧЕНИЕ ВРАГОВ ==========
 local function GetAliveEnemies()
     local enemies = {}
     for _, player in ipairs(Players:GetPlayers()) do
@@ -204,7 +203,7 @@ local function GetAliveEnemies()
     return enemies
 end
 
--- ========== WALLCHECK (RAYCAST) ==========
+-- ========== WALLCHECK ==========
 local function IsVisible(targetPosition)
     if not env.WallCheckEnabled then return true end
     local character = LocalPlayer.Character
@@ -275,7 +274,6 @@ local function CreateESP()
         local head = character:FindFirstChild("Head")
         local humanoid = character:FindFirstChildOfClass("Humanoid")
         if rootPart and head and humanoid then
-            -- Box
             local box = Drawing.new("Square")
             box.Thickness = 2
             box.Color = Color3.fromRGB(255,0,0)
@@ -284,7 +282,6 @@ local function CreateESP()
             box.Visible = true
             table.insert(espObjects, box)
 
-            -- Name
             local nameTag = Drawing.new("Text")
             nameTag.Text = player.Name
             nameTag.Size = 14
@@ -295,7 +292,6 @@ local function CreateESP()
             nameTag.Visible = true
             table.insert(espObjects, nameTag)
 
-            -- Health background
             local healthBg = Drawing.new("Square")
             healthBg.Thickness = 1
             healthBg.Color = Color3.fromRGB(0,0,0)
@@ -304,7 +300,6 @@ local function CreateESP()
             healthBg.Visible = true
             table.insert(espObjects, healthBg)
 
-            -- Health bar
             local healthBar = Drawing.new("Square")
             healthBar.Thickness = 1
             healthBar.Color = Color3.fromRGB(0,255,0)
@@ -316,7 +311,7 @@ local function CreateESP()
 end
 
 -- ========== КРУГ FOV ==========
-local fovCircle = nil
+local fovCircle
 if Drawing.new then
     pcall(function()
         fovCircle = Drawing.new("Circle")
@@ -349,11 +344,9 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Обновление ESP позиций
+    -- Обновление ESP
     if env.ESPEnabled and #espObjects > 0 then
         local enemies = GetAliveEnemies()
-        -- Простое обновление для существующих объектов (без динамического добавления/удаления)
-        -- Индексы сохраняются, если игроки не меняются. При изменении списка вызовите CreateESP()
         local index = 1
         for _, player in ipairs(enemies) do
             local character = player.Character
@@ -361,9 +354,9 @@ RunService.RenderStepped:Connect(function()
             local head = character:FindFirstChild("Head")
             local humanoid = character:FindFirstChildOfClass("Humanoid")
             if rootPart and head and humanoid then
-                -- Исправление: нижняя точка = rootPart.Position - 3 (приблизительно ноги)
-                local footPos = rootPart.Position - Vector3.new(0, 3, 0)  -- подстройте под рост модели
-                local footScreenPos, footVisible = Camera:WorldToScreenPoint(footPos)
+                -- ИСПРАВЛЕНИЕ: используем HipHeight для точной нижней точки
+                local footPosition = rootPart.Position - Vector3.new(0, humanoid.HipHeight, 0)
+                local footScreenPos, footVisible = Camera:WorldToScreenPoint(footPosition)
                 local headScreenPos, headVisible = Camera:WorldToScreenPoint(head.Position + Vector3.new(0, 0.3, 0))
 
                 if footVisible and headVisible then
@@ -401,5 +394,4 @@ end)
 -- Начальное создание ESP
 CreateESP()
 
--- Уведомление
 print("Script loaded! Press Menu button to open settings.")
