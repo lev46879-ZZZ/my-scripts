@@ -1,5 +1,5 @@
 -- Delta Executor / Roblox Exploit Script
--- Flick Game Cheat Menu (финальная версия с исправлениями)
+-- Flick Game Cheat Menu (финальная версия с ползунками FOV)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -7,10 +7,10 @@ local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- GUI
+-- GUI в CoreGui (не исчезает при респавне)
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "DeltaCheatMenu"
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.Parent = game:GetService("CoreGui")
 
 -- Плавающая кнопка
 local ToggleButton = Instance.new("TextButton")
@@ -25,16 +25,16 @@ ToggleButton.AutoButtonColor = false
 ToggleButton.Parent = ScreenGui
 
 -- Улучшенное перетаскивание (мышь + тач)
-local function makeDraggable(obj)
+local function makeDraggable(obj, targetToMove)
     local dragging = false
-    local dragStartPos = nil
+    local startInputPos = nil
     local startObjPos = nil
 
     obj.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
-            dragStartPos = input.Position
-            startObjPos = obj.Position
+            startInputPos = input.Position
+            startObjPos = targetToMove.Position
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
@@ -47,24 +47,25 @@ local function makeDraggable(obj)
         if dragging then
             local delta
             if input.UserInputType == Enum.UserInputType.MouseMovement then
-                delta = input.Position - dragStartPos
+                delta = input.Position - startInputPos
             elseif input.UserInputType == Enum.UserInputType.Touch then
                 delta = input.Delta
             else
                 return
             end
-            obj.Position = UDim2.new(
+            targetToMove.Position = UDim2.new(
                 startObjPos.X.Scale, startObjPos.X.Offset + delta.X,
                 startObjPos.Y.Scale, startObjPos.Y.Offset + delta.Y
             )
         end
     end)
 end
-makeDraggable(ToggleButton)
+
+makeDraggable(ToggleButton, ToggleButton)
 
 -- Основное меню
 local MenuFrame = Instance.new("Frame")
-MenuFrame.Size = UDim2.new(0, 260, 0, 400)
+MenuFrame.Size = UDim2.new(0, 260, 0, 450)
 MenuFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 MenuFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 MenuFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -72,7 +73,7 @@ MenuFrame.BorderSizePixel = 0
 MenuFrame.Visible = false
 MenuFrame.Parent = ScreenGui
 
--- Заголовок
+-- Заголовок (перетаскивание меню за заголовок)
 local TitleBar = Instance.new("TextButton")
 TitleBar.Size = UDim2.new(1, 0, 0, 30)
 TitleBar.Position = UDim2.new(0, 0, 0, 0)
@@ -84,7 +85,7 @@ TitleBar.TextSize = 16
 TitleBar.TextColor3 = Color3.new(1, 1, 1)
 TitleBar.AutoButtonColor = false
 TitleBar.Parent = MenuFrame
-makeDraggable(TitleBar) -- двигаем меню за заголовок
+makeDraggable(TitleBar, MenuFrame)
 
 -- Кнопка закрытия
 local CloseButton = Instance.new("TextButton")
@@ -110,7 +111,6 @@ ScrollFrame.Position = UDim2.new(0, 0, 0, 30)
 ScrollFrame.BackgroundTransparency = 1
 ScrollFrame.BorderSizePixel = 0
 ScrollFrame.ScrollBarThickness = 5
-ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0) -- будет авторазмер
 ScrollFrame.Parent = MenuFrame
 
 local UIListLayout = Instance.new("UIListLayout")
@@ -118,7 +118,18 @@ UIListLayout.Parent = ScrollFrame
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 UIListLayout.Padding = UDim.new(0, 5)
 
--- Функция создания кнопки (теперь позиция не нужна)
+-- Функция обновления CanvasSize
+local function updateCanvasSize()
+    local totalHeight = 0
+    for _, child in ipairs(ScrollFrame:GetChildren()) do
+        if child:IsA("GuiObject") and child.Visible then
+            totalHeight += child.AbsoluteSize.Y + 5
+        end
+    end
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+end
+
+-- Функция создания кнопки
 local function createToggleButton(parent, text)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -20, 0, 30)
@@ -133,12 +144,105 @@ local function createToggleButton(parent, text)
     return btn
 end
 
+-- Функция создания ползунка
+local function createSlider(parent, minValue, maxValue, defaultValue, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, -20, 0, 30)
+    container.BackgroundTransparency = 1
+    container.Parent = parent
+
+    local sliderBar = Instance.new("Frame")
+    sliderBar.Size = UDim2.new(1, -40, 0, 6)
+    sliderBar.Position = UDim2.new(0, 20, 0.5, -3)
+    sliderBar.BackgroundColor3 = Color3.fromRGB(100,100,100)
+    sliderBar.Parent = container
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new(0, 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(0,150,0)
+    fill.BorderSizePixel = 0
+    fill.Parent = sliderBar
+
+    local handle = Instance.new("TextButton")
+    handle.Size = UDim2.new(0, 20, 0, 20)
+    handle.Position = UDim2.new(0, 0, 0.5, -10)
+    handle.BackgroundColor3 = Color3.new(1,1,1)
+    handle.Text = ""
+    handle.AutoButtonColor = false
+    handle.Parent = container
+
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Size = UDim2.new(0, 35, 0, 20)
+    valueLabel.Position = UDim2.new(1, -35, 0, 0)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.Text = tostring(defaultValue)
+    valueLabel.Parent = container
+
+    local currentValue = defaultValue
+
+    local function updateVisuals()
+        local percent = (currentValue - minValue) / (maxValue - minValue)
+        fill.Size = UDim2.new(percent, 0, 1, 0)
+        handle.Position = UDim2.new(percent, -10, 0.5, -10)
+        valueLabel.Text = tostring(math.floor(currentValue))
+        callback(currentValue)
+    end
+
+    local function setValueFromX(x)
+        local barWidth = sliderBar.AbsoluteSize.X
+        local relativeX = math.clamp(x - sliderBar.AbsolutePosition.X, 0, barWidth)
+        local percent = relativeX / barWidth
+        currentValue = minValue + percent * (maxValue - minValue)
+        updateVisuals()
+    end
+
+    local dragging = false
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    handle.InputChanged:Connect(function(input)
+        if dragging then
+            setValueFromX(input.Position.X)
+        end
+    end)
+
+    sliderBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            setValueFromX(input.Position.X)
+        end
+    end)
+
+    updateVisuals()
+
+    return {
+        SetValue = function(val)
+            currentValue = math.clamp(val, minValue, maxValue)
+            updateVisuals()
+        end,
+        GetValue = function()
+            return currentValue
+        end
+    }
+end
+
 -- Переменные состояний
 local aimbotEnabled = false
+local aimbotFOVEnabled = false
+local aimbotFOVAngle = 90
+
+local rageBotEnabled = false
+local rageFOVEnabled = false
+local rageFOVAngle = 90
+
 local wallCheckEnabled = true
 local autoFarmEnabled = false
-local rageBotEnabled = false
-local fovEnabled = false
 local autoShotEnabled = false
 local bhopEnabled = false
 local flyEnabled = false
@@ -148,20 +252,48 @@ local espEnabled = false
 local antiAimOptions = {"None", "Spin", "Jitter", "Backward", "Sideways", "Random"}
 local antiAimIndex = 1
 
--- Создание элементов в списке
+-- Создание элементов
 
--- Aimbot
+-- Aimbot и его настройки
 local AimbotToggle = createToggleButton(ScrollFrame, "Aimbot: OFF")
 AimbotToggle.Activated:Connect(function()
     aimbotEnabled = not aimbotEnabled
     AimbotToggle.Text = "Aimbot: " .. (aimbotEnabled and "ON" or "OFF")
     AimbotToggle.BackgroundColor3 = aimbotEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
+    AimbotSettingsFrame.Visible = aimbotEnabled
+    updateCanvasSize()
     if aimbotEnabled and rageBotEnabled then
         rageBotEnabled = false
         RageBotToggle.Text = "RageBot: OFF"
         RageBotToggle.BackgroundColor3 = Color3.fromRGB(80,80,80)
         RageSettingsFrame.Visible = false
+        updateCanvasSize()
     end
+end)
+
+-- Панель настроек Aimbot
+local AimbotSettingsFrame = Instance.new("Frame")
+AimbotSettingsFrame.Size = UDim2.new(1, -20, 0, 70)
+AimbotSettingsFrame.BackgroundColor3 = Color3.fromRGB(45,45,45)
+AimbotSettingsFrame.BorderSizePixel = 0
+AimbotSettingsFrame.Visible = false
+AimbotSettingsFrame.Parent = ScrollFrame
+
+local AimbotSettingsLayout = Instance.new("UIListLayout")
+AimbotSettingsLayout.Parent = AimbotSettingsFrame
+AimbotSettingsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+AimbotSettingsLayout.Padding = UDim.new(0, 5)
+
+local AimbotFOVToggle = createToggleButton(AimbotSettingsFrame, "FOV: OFF")
+AimbotFOVToggle.Activated:Connect(function()
+    aimbotFOVEnabled = not aimbotFOVEnabled
+    AimbotFOVToggle.Text = "FOV: " .. (aimbotFOVEnabled and "ON" or "OFF")
+    AimbotFOVToggle.BackgroundColor3 = aimbotFOVEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
+end)
+
+-- Ползунок угла FOV для Aimbot
+local AimbotFOVSlider = createSlider(AimbotSettingsFrame, 5, 360, aimbotFOVAngle, function(val)
+    aimbotFOVAngle = val
 end)
 
 -- WallCheck
@@ -181,21 +313,24 @@ AutoFarmToggle.Activated:Connect(function()
     if autoFarmEnabled then task.spawn(autoFarmLoop) end
 end)
 
--- RageBot (сама кнопка)
+-- RageBot и его настройки
 local RageBotToggle = createToggleButton(ScrollFrame, "RageBot: OFF")
 RageBotToggle.Activated:Connect(function()
     rageBotEnabled = not rageBotEnabled
     RageBotToggle.Text = "RageBot: " .. (rageBotEnabled and "ON" or "OFF")
     RageBotToggle.BackgroundColor3 = rageBotEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
     RageSettingsFrame.Visible = rageBotEnabled
+    updateCanvasSize()
     if rageBotEnabled and aimbotEnabled then
         aimbotEnabled = false
         AimbotToggle.Text = "Aimbot: OFF"
         AimbotToggle.BackgroundColor3 = Color3.fromRGB(80,80,80)
+        AimbotSettingsFrame.Visible = false
+        updateCanvasSize()
     end
 end)
 
--- Панель настроек RageBot (появляется сразу после кнопки)
+-- Панель настроек RageBot
 local RageSettingsFrame = Instance.new("Frame")
 RageSettingsFrame.Size = UDim2.new(1, -20, 0, 130)
 RageSettingsFrame.BackgroundColor3 = Color3.fromRGB(45,45,45)
@@ -203,17 +338,20 @@ RageSettingsFrame.BorderSizePixel = 0
 RageSettingsFrame.Visible = false
 RageSettingsFrame.Parent = ScrollFrame
 
--- Внутри панели используем UIListLayout
 local RageLayout = Instance.new("UIListLayout")
 RageLayout.Parent = RageSettingsFrame
 RageLayout.SortOrder = Enum.SortOrder.LayoutOrder
 RageLayout.Padding = UDim.new(0, 5)
 
-local FOVToggle = createToggleButton(RageSettingsFrame, "FOV: OFF (360)")
-FOVToggle.Activated:Connect(function()
-    fovEnabled = not fovEnabled
-    FOVToggle.Text = "FOV: " .. (fovEnabled and "ON" or "OFF (360)")
-    FOVToggle.BackgroundColor3 = fovEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
+local RageFOVToggle = createToggleButton(RageSettingsFrame, "FOV: OFF")
+RageFOVToggle.Activated:Connect(function()
+    rageFOVEnabled = not rageFOVEnabled
+    RageFOVToggle.Text = "FOV: " .. (rageFOVEnabled and "ON" or "OFF")
+    RageFOVToggle.BackgroundColor3 = rageFOVEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
+end)
+
+local RageFOVSlider = createSlider(RageSettingsFrame, 5, 360, rageFOVAngle, function(val)
+    rageFOVAngle = val
 end)
 
 local AutoShotToggle = createToggleButton(RageSettingsFrame, "AutoShot: OFF")
@@ -230,16 +368,7 @@ AntiAimButton.Activated:Connect(function()
     AntiAimButton.BackgroundColor3 = antiAimIndex > 1 and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
 end)
 
-local RageInfoLabel = Instance.new("TextLabel")
-RageInfoLabel.Size = UDim2.new(1, -20, 0, 20)
-RageInfoLabel.BackgroundTransparency = 1
-RageInfoLabel.Text = "RageBot Settings"
-RageInfoLabel.Font = Enum.Font.SourceSans
-RageInfoLabel.TextSize = 12
-RageInfoLabel.TextColor3 = Color3.new(1,1,1)
-RageInfoLabel.Parent = RageSettingsFrame
-
--- BHop
+-- Остальные кнопки
 local BHopToggle = createToggleButton(ScrollFrame, "BHop: OFF")
 BHopToggle.Activated:Connect(function()
     bhopEnabled = not bhopEnabled
@@ -251,7 +380,6 @@ BHopToggle.Activated:Connect(function()
     end
 end)
 
--- Fly
 local FlyToggle = createToggleButton(ScrollFrame, "Fly: OFF")
 FlyToggle.Activated:Connect(function()
     flyEnabled = not flyEnabled
@@ -259,13 +387,10 @@ FlyToggle.Activated:Connect(function()
     FlyToggle.BackgroundColor3 = flyEnabled and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
     if flyEnabled and LocalPlayer.Character then
         local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.PlatformStand = true
-        end
+        if humanoid then humanoid.PlatformStand = true end
     end
 end)
 
--- Noclip
 local NoclipToggle = createToggleButton(ScrollFrame, "Noclip: OFF")
 NoclipToggle.Activated:Connect(function()
     noclipEnabled = not noclipEnabled
@@ -281,7 +406,6 @@ NoclipToggle.Activated:Connect(function()
     end
 end)
 
--- ESP
 local ESPToggle = createToggleButton(ScrollFrame, "ESP: OFF")
 ESPToggle.Activated:Connect(function()
     espEnabled = not espEnabled
@@ -303,7 +427,10 @@ ToggleButton.Activated:Connect(function()
     ToggleButton.Visible = not MenuFrame.Visible
 end)
 
--- Вспомогательные функции (без изменений, кроме Fly и атаки)
+-- Инициализация CanvasSize
+updateCanvasSize()
+
+-- Вспомогательные функции
 local function isWallBetween(origin, targetPos, ignoreList)
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -353,7 +480,6 @@ local function findNearestTarget(useFOV, fovAngle)
     return nearestTarget
 end
 
--- Атака: пробуем нож, если нет - клик мышью
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local function attack()
     local character = LocalPlayer.Character
@@ -361,7 +487,6 @@ local function attack()
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     if not humanoid then return end
 
-    -- Пытаемся найти нож
     local knife = nil
     local backpack = LocalPlayer:FindFirstChild("Backpack")
     if backpack then
@@ -378,7 +503,6 @@ local function attack()
         humanoid:EquipTool(knife)
         knife:Activate()
     else
-        -- Если нет ножа, имитируем клик мышью
         VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
         task.wait(0.05)
         VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
@@ -431,7 +555,6 @@ function autoFarmLoop()
                 local localChar = LocalPlayer.Character
                 local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
                 if targetRoot and localRoot then
-                    -- Телепорт за спину
                     local behindOffset = targetRoot.CFrame.LookVector * -3
                     local newPos = targetRoot.Position + behindOffset
                     localRoot.CFrame = CFrame.new(newPos, targetRoot.Position)
@@ -483,7 +606,6 @@ local function handleBHop()
     end
 end
 
--- Исправленный Fly: управление CFrame напрямую
 local flySpeed = 50
 local function handleFly()
     if not flyEnabled then return end
@@ -547,7 +669,7 @@ RunService.RenderStepped:Connect(function()
     end
 
     if rageBotEnabled then
-        local target = findNearestTarget(fovEnabled, 90)
+        local target = findNearestTarget(rageFOVEnabled, rageFOVAngle)
         if target then
             local targetHead = target:FindFirstChild("Head")
             if targetHead then
@@ -556,7 +678,7 @@ RunService.RenderStepped:Connect(function()
             end
         end
     elseif aimbotEnabled then
-        local target = findNearestTarget(false, 0)
+        local target = findNearestTarget(aimbotFOVEnabled, aimbotFOVAngle)
         if target then
             local targetHead = target:FindFirstChild("Head")
             if targetHead then
