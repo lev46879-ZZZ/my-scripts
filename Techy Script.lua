@@ -1,6 +1,6 @@
 -- ╔═══════════════════════════════════════════════════════════════╗
--- ║     TECHY SCRIPT v5 - ФИНАЛЬНАЯ ВЕРСИЯ                      ║
--- ║  Меню работает правильно, перетаскивание без багов          ║
+-- ║     TECHY SCRIPT МОБИЛЬНАЯ v1 - ДЛЯ ТЕЛЕФОНА                ║
+-- ║  Сенсорные управления, плавающее меню, все работает!        ║
 -- ╚═══════════════════════════════════════════════════════════════╝
 
 local env = getgenv() or shared
@@ -37,7 +37,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Name = "TechyMenuGui"
 
--- ========== ПЛАВАЮЩАЯ КНОПКА МЕНЮ ==========
+-- ========== ПЛАВАЮЩАЯ КНОПКА МЕНЮ (СЕНСОР) ==========
 local MenuButton = Instance.new("TextButton")
 MenuButton.Name = "MenuButton"
 MenuButton.Size = UDim2.new(0, 70, 0, 70)
@@ -60,13 +60,6 @@ local Shadow1 = Instance.new("UIStroke")
 Shadow1.Color = Color3.fromRGB(20, 120, 180)
 Shadow1.Thickness = 2
 Shadow1.Parent = MenuButton
-
--- Простое открытие/закрытие меню - БЕЗ перетаскивания кнопки!
-local menuOpen = false
-MenuButton.MouseButton1Click:Connect(function()
-    menuOpen = not menuOpen
-    MainMenu.Visible = menuOpen
-end)
 
 -- ========== ОСНОВНОЕ МЕНЮ ==========
 local MainMenu = Instance.new("Frame")
@@ -96,10 +89,10 @@ Header.Name = "Header"
 Header.Size = UDim2.new(1, 0, 0, 50)
 Header.BackgroundColor3 = Color3.fromRGB(25, 135, 200)
 Header.BackgroundTransparency = 0.2
-Header.Text = "⚙️ TECHY MENU (тащи за заголовок)"
+Header.Text = "⚙️ TECHY MENU"
 Header.TextColor3 = Color3.new(1, 1, 1)
 Header.Font = Enum.Font.SourceSansBold
-Header.TextSize = 16
+Header.TextSize = 18
 Header.BorderSizePixel = 0
 Header.ZIndex = 998
 Header.Parent = MainMenu
@@ -107,37 +100,6 @@ Header.Parent = MainMenu
 local HeaderCorner = Instance.new("UICorner")
 HeaderCorner.CornerRadius = UDim.new(0, 12)
 HeaderCorner.Parent = Header
-
--- Правильное перетаскивание ТОЛЬКО за заголовок
-local draggingMenu = false
-local dragOffsetMenu = Vector2.new(0, 0)
-
-Header.MouseButton1Down:Connect(function()
-    draggingMenu = true
-    dragOffsetMenu = UserInputService:GetMouseLocation() - Vector2.new(MainMenu.AbsolutePosition.X, MainMenu.AbsolutePosition.Y)
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        draggingMenu = false
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    if draggingMenu then
-        local mousePos = UserInputService:GetMouseLocation()
-        local newPos = mousePos - dragOffsetMenu
-        
-        -- Ограничиваем чтобы меню не вышло за границы экрана
-        local screenSize = ScreenGui.AbsoluteSize
-        newPos = Vector2.new(
-            math.clamp(newPos.X, 0, screenSize.X - MainMenu.AbsoluteSize.X),
-            math.clamp(newPos.Y, 0, screenSize.Y - MainMenu.AbsoluteSize.Y)
-        )
-        
-        MainMenu.Position = UDim2.new(0, newPos.X, 0, newPos.Y)
-    end
-end)
 
 -- Кнопка закрытия
 local CloseBtn = Instance.new("TextButton")
@@ -158,11 +120,6 @@ local CloseCorner = Instance.new("UICorner")
 CloseCorner.CornerRadius = UDim.new(0, 8)
 CloseCorner.Parent = CloseBtn
 
-CloseBtn.MouseButton1Click:Connect(function()
-    menuOpen = false
-    MainMenu.Visible = false
-end)
-
 -- Контейнер для опций
 local ContentFrame = Instance.new("ScrollingFrame")
 ContentFrame.Name = "Content"
@@ -181,6 +138,46 @@ UIListLayout.Parent = ContentFrame
 UIListLayout.Padding = UDim.new(0, 10)
 UIListLayout.FillDirection = Enum.FillDirection.Vertical
 UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+-- ========== СЕНСОРНОЕ УПРАВЛЕНИЕ МЕНЮ ==========
+local menuOpen = false
+local draggingMenu = false
+local dragOffsetMenu = Vector2.new(0, 0)
+local touchStartPos = Vector2.new(0, 0)
+
+-- Открытие/закрытие меню при касании кнопки
+MenuButton.TouchTap:Connect(function()
+    menuOpen = not menuOpen
+    MainMenu.Visible = menuOpen
+end)
+
+-- Закрытие кнопкой X
+CloseBtn.TouchTap:Connect(function()
+    menuOpen = false
+    MainMenu.Visible = false
+end)
+
+-- Перетаскивание меню за заголовок
+Header.InputBegan:Connect(function(input, gameProcessed)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        draggingMenu = true
+        touchStartPos = input.Position
+        dragOffsetMenu = Vector2.new(MainMenu.AbsolutePosition.X, MainMenu.AbsolutePosition.Y) - input.Position
+    end
+end)
+
+Header.InputEnded:Connect(function(input, gameProcessed)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        draggingMenu = false
+    end
+end)
+
+Header.InputChanged:Connect(function(input, gameProcessed)
+    if draggingMenu and input.UserInputType == Enum.UserInputType.Touch then
+        local newPos = input.Position + dragOffsetMenu
+        MainMenu.Position = UDim2.new(0, newPos.X, 0, newPos.Y)
+    end
+end)
 
 -- ========== ФУНКЦИЯ СОЗДАНИЯ ПЕРЕКЛЮЧАТЕЛЯ ==========
 local function CreateToggle(text, defaultValue, callback)
@@ -226,7 +223,8 @@ local function CreateToggle(text, defaultValue, callback)
     SwitchCorner.Parent = ToggleSwitch
 
     local state = defaultValue
-    ToggleSwitch.MouseButton1Click:Connect(function()
+    
+    ToggleSwitch.TouchTap:Connect(function()
         state = not state
         ToggleSwitch.BackgroundColor3 = state and Color3.fromRGB(50, 180, 100) or Color3.fromRGB(100, 100, 100)
         ToggleSwitch.Text = state and "ВКЛ" or "ВЫКЛ"
@@ -319,35 +317,41 @@ local function CreateSlider(text, minVal, maxVal, defaultVal, callback)
 
     UpdateSlider(defaultVal)
 
-    Thumb.MouseButton1Down:Connect(function()
-        isDragging = true
+    -- Сенсорное перетаскивание слайдера
+    Thumb.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            isDragging = true
+        end
     end)
 
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    Thumb.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
             isDragging = false
         end
     end)
 
-    UserInputService.InputChanged:Connect(function()
-        if isDragging then
-            local mouseX = UserInputService:GetMouseLocation().X
+    Thumb.InputChanged:Connect(function(input)
+        if isDragging and input.UserInputType == Enum.UserInputType.Touch then
+            local touchX = input.Position.X
             local sliderX = SliderBg.AbsolutePosition.X
             local sliderWidth = SliderBg.AbsoluteSize.X
-            local ratio = math.clamp((mouseX - sliderX) / sliderWidth, 0, 1)
+            local ratio = math.clamp((touchX - sliderX) / sliderWidth, 0, 1)
             local value = minVal + (maxVal - minVal) * ratio
             UpdateSlider(value)
         end
     end)
 
-    SliderBg.MouseButton1Down:Connect(function()
-        local mouseX = UserInputService:GetMouseLocation().X
-        local sliderX = SliderBg.AbsolutePosition.X
-        local sliderWidth = SliderBg.AbsoluteSize.X
-        local ratio = math.clamp((mouseX - sliderX) / sliderWidth, 0, 1)
-        local value = minVal + (maxVal - minVal) * ratio
-        UpdateSlider(value)
-        isDragging = true
+    -- Клик по слайдеру
+    SliderBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            local touchX = input.Position.X
+            local sliderX = SliderBg.AbsolutePosition.X
+            local sliderWidth = SliderBg.AbsoluteSize.X
+            local ratio = math.clamp((touchX - sliderX) / sliderWidth, 0, 1)
+            local value = minVal + (maxVal - minVal) * ratio
+            UpdateSlider(value)
+            isDragging = true
+        end
     end)
 
     InputBox.FocusLost:Connect(function()
@@ -393,7 +397,7 @@ CreateToggle("🔫 БЕЗ ОТДАЧИ", false, function(value)
     env.NoRecoilEnabled = value
 end)
 
-CreateToggle("💥 PRO SPREAD (разброс при прыжке)", false, function(value)
+CreateToggle("💥 PRO SPREAD", false, function(value)
     env.ProSpreadEnabled = value
 end)
 
@@ -571,7 +575,7 @@ end)
 local lastCameraLookVector = Camera.CFrame.LookVector
 local recoilAccumulation = Vector3.new(0, 0, 0)
 
--- ========== PRO SPREAD (автоматический, без слайдеров) ==========
+-- ========== PRO SPREAD ==========
 local lastCameraDirection = Camera.CFrame.LookVector
 
 local function ApplyProSpread()
@@ -584,33 +588,27 @@ local function ApplyProSpread()
     
     if not humanoid then return end
     
-    -- Проверяем в ли игрок в воздухе (прыгает)
     local isInAir = humanoid:GetState() == Enum.HumanoidStateType.Freefall or 
                     humanoid:GetState() == Enum.HumanoidStateType.Flying or
                     humanoid:GetState() == Enum.HumanoidStateType.Jumping
     
     if isInAir then
-        -- Если в воздухе - выравниваем разброс
         local currentLook = Camera.CFrame.LookVector
         local lookDifference = (currentLook - lastCameraDirection).Magnitude
         
         if lookDifference > 0.001 then
-            -- Компенсируем разброс
             local targetCFrame = CFrame.lookAt(Camera.CFrame.Position, Camera.CFrame.Position + lastCameraDirection)
             Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, 0.6)
         end
     else
-        -- Когда на земле - обновляем направление
         lastCameraDirection = Camera.CFrame.LookVector
     end
 end
 
 -- ========== ГЛАВНЫЙ ИГРОВОЙ ЦИКЛ ==========
 RunService.RenderStepped:Connect(function()
-    -- Pro Spread
     ApplyProSpread()
     
-    -- Aimbot
     if env.AimbotEnabled then
         local target = GetClosestEnemyInFOV()
         if target then
@@ -618,7 +616,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- No Recoil
     if env.NoRecoilEnabled then
         local currentCFrame = Camera.CFrame
         local currentLookVector = currentCFrame.LookVector
@@ -642,7 +639,6 @@ RunService.RenderStepped:Connect(function()
         recoilAccumulation = Vector3.new(0, 0, 0)
     end
 
-    -- FOV Circle
     if fovCircle then
         fovCircle.Visible = env.ShowFOV and env.AimbotEnabled
         if fovCircle.Visible then
@@ -651,16 +647,14 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Chams
     UpdateChams()
 end)
 
--- Очистка
 LocalPlayer.CharacterAdded:Connect(function()
     ClearAllChams()
 end)
 
-print("✅ TECHY SCRIPT v5 загружен!")
-print("🎯 Нажми кнопку ⚙️ для открытия меню")
-print("📌 Перетаскивай меню за заголовок!")
-print("💥 Pro Spread работает автоматически при прыжке")
+print("✅ TECHY SCRIPT МОБИЛЬНАЯ v1 загружена!")
+print("📱 Для телефона - все работает через сенсор!")
+print("🎮 Тапни кнопку ⚙️ чтобы открыть меню")
+print("👆 Тащи меню за заголовок")
