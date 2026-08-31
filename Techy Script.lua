@@ -1,4 +1,4 @@
--- // Roblox Delta Script: Floating GUI + Aimbot + WallCheck + ESP (исправлено)
+-- // Roblox Delta Script: Floating GUI + Aimbot + WallCheck + Chams + No Recoil
 -- // Для мобильных устройств
 
 local env = getgenv() or shared
@@ -8,15 +8,16 @@ local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- Библиотека Drawing
+-- Библиотека Drawing (для FOV Circle)
 local Drawing = Drawing or loadstring(game:HttpGet("https://raw.githubusercontent.com/Blissful4992/ESPs/main/Drawing.lua"))()
 
 -- ========== НАСТРОЙКИ ==========
 env.AimbotEnabled = false
 env.FOV = 100
 env.WallCheckEnabled = true
-env.ESPEnabled = true
+env.ChamsEnabled = true       -- вместо ESP
 env.ShowFOV = false
+env.NoRecoilEnabled = false   -- без отдачи
 
 -- Функция определения врага
 local function IsEnemy(player)
@@ -73,8 +74,8 @@ end)
 
 -- ========== ПЛАВАЮЩЕЕ МЕНЮ ==========
 local Menu = Instance.new("Frame")
-Menu.Size = UDim2.new(0, 220, 0, 300)
-Menu.Position = UDim2.new(0.5, -110, 0.5, -150)
+Menu.Size = UDim2.new(0, 220, 0, 340)  -- увеличено для No Recoil
+Menu.Position = UDim2.new(0.5, -110, 0.5, -170)
 Menu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Menu.BackgroundTransparency = 0.1
 Menu.BorderSizePixel = 0
@@ -133,7 +134,7 @@ end
 -- Слайдер FOV
 local FOVLabel = Instance.new("TextLabel")
 FOVLabel.Size = UDim2.new(1, 0, 0, 20)
-FOVLabel.Position = UDim2.new(0, 10, 0, 200)
+FOVLabel.Position = UDim2.new(0, 10, 0, 240)
 FOVLabel.BackgroundTransparency = 1
 FOVLabel.Text = "FOV: " .. env.FOV
 FOVLabel.TextColor3 = Color3.new(1,1,1)
@@ -144,7 +145,7 @@ FOVLabel.Parent = Menu
 
 local FOVSlider = Instance.new("TextBox")
 FOVSlider.Size = UDim2.new(0, 180, 0, 30)
-FOVSlider.Position = UDim2.new(0, 20, 0, 225)
+FOVSlider.Position = UDim2.new(0, 20, 0, 265)
 FOVSlider.BackgroundColor3 = Color3.fromRGB(50,50,50)
 FOVSlider.Text = tostring(env.FOV)
 FOVSlider.TextColor3 = Color3.new(1,1,1)
@@ -166,15 +167,16 @@ end)
 -- Тумблеры
 CreateToggle("Aimbot", false, 40, function(value) env.AimbotEnabled = value end)
 CreateToggle("WallCheck", true, 80, function(value) env.WallCheckEnabled = value end)
-CreateToggle("ESP", true, 120, function(value)
-    env.ESPEnabled = value
+CreateToggle("Chams", true, 120, function(value)
+    env.ChamsEnabled = value
     if value then
-        CreateESP()
+        CreateAllChams()
     else
-        ClearESP()
+        ClearAllChams()
     end
 end)
 CreateToggle("Show FOV", false, 160, function(value) env.ShowFOV = value end)
+CreateToggle("No Recoil", false, 200, function(value) env.NoRecoilEnabled = value end)
 
 -- Кнопка закрытия
 local CloseButton = Instance.new("TextButton")
@@ -255,58 +257,57 @@ local function InstantAimbot(targetPlayer)
     Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetPart.Position)
 end
 
--- ========== ESP ==========
-local espObjects = {}
-local function ClearESP()
-    for _, obj in pairs(espObjects) do
-        if obj.Remove then obj:Remove() end
-    end
-    espObjects = {}
+-- ========== CHAMS (Highlight) ==========
+local chamsHighlights = {}  -- таблица: player -> Highlight
+
+local function CreateChamsForPlayer(player)
+    if chamsHighlights[player] then return end
+    local character = player.Character
+    if not character then return end
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ChamsHighlight"
+    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+    highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+    highlight.FillTransparency = 0.0
+    highlight.OutlineTransparency = 0.0
+    highlight.DepthMode = Enum.HighlightDepthMode.Always  -- видно сквозь стены
+    highlight.Parent = character
+    chamsHighlights[player] = highlight
 end
 
-local function CreateESP()
-    ClearESP()
-    if not env.ESPEnabled then return end
+local function ClearChamsForPlayer(player)
+    local hl = chamsHighlights[player]
+    if hl then
+        hl:Destroy()
+        chamsHighlights[player] = nil
+    end
+end
 
+local function CreateAllChams()
     for _, player in ipairs(GetAliveEnemies()) do
-        local character = player.Character
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        local head = character:FindFirstChild("Head")
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if rootPart and head and humanoid then
-            local box = Drawing.new("Square")
-            box.Thickness = 2
-            box.Color = Color3.fromRGB(255,0,0)
-            box.Filled = false
-            box.Transparency = 1
-            box.Visible = true
-            table.insert(espObjects, box)
+        CreateChamsForPlayer(player)
+    end
+end
 
-            local nameTag = Drawing.new("Text")
-            nameTag.Text = player.Name
-            nameTag.Size = 14
-            nameTag.Color = Color3.fromRGB(255,255,255)
-            nameTag.Center = true
-            nameTag.Outline = true
-            nameTag.OutlineColor = Color3.new(0,0,0)
-            nameTag.Visible = true
-            table.insert(espObjects, nameTag)
+local function ClearAllChams()
+    for player, hl in pairs(chamsHighlights) do
+        if hl then hl:Destroy() end
+    end
+    chamsHighlights = {}
+end
 
-            local healthBg = Drawing.new("Square")
-            healthBg.Thickness = 1
-            healthBg.Color = Color3.fromRGB(0,0,0)
-            healthBg.Filled = true
-            healthBg.Transparency = 0.7
-            healthBg.Visible = true
-            table.insert(espObjects, healthBg)
-
-            local healthBar = Drawing.new("Square")
-            healthBar.Thickness = 1
-            healthBar.Color = Color3.fromRGB(0,255,0)
-            healthBar.Filled = true
-            healthBar.Visible = true
-            table.insert(espObjects, healthBar)
+-- Обновление chams при появлении/исчезновении врагов
+local function UpdateChams()
+    if not env.ChamsEnabled then return end
+    -- Удаляем подсветку для мёртвых/вышедших
+    for player, hl in pairs(chamsHighlights) do
+        if not player.Character or not player.Character:FindFirstChild("Humanoid") or player.Character.Humanoid.Health <= 0 then
+            ClearChamsForPlayer(player)
         end
+    end
+    -- Добавляем для новых врагов
+    for _, player in ipairs(GetAliveEnemies()) do
+        CreateChamsForPlayer(player)
     end
 end
 
@@ -322,6 +323,29 @@ if Drawing.new then
         fovCircle.Visible = false
     end)
 end
+
+-- ========== NO RECOIL (простая компенсация) ==========
+local lastCameraCFrame = Camera.CFrame
+local userInputActive = false
+local lastInputTime = 0
+
+-- Отслеживаем пользовательский ввод (движение пальца)
+UIS.TouchMoved:Connect(function(input, processed)
+    if not processed then
+        userInputActive = true
+        lastInputTime = tick()
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        -- небольшая задержка перед сбросом флага, чтобы отдача не мешала
+        task.delay(0.1, function()
+            if tick() - lastInputTime > 0.1 then
+                userInputActive = false
+            end
+        end)
+    end
+end)
 
 -- ========== ГЛАВНЫЙ ЦИКЛ ==========
 RunService.RenderStepped:Connect(function()
@@ -344,54 +368,31 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Обновление ESP
-    if env.ESPEnabled and #espObjects > 0 then
-        local enemies = GetAliveEnemies()
-        local index = 1
-        for _, player in ipairs(enemies) do
-            local character = player.Character
-            local rootPart = character:FindFirstChild("HumanoidRootPart")
-            local head = character:FindFirstChild("Head")
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if rootPart and head and humanoid then
-                -- ИСПРАВЛЕНИЕ: используем HipHeight для точной нижней точки
-                local footPosition = rootPart.Position - Vector3.new(0, humanoid.HipHeight, 0)
-                local footScreenPos, footVisible = Camera:WorldToScreenPoint(footPosition)
-                local headScreenPos, headVisible = Camera:WorldToScreenPoint(head.Position + Vector3.new(0, 0.3, 0))
+    -- Обновление Chams
+    UpdateChams()
 
-                if footVisible and headVisible then
-                    local baseIndex = (index - 1) * 4 + 1
-                    if espObjects[baseIndex] then
-                        local box = espObjects[baseIndex]
-                        local nameTag = espObjects[baseIndex + 1]
-                        local healthBg = espObjects[baseIndex + 2]
-                        local healthBar = espObjects[baseIndex + 3]
-
-                        local height = math.abs(footScreenPos.Y - headScreenPos.Y)
-                        local width = height * 0.6
-
-                        box.Position = Vector2.new(footScreenPos.X - width/2, footScreenPos.Y - height)
-                        box.Size = Vector2.new(width, height)
-
-                        nameTag.Position = Vector2.new(footScreenPos.X, footScreenPos.Y - height - 15)
-                        nameTag.Text = player.Name
-
-                        local healthPercent = humanoid.Health / humanoid.MaxHealth
-                        healthBg.Position = Vector2.new(footScreenPos.X - width/2 - 5, footScreenPos.Y - height)
-                        healthBg.Size = Vector2.new(3, height)
-
-                        healthBar.Position = Vector2.new(footScreenPos.X - width/2 - 5, footScreenPos.Y - height + height * (1 - healthPercent))
-                        healthBar.Size = Vector2.new(3, height * healthPercent)
-                        healthBar.Color = Color3.fromHSV(healthPercent * 0.33, 1, 1)
-                    end
-                end
-                index = index + 1
+    -- No Recoil
+    if env.NoRecoilEnabled then
+        if not userInputActive then
+            local currentCFrame = Camera.CFrame
+            -- Сравниваем углы: если разница существенная, возвращаем камеру
+            local angleDiff = (currentCFrame.LookVector - lastCameraCFrame.LookVector).Magnitude
+            if angleDiff > 0.05 then  -- порог срабатывания
+                Camera.CFrame = lastCameraCFrame
             end
+        else
+            -- если пользователь двигает камеру, обновляем lastCameraCFrame
+            lastCameraCFrame = Camera.CFrame
         end
+    else
+        lastCameraCFrame = Camera.CFrame
     end
+    lastCameraCFrame = Camera.CFrame
 end)
 
--- Начальное создание ESP
-CreateESP()
+-- Начальное создание Chams
+if env.ChamsEnabled then
+    CreateAllChams()
+end
 
 print("Script loaded! Press Menu button to open settings.")
