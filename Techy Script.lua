@@ -1,6 +1,6 @@
 -- ╔═══════════════════════════════════════════════════════════════╗
--- ║     TECHY SCRIPT v3 - Pro Spread + Исправленные Слайдеры   ║
--- ║  No Recoil, Aimbot, Chams, Pro Spread (убирает разброс)    ║
+-- ║     TECHY SCRIPT v5 - ФИНАЛЬНАЯ ВЕРСИЯ                      ║
+-- ║  Меню работает правильно, перетаскивание без багов          ║
 -- ╚═══════════════════════════════════════════════════════════════╝
 
 local env = getgenv() or shared
@@ -20,7 +20,6 @@ env.NoRecoilEnabled = false
 env.ProSpreadEnabled = false
 env.NoRecoilStrength = 1.0
 env.AimbotSmoothness = 0.15
-env.SpreadReduction = 1.0
 
 -- Функция определения врага
 local function IsEnemy(player)
@@ -62,40 +61,23 @@ Shadow1.Color = Color3.fromRGB(20, 120, 180)
 Shadow1.Thickness = 2
 Shadow1.Parent = MenuButton
 
--- Перетаскивание кнопки
-local dragging = false
-local dragOffset = Vector2.new(0, 0)
-
-MenuButton.MouseButton1Down:Connect(function()
-    dragging = true
-    dragOffset = UserInputService:GetMouseLocation() - Vector2.new(MenuButton.AbsolutePosition.X, MenuButton.AbsolutePosition.Y)
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    if dragging then
-        local mousePos = UserInputService:GetMouseLocation()
-        local newPos = mousePos - dragOffset
-        MenuButton.Position = UDim2.new(0, newPos.X, 0, newPos.Y)
-    end
+-- Простое открытие/закрытие меню - БЕЗ перетаскивания кнопки!
+local menuOpen = false
+MenuButton.MouseButton1Click:Connect(function()
+    menuOpen = not menuOpen
+    MainMenu.Visible = menuOpen
 end)
 
 -- ========== ОСНОВНОЕ МЕНЮ ==========
 local MainMenu = Instance.new("Frame")
 MainMenu.Name = "MainMenu"
-MainMenu.Size = UDim2.new(0, 340, 0, 800)
-MainMenu.Position = UDim2.new(0.5, -170, 0.5, -400)
+MainMenu.Size = UDim2.new(0, 340, 0, 700)
+MainMenu.Position = UDim2.new(0.5, -170, 0.5, -350)
 MainMenu.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
 MainMenu.BackgroundTransparency = 0.05
 MainMenu.BorderSizePixel = 0
 MainMenu.Visible = false
 MainMenu.Active = true
-MainMenu.Draggable = true
 MainMenu.ZIndex = 998
 MainMenu.Parent = ScreenGui
 
@@ -114,10 +96,10 @@ Header.Name = "Header"
 Header.Size = UDim2.new(1, 0, 0, 50)
 Header.BackgroundColor3 = Color3.fromRGB(25, 135, 200)
 Header.BackgroundTransparency = 0.2
-Header.Text = "⚙️ TECHY PRO MENU"
+Header.Text = "⚙️ TECHY MENU (тащи за заголовок)"
 Header.TextColor3 = Color3.new(1, 1, 1)
 Header.Font = Enum.Font.SourceSansBold
-Header.TextSize = 22
+Header.TextSize = 16
 Header.BorderSizePixel = 0
 Header.ZIndex = 998
 Header.Parent = MainMenu
@@ -125,6 +107,37 @@ Header.Parent = MainMenu
 local HeaderCorner = Instance.new("UICorner")
 HeaderCorner.CornerRadius = UDim.new(0, 12)
 HeaderCorner.Parent = Header
+
+-- Правильное перетаскивание ТОЛЬКО за заголовок
+local draggingMenu = false
+local dragOffsetMenu = Vector2.new(0, 0)
+
+Header.MouseButton1Down:Connect(function()
+    draggingMenu = true
+    dragOffsetMenu = UserInputService:GetMouseLocation() - Vector2.new(MainMenu.AbsolutePosition.X, MainMenu.AbsolutePosition.Y)
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        draggingMenu = false
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if draggingMenu then
+        local mousePos = UserInputService:GetMouseLocation()
+        local newPos = mousePos - dragOffsetMenu
+        
+        -- Ограничиваем чтобы меню не вышло за границы экрана
+        local screenSize = ScreenGui.AbsoluteSize
+        newPos = Vector2.new(
+            math.clamp(newPos.X, 0, screenSize.X - MainMenu.AbsoluteSize.X),
+            math.clamp(newPos.Y, 0, screenSize.Y - MainMenu.AbsoluteSize.Y)
+        )
+        
+        MainMenu.Position = UDim2.new(0, newPos.X, 0, newPos.Y)
+    end
+end)
 
 -- Кнопка закрытия
 local CloseBtn = Instance.new("TextButton")
@@ -146,6 +159,7 @@ CloseCorner.CornerRadius = UDim.new(0, 8)
 CloseCorner.Parent = CloseBtn
 
 CloseBtn.MouseButton1Click:Connect(function()
+    menuOpen = false
     MainMenu.Visible = false
 end)
 
@@ -159,7 +173,7 @@ ContentFrame.BorderSizePixel = 0
 ContentFrame.ScrollBarThickness = 4
 ContentFrame.ScrollBarImageColor3 = Color3.fromRGB(25, 135, 200)
 ContentFrame.ZIndex = 998
-ContentFrame.CanvasSize = UDim2.new(0, 0, 0, 1000)
+ContentFrame.CanvasSize = UDim2.new(0, 0, 0, 800)
 ContentFrame.Parent = MainMenu
 
 local UIListLayout = Instance.new("UIListLayout")
@@ -222,7 +236,7 @@ local function CreateToggle(text, defaultValue, callback)
     return ToggleContainer
 end
 
--- ========== ФУНКЦИЯ СОЗДАНИЯ СЛАЙДЕРА (БЕЗ СЛЕДОВАНИЯ) ==========
+-- ========== ФУНКЦИЯ СОЗДАНИЯ СЛАЙДЕРА ==========
 local function CreateSlider(text, minVal, maxVal, defaultVal, callback)
     local SliderContainer = Instance.new("Frame")
     SliderContainer.Size = UDim2.new(0, 310, 0, 85)
@@ -248,7 +262,6 @@ local function CreateSlider(text, minVal, maxVal, defaultVal, callback)
     Label.ZIndex = 998
     Label.Parent = SliderContainer
 
-    -- Поле ввода для прямого ввода числа
     local InputBox = Instance.new("TextBox")
     InputBox.Size = UDim2.new(0, 70, 0, 25)
     InputBox.Position = UDim2.new(1, -80, 0, 5)
@@ -289,10 +302,9 @@ local function CreateSlider(text, minVal, maxVal, defaultVal, callback)
     ThumbCorner.CornerRadius = UDim.new(0, 9)
     ThumbCorner.Parent = Thumb
 
-    local currentValue = defaultValue
+    local currentValue = defaultVal
     local isDragging = false
 
-    -- Функция обновления слайдера
     local function UpdateSlider(value)
         value = math.clamp(value, minVal, maxVal)
         value = math.floor(value * 100) / 100
@@ -307,7 +319,6 @@ local function CreateSlider(text, minVal, maxVal, defaultVal, callback)
 
     UpdateSlider(defaultVal)
 
-    -- Перетаскивание ползунка
     Thumb.MouseButton1Down:Connect(function()
         isDragging = true
     end)
@@ -329,7 +340,6 @@ local function CreateSlider(text, minVal, maxVal, defaultVal, callback)
         end
     end)
 
-    -- Клик по слайдеру (но не ввод в поле)
     SliderBg.MouseButton1Down:Connect(function()
         local mouseX = UserInputService:GetMouseLocation().X
         local sliderX = SliderBg.AbsolutePosition.X
@@ -340,7 +350,6 @@ local function CreateSlider(text, minVal, maxVal, defaultVal, callback)
         isDragging = true
     end)
 
-    -- Ввод в текстовое поле
     InputBox.FocusLost:Connect(function()
         local num = tonumber(InputBox.Text)
         if num then
@@ -384,7 +393,7 @@ CreateToggle("🔫 БЕЗ ОТДАЧИ", false, function(value)
     env.NoRecoilEnabled = value
 end)
 
-CreateToggle("💥 PRO SPREAD", false, function(value)
+CreateToggle("💥 PRO SPREAD (разброс при прыжке)", false, function(value)
     env.ProSpreadEnabled = value
 end)
 
@@ -398,29 +407,6 @@ end)
 
 CreateSlider("💥 Сила No Recoil", 0.1, 2.0, 1.0, function(value)
     env.NoRecoilStrength = value
-end)
-
-CreateSlider("🌟 Pro Spread (разброс)", 0.1, 2.0, 1.0, function(value)
-    env.SpreadReduction = value
-end)
-
--- Статус
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(1, 0, 0, 50)
-StatusLabel.Position = UDim2.new(0, 0, 1, -50)
-StatusLabel.BackgroundColor3 = Color3.fromRGB(25, 135, 200)
-StatusLabel.BackgroundTransparency = 0.2
-StatusLabel.Text = "✓ Скрипт загружен | Pro Spread готов"
-StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-StatusLabel.Font = Enum.Font.SourceSansBold
-StatusLabel.TextSize = 12
-StatusLabel.BorderSizePixel = 0
-StatusLabel.ZIndex = 998
-StatusLabel.Parent = MainMenu
-
--- Открытие/закрытие меню
-MenuButton.MouseButton1Click:Connect(function()
-    MainMenu.Visible = not MainMenu.Visible
 end)
 
 -- ========== ПОЛУЧЕНИЕ ВРАГОВ ==========
@@ -585,24 +571,9 @@ end)
 local lastCameraLookVector = Camera.CFrame.LookVector
 local recoilAccumulation = Vector3.new(0, 0, 0)
 
--- ========== PRO SPREAD СИСТЕМА ==========
--- Перехватываем выстрелы и убираем разброс
-local lastShotTime = 0
+-- ========== PRO SPREAD (автоматический, без слайдеров) ==========
 local lastCameraDirection = Camera.CFrame.LookVector
 
--- Отслеживаем когда игрок стреляет
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        if env.ProSpreadEnabled then
-            lastShotTime = tick()
-            lastCameraDirection = Camera.CFrame.LookVector
-        end
-    end
-end)
-
--- Функция Pro Spread - убирает разброс
 local function ApplyProSpread()
     if not env.ProSpreadEnabled then return end
     
@@ -610,31 +581,27 @@ local function ApplyProSpread()
     if not character then return end
     
     local humanoid = character:FindFirstChild("Humanoid")
-    local hrp = character:FindFirstChild("HumanoidRootPart")
     
-    if not humanoid or not hrp then return end
+    if not humanoid then return end
     
-    -- Проверяем условия для Pro Spread:
-    -- 1. Персонаж в воздухе (прыгает)
-    -- 2. Недавно выстрелил
-    
+    -- Проверяем в ли игрок в воздухе (прыгает)
     local isInAir = humanoid:GetState() == Enum.HumanoidStateType.Freefall or 
                     humanoid:GetState() == Enum.HumanoidStateType.Flying or
                     humanoid:GetState() == Enum.HumanoidStateType.Jumping
     
-    local timeSinceShot = tick() - lastShotTime
-    
-    -- Если в воздухе или недавно выстрелил - выравниваем разброс
-    if (isInAir or timeSinceShot < 0.15) then
-        -- Пытаемся выровнять камеру по последнему направлению стрельбы
+    if isInAir then
+        -- Если в воздухе - выравниваем разброс
         local currentLook = Camera.CFrame.LookVector
         local lookDifference = (currentLook - lastCameraDirection).Magnitude
         
-        -- Если есть разброс - компенсируем его
         if lookDifference > 0.001 then
+            -- Компенсируем разброс
             local targetCFrame = CFrame.lookAt(Camera.CFrame.Position, Camera.CFrame.Position + lastCameraDirection)
-            Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, 0.5 * env.SpreadReduction)
+            Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, 0.6)
         end
+    else
+        -- Когда на земле - обновляем направление
+        lastCameraDirection = Camera.CFrame.LookVector
     end
 end
 
@@ -693,7 +660,7 @@ LocalPlayer.CharacterAdded:Connect(function()
     ClearAllChams()
 end)
 
-print("✅ TECHY SCRIPT v3 загружен!")
-print("🎯 Функции: Aimbot, No Recoil, Chams, PRO SPREAD")
-print("💥 Pro Spread: убирает разброс при прыжке и стрельбе")
-print("🎮 Нажми кнопку ⚙️ чтобы открыть меню")
+print("✅ TECHY SCRIPT v5 загружен!")
+print("🎯 Нажми кнопку ⚙️ для открытия меню")
+print("📌 Перетаскивай меню за заголовок!")
+print("💥 Pro Spread работает автоматически при прыжке")
