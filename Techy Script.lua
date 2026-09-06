@@ -1,476 +1,388 @@
--- ╔═══════════════════════════════════════════════════════════════╗
--- ║     TECHY SCRIPT МОБИЛЬНАЯ v1 - ДЛЯ ТЕЛЕФОНА                ║
--- ║  Сенсорные управления, плавающее меню, все работает!        ║
--- ╚═══════════════════════════════════════════════════════════════╝
+-- // BLOXSTRIKE MOBILE SCRIPT // --
+-- // Работает на телефоне: плавающая кнопка и меню // --
+-- // Функции: Aimbot, Wallcheck, ESP (VH Charms), Skin Changer // --
 
-local env = getgenv() or shared
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Camera = workspace.CurrentCamera
-local LocalPlayer = Players.LocalPlayer
+-- // Настройки по умолчанию // --
+local Settings = {
+    Aimbot = false,
+    FOV = 120,                 -- градусы
+    WallCheck = false,
+    ESP = false,
+    SkinChanger = false,
+    SkinID = "rbxassetid://1234567890" -- замените на ID вашего скина
+}
 
--- ========== НАСТРОЙКИ ==========
-env.AimbotEnabled = false
-env.FOV = 150
-env.WallCheckEnabled = true
-env.ChamsEnabled = false
-env.ShowFOV = false
-env.NoRecoilEnabled = false
-env.ProSpreadEnabled = false
-env.NoRecoilStrength = 1.0
-env.AimbotSmoothness = 0.15
+-- // Создание GUI // --
+local player = game.Players.LocalPlayer
+local mouse = player:GetMouse()
+local camera = workspace.CurrentCamera
 
--- Функция определения врага
-local function IsEnemy(player)
-    if player == LocalPlayer then return false end
-    if player.Team and LocalPlayer.Team then
-        return player.Team ~= LocalPlayer.Team
+-- Глобальный ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "BloxStrikeGUI"
+gui.ResetOnSpawn = false
+gui.Parent = player.PlayerGui
+
+-- Стили
+local function createStyle()
+    local styles = {
+        BackgroundColor3 = Color3.fromRGB(25, 25, 35),
+        BorderColor3 = Color3.fromRGB(80, 80, 120),
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        ButtonColor = Color3.fromRGB(60, 60, 90),
+        ButtonHover = Color3.fromRGB(80, 80, 130),
+        AccentColor = Color3.fromRGB(0, 180, 255)
+    }
+    return styles
+end
+local style = createStyle()
+
+-- // Плавающая кнопка (открытие/закрытие меню) // --
+local toggleButton = Instance.new("ImageButton")
+toggleButton.Name = "ToggleButton"
+toggleButton.Size = UDim2.new(0, 70, 0, 70)
+toggleButton.Position = UDim2.new(0.9, -40, 0.05, 20) -- справа вверху
+toggleButton.BackgroundColor3 = style.ButtonColor
+toggleButton.BorderSizePixel = 2
+toggleButton.BorderColor3 = style.BorderColor3
+toggleButton.Image = "rbxassetid://3926305904" -- иконка шестерёнки
+toggleButton.ImageColor3 = Color3.new(1,1,1)
+toggleButton.ScaleType = Enum.ScaleType.Fit
+toggleButton.Parent = gui
+
+-- Перетаскивание кнопки (для телефона через Touch)
+local function makeDraggable(frame)
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+
+    local function onInputBegan(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
     end
-    return true
+
+    local function onInputChanged(input)
+        if dragging and input.UserInputType == Enum.UserInputType.Touch then
+            local delta = input.Position - dragStart
+            local pos = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+            frame.Position = pos
+        end
+    end
+
+    local function onInputEnded(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end
+
+    frame.InputBegan:Connect(onInputBegan)
+    frame.InputChanged:Connect(onInputChanged)
+    frame.InputEnded:Connect(onInputEnded)
 end
 
--- ========== ГЛАВНОЕ GUI ==========
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Parent = game:GetService("CoreGui")
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Name = "TechyMenuGui"
+makeDraggable(toggleButton)
 
--- ========== ПЛАВАЮЩАЯ КНОПКА МЕНЮ (СЕНСОР) ==========
-local MenuButton = Instance.new("TextButton")
-MenuButton.Name = "MenuButton"
-MenuButton.Size = UDim2.new(0, 70, 0, 70)
-MenuButton.Position = UDim2.new(0, 20, 0, 250)
-MenuButton.BackgroundColor3 = Color3.fromRGB(25, 135, 200)
-MenuButton.BackgroundTransparency = 0.15
-MenuButton.BorderSizePixel = 0
-MenuButton.Text = "⚙️"
-MenuButton.TextColor3 = Color3.new(1, 1, 1)
-MenuButton.Font = Enum.Font.SourceSansBold
-MenuButton.TextSize = 28
-MenuButton.ZIndex = 999
-MenuButton.Parent = ScreenGui
+-- // Главное меню // --
+local menuFrame = Instance.new("Frame")
+menuFrame.Name = "MenuFrame"
+menuFrame.Size = UDim2.new(0, 360, 0, 400)
+menuFrame.Position = UDim2.new(0.5, -180, 0.4, -200) -- центр
+menuFrame.BackgroundColor3 = style.BackgroundColor3
+menuFrame.BorderSizePixel = 3
+menuFrame.BorderColor3 = style.BorderColor3
+menuFrame.Visible = false
+menuFrame.Parent = gui
+makeDraggable(menuFrame) -- меню тоже можно перетаскивать
 
-local UICorner1 = Instance.new("UICorner")
-UICorner1.CornerRadius = UDim.new(0, 15)
-UICorner1.Parent = MenuButton
+-- Скругление углов (для красоты)
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = menuFrame
 
-local Shadow1 = Instance.new("UIStroke")
-Shadow1.Color = Color3.fromRGB(20, 120, 180)
-Shadow1.Thickness = 2
-Shadow1.Parent = MenuButton
+-- Заголовок
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundColor3 = style.AccentColor
+title.BackgroundTransparency = 0.2
+title.Text = "BLOXSTRIKE MENU"
+title.TextColor3 = style.TextColor3
+title.TextSize = 22
+title.Font = Enum.Font.GothamBold
+title.Parent = menuFrame
 
--- ========== ОСНОВНОЕ МЕНЮ ==========
-local MainMenu = Instance.new("Frame")
-MainMenu.Name = "MainMenu"
-MainMenu.Size = UDim2.new(0, 340, 0, 700)
-MainMenu.Position = UDim2.new(0.5, -170, 0.5, -350)
-MainMenu.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
-MainMenu.BackgroundTransparency = 0.05
-MainMenu.BorderSizePixel = 0
-MainMenu.Visible = false
-MainMenu.Active = true
-MainMenu.ZIndex = 998
-MainMenu.Parent = ScreenGui
+-- Контейнер для элементов (скроллинг не нужен, все помещается)
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1, -20, 1, -60)
+content.Position = UDim2.new(0, 10, 0, 50)
+content.BackgroundTransparency = 1
+content.Parent = menuFrame
 
-local MenuCorner = Instance.new("UICorner")
-MenuCorner.CornerRadius = UDim.new(0, 12)
-MenuCorner.Parent = MainMenu
+-- Функция для создания переключателя
+local function createToggle(labelText, defaultValue, yPos, callback)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, 0, 0, 35)
+    container.Position = UDim2.new(0, 0, 0, yPos)
+    container.BackgroundTransparency = 1
+    container.Parent = content
 
-local MenuStroke = Instance.new("UIStroke")
-MenuStroke.Color = Color3.fromRGB(25, 135, 200)
-MenuStroke.Thickness = 1.5
-MenuStroke.Parent = MainMenu
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.6, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = style.TextColor3
+    label.TextSize = 18
+    label.Font = Enum.Font.GothamMedium
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = container
 
--- Заголовок меню
-local Header = Instance.new("TextLabel")
-Header.Name = "Header"
-Header.Size = UDim2.new(1, 0, 0, 50)
-Header.BackgroundColor3 = Color3.fromRGB(25, 135, 200)
-Header.BackgroundTransparency = 0.2
-Header.Text = "⚙️ TECHY MENU"
-Header.TextColor3 = Color3.new(1, 1, 1)
-Header.Font = Enum.Font.SourceSansBold
-Header.TextSize = 18
-Header.BorderSizePixel = 0
-Header.ZIndex = 998
-Header.Parent = MainMenu
-
-local HeaderCorner = Instance.new("UICorner")
-HeaderCorner.CornerRadius = UDim.new(0, 12)
-HeaderCorner.Parent = Header
-
--- Кнопка закрытия
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Name = "CloseBtn"
-CloseBtn.Size = UDim2.new(0, 35, 0, 35)
-CloseBtn.Position = UDim2.new(1, -45, 0, 7.5)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-CloseBtn.BackgroundTransparency = 0.2
-CloseBtn.Text = "✕"
-CloseBtn.TextColor3 = Color3.new(1, 1, 1)
-CloseBtn.Font = Enum.Font.SourceSansBold
-CloseBtn.TextSize = 20
-CloseBtn.BorderSizePixel = 0
-CloseBtn.ZIndex = 998
-CloseBtn.Parent = Header
-
-local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(0, 8)
-CloseCorner.Parent = CloseBtn
-
--- Контейнер для опций
-local ContentFrame = Instance.new("ScrollingFrame")
-ContentFrame.Name = "Content"
-ContentFrame.Size = UDim2.new(1, 0, 1, -50)
-ContentFrame.Position = UDim2.new(0, 0, 0, 50)
-ContentFrame.BackgroundTransparency = 1
-ContentFrame.BorderSizePixel = 0
-ContentFrame.ScrollBarThickness = 4
-ContentFrame.ScrollBarImageColor3 = Color3.fromRGB(25, 135, 200)
-ContentFrame.ZIndex = 998
-ContentFrame.CanvasSize = UDim2.new(0, 0, 0, 800)
-ContentFrame.Parent = MainMenu
-
-local UIListLayout = Instance.new("UIListLayout")
-UIListLayout.Parent = ContentFrame
-UIListLayout.Padding = UDim.new(0, 10)
-UIListLayout.FillDirection = Enum.FillDirection.Vertical
-UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
--- ========== СЕНСОРНОЕ УПРАВЛЕНИЕ МЕНЮ ==========
-local menuOpen = false
-local draggingMenu = false
-local dragOffsetMenu = Vector2.new(0, 0)
-local touchStartPos = Vector2.new(0, 0)
-
--- Открытие/закрытие меню при касании кнопки
-MenuButton.TouchTap:Connect(function()
-    menuOpen = not menuOpen
-    MainMenu.Visible = menuOpen
-end)
-
--- Закрытие кнопкой X
-CloseBtn.TouchTap:Connect(function()
-    menuOpen = false
-    MainMenu.Visible = false
-end)
-
--- Перетаскивание меню за заголовок
-Header.InputBegan:Connect(function(input, gameProcessed)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        draggingMenu = true
-        touchStartPos = input.Position
-        dragOffsetMenu = Vector2.new(MainMenu.AbsolutePosition.X, MainMenu.AbsolutePosition.Y) - input.Position
-    end
-end)
-
-Header.InputEnded:Connect(function(input, gameProcessed)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        draggingMenu = false
-    end
-end)
-
-Header.InputChanged:Connect(function(input, gameProcessed)
-    if draggingMenu and input.UserInputType == Enum.UserInputType.Touch then
-        local newPos = input.Position + dragOffsetMenu
-        MainMenu.Position = UDim2.new(0, newPos.X, 0, newPos.Y)
-    end
-end)
-
--- ========== ФУНКЦИЯ СОЗДАНИЯ ПЕРЕКЛЮЧАТЕЛЯ ==========
-local function CreateToggle(text, defaultValue, callback)
-    local ToggleContainer = Instance.new("Frame")
-    ToggleContainer.Size = UDim2.new(0, 310, 0, 50)
-    ToggleContainer.BackgroundColor3 = Color3.fromRGB(35, 45, 60)
-    ToggleContainer.BackgroundTransparency = 0.3
-    ToggleContainer.BorderSizePixel = 0
-    ToggleContainer.ZIndex = 998
-    ToggleContainer.Parent = ContentFrame
-
-    local ToggleCorner = Instance.new("UICorner")
-    ToggleCorner.CornerRadius = UDim.new(0, 8)
-    ToggleCorner.Parent = ToggleContainer
-
-    local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(0, 220, 1, 0)
-    Label.Position = UDim2.new(0, 15, 0, 0)
-    Label.BackgroundTransparency = 1
-    Label.Text = text
-    Label.TextColor3 = Color3.new(1, 1, 1)
-    Label.Font = Enum.Font.SourceSans
-    Label.TextSize = 16
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.ZIndex = 998
-    Label.Parent = ToggleContainer
-
-    local ToggleSwitch = Instance.new("TextButton")
-    ToggleSwitch.Size = UDim2.new(0, 55, 0, 30)
-    ToggleSwitch.Position = UDim2.new(1, -70, 0.5, -15)
-    ToggleSwitch.BackgroundColor3 = defaultValue and Color3.fromRGB(50, 180, 100) or Color3.fromRGB(100, 100, 100)
-    ToggleSwitch.BackgroundTransparency = 0.2
-    ToggleSwitch.Text = defaultValue and "ВКЛ" or "ВЫКЛ"
-    ToggleSwitch.TextColor3 = Color3.new(1, 1, 1)
-    ToggleSwitch.Font = Enum.Font.SourceSansBold
-    ToggleSwitch.TextSize = 13
-    ToggleSwitch.BorderSizePixel = 0
-    ToggleSwitch.ZIndex = 998
-    ToggleSwitch.Parent = ToggleContainer
-
-    local SwitchCorner = Instance.new("UICorner")
-    SwitchCorner.CornerRadius = UDim.new(0, 6)
-    SwitchCorner.Parent = ToggleSwitch
+    local toggle = Instance.new("ImageButton")
+    toggle.Size = UDim2.new(0, 40, 0, 25)
+    toggle.Position = UDim2.new(0.85, 0, 0.15, 0)
+    toggle.BackgroundColor3 = defaultValue and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(150, 50, 50)
+    toggle.BorderSizePixel = 1
+    toggle.BorderColor3 = style.BorderColor3
+    toggle.Image = "rbxassetid://" .. (defaultValue and "3926307737" or "3926307738") -- переключатель вкл/выкл
+    toggle.ScaleType = Enum.ScaleType.Fit
+    toggle.Parent = container
 
     local state = defaultValue
-    
-    ToggleSwitch.TouchTap:Connect(function()
+    toggle.MouseButton1Click:Connect(function()
         state = not state
-        ToggleSwitch.BackgroundColor3 = state and Color3.fromRGB(50, 180, 100) or Color3.fromRGB(100, 100, 100)
-        ToggleSwitch.Text = state and "ВКЛ" or "ВЫКЛ"
+        toggle.BackgroundColor3 = state and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(150, 50, 50)
+        toggle.Image = "rbxassetid://" .. (state and "3926307737" or "3926307738")
         callback(state)
     end)
-
-    return ToggleContainer
+    -- для телефона
+    toggle.TouchTap:Connect(function()
+        state = not state
+        toggle.BackgroundColor3 = state and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(150, 50, 50)
+        toggle.Image = "rbxassetid://" .. (state and "3926307737" or "3926307738")
+        callback(state)
+    end)
+    return toggle
 end
 
--- ========== ФУНКЦИЯ СОЗДАНИЯ СЛАЙДЕРА ==========
-local function CreateSlider(text, minVal, maxVal, defaultVal, callback)
-    local SliderContainer = Instance.new("Frame")
-    SliderContainer.Size = UDim2.new(0, 310, 0, 85)
-    SliderContainer.BackgroundColor3 = Color3.fromRGB(35, 45, 60)
-    SliderContainer.BackgroundTransparency = 0.3
-    SliderContainer.BorderSizePixel = 0
-    SliderContainer.ZIndex = 998
-    SliderContainer.Parent = ContentFrame
-
-    local SliderCorner = Instance.new("UICorner")
-    SliderCorner.CornerRadius = UDim.new(0, 8)
-    SliderCorner.Parent = SliderContainer
-
-    local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, -20, 0, 25)
-    Label.Position = UDim2.new(0, 10, 0, 5)
-    Label.BackgroundTransparency = 1
-    Label.Text = text .. ": " .. tostring(math.floor(defaultVal * 100) / 100)
-    Label.TextColor3 = Color3.new(1, 1, 1)
-    Label.Font = Enum.Font.SourceSans
-    Label.TextSize = 15
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.ZIndex = 998
-    Label.Parent = SliderContainer
-
-    local InputBox = Instance.new("TextBox")
-    InputBox.Size = UDim2.new(0, 70, 0, 25)
-    InputBox.Position = UDim2.new(1, -80, 0, 5)
-    InputBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    InputBox.BackgroundTransparency = 0.3
-    InputBox.Text = tostring(math.floor(defaultVal * 100) / 100)
-    InputBox.TextColor3 = Color3.new(1, 1, 1)
-    InputBox.Font = Enum.Font.SourceSans
-    InputBox.TextSize = 14
-    InputBox.BorderSizePixel = 0
-    InputBox.ZIndex = 998
-    InputBox.Parent = SliderContainer
-
-    local InputCorner = Instance.new("UICorner")
-    InputCorner.CornerRadius = UDim.new(0, 4)
-    InputCorner.Parent = InputBox
-
-    local SliderBg = Instance.new("Frame")
-    SliderBg.Size = UDim2.new(0, 290, 0, 8)
-    SliderBg.Position = UDim2.new(0, 10, 0, 40)
-    SliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    SliderBg.BorderSizePixel = 0
-    SliderBg.ZIndex = 998
-    SliderBg.Parent = SliderContainer
-
-    local BgCorner = Instance.new("UICorner")
-    BgCorner.CornerRadius = UDim.new(0, 4)
-    BgCorner.Parent = SliderBg
-
-    local Thumb = Instance.new("Frame")
-    Thumb.Size = UDim2.new(0, 18, 0, 18)
-    Thumb.BackgroundColor3 = Color3.fromRGB(25, 135, 200)
-    Thumb.BorderSizePixel = 0
-    Thumb.ZIndex = 999
-    Thumb.Parent = SliderBg
-
-    local ThumbCorner = Instance.new("UICorner")
-    ThumbCorner.CornerRadius = UDim.new(0, 9)
-    ThumbCorner.Parent = Thumb
-
-    local currentValue = defaultVal
-    local isDragging = false
-
-    local function UpdateSlider(value)
-        value = math.clamp(value, minVal, maxVal)
-        value = math.floor(value * 100) / 100
-        
-        local ratio = (value - minVal) / (maxVal - minVal)
-        Thumb.Position = UDim2.new(ratio, -9, 0.5, -9)
-        Label.Text = text .. ": " .. tostring(value)
-        InputBox.Text = tostring(value)
-        currentValue = value
-        callback(value)
-    end
-
-    UpdateSlider(defaultVal)
-
-    -- Сенсорное перетаскивание слайдера
-    Thumb.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = true
-        end
-    end)
-
-    Thumb.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = false
-        end
-    end)
-
-    Thumb.InputChanged:Connect(function(input)
-        if isDragging and input.UserInputType == Enum.UserInputType.Touch then
-            local touchX = input.Position.X
-            local sliderX = SliderBg.AbsolutePosition.X
-            local sliderWidth = SliderBg.AbsoluteSize.X
-            local ratio = math.clamp((touchX - sliderX) / sliderWidth, 0, 1)
-            local value = minVal + (maxVal - minVal) * ratio
-            UpdateSlider(value)
-        end
-    end)
-
-    -- Клик по слайдеру
-    SliderBg.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            local touchX = input.Position.X
-            local sliderX = SliderBg.AbsolutePosition.X
-            local sliderWidth = SliderBg.AbsoluteSize.X
-            local ratio = math.clamp((touchX - sliderX) / sliderWidth, 0, 1)
-            local value = minVal + (maxVal - minVal) * ratio
-            UpdateSlider(value)
-            isDragging = true
-        end
-    end)
-
-    InputBox.FocusLost:Connect(function()
-        local num = tonumber(InputBox.Text)
-        if num then
-            UpdateSlider(num)
-        else
-            InputBox.Text = tostring(currentValue)
-        end
-    end)
-
-    return SliderContainer
-end
-
--- ========== ДОБАВЛЕНИЕ ЭЛЕМЕНТОВ МЕНЮ ==========
-local padding = Instance.new("Frame")
-padding.Size = UDim2.new(0, 0, 0, 5)
-padding.BackgroundTransparency = 1
-padding.Parent = ContentFrame
-
-CreateToggle("🎯 Aimbot", false, function(value)
-    env.AimbotEnabled = value
+-- Aimbot
+local aimbotToggle = createToggle("Aimbot", Settings.Aimbot, 0, function(val)
+    Settings.Aimbot = val
 end)
 
-CreateToggle("👁️ Проверка стен", true, function(value)
-    env.WallCheckEnabled = value
+-- WallCheck
+local wallToggle = createToggle("WallCheck", Settings.WallCheck, 40, function(val)
+    Settings.WallCheck = val
 end)
 
-CreateToggle("✨ Chams (свечение)", false, function(value)
-    env.ChamsEnabled = value
-    if value then
-        CreateAllChams()
-    else
-        ClearAllChams()
-    end
-end)
-
-CreateToggle("🎲 Показать FOV", false, function(value)
-    env.ShowFOV = value
-end)
-
-CreateToggle("🔫 БЕЗ ОТДАЧИ", false, function(value)
-    env.NoRecoilEnabled = value
-end)
-
-CreateToggle("💥 PRO SPREAD", false, function(value)
-    env.ProSpreadEnabled = value
-end)
-
-CreateSlider("🎯 FOV", 10, 600, 150, function(value)
-    env.FOV = value
-end)
-
-CreateSlider("⚡ Точность Aimbot", 0.01, 1.0, 0.15, function(value)
-    env.AimbotSmoothness = value
-end)
-
-CreateSlider("💥 Сила No Recoil", 0.1, 2.0, 1.0, function(value)
-    env.NoRecoilStrength = value
-end)
-
--- ========== ПОЛУЧЕНИЕ ВРАГОВ ==========
-local function GetAliveEnemies()
-    local enemies = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if IsEnemy(player) and player.Character then
-            local humanoid = player.Character:FindFirstChild("Humanoid")
-            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-            if humanoid and hrp and humanoid.Health > 0 then
-                table.insert(enemies, player)
+-- ESP (VH Charms)
+local espToggle = createToggle("VH Charms", Settings.ESP, 80, function(val)
+    Settings.ESP = val
+    if not val then
+        -- убираем все Highlights
+        for _, v in pairs(game.Players:GetPlayers()) do
+            if v ~= player and v.Character then
+                local highlight = v.Character:FindFirstChild("ESP_Highlight")
+                if highlight then highlight:Destroy() end
             end
         end
     end
-    return enemies
+end)
+
+-- Skin Changer
+local skinToggle = createToggle("Skin Changer", Settings.SkinChanger, 120, function(val)
+    Settings.SkinChanger = val
+    if val then
+        applySkinToWeapon()
+    else
+        -- сброс скина (возврат к оригиналу) - сложно, оставим как есть, или перезагрузить оружие
+        -- Можно попробовать удалить оружие и дать заново, но это небезопасно. 
+        -- Для простоты просто не применяем скин.
+    end
+end)
+
+-- Ползунок FOV
+local fovContainer = Instance.new("Frame")
+fovContainer.Size = UDim2.new(1, 0, 0, 45)
+fovContainer.Position = UDim2.new(0, 0, 0, 165)
+fovContainer.BackgroundTransparency = 1
+fovContainer.Parent = content
+
+local fovLabel = Instance.new("TextLabel")
+fovLabel.Size = UDim2.new(0.5, 0, 1, 0)
+fovLabel.BackgroundTransparency = 1
+fovLabel.Text = "FOV: " .. Settings.FOV
+fovLabel.TextColor3 = style.TextColor3
+fovLabel.TextSize = 18
+fovLabel.Font = Enum.Font.GothamMedium
+fovLabel.TextXAlignment = Enum.TextXAlignment.Left
+fovLabel.Parent = fovContainer
+
+local fovSlider = Instance.new("Frame")
+fovSlider.Size = UDim2.new(0.4, 0, 0.4, 0)
+fovSlider.Position = UDim2.new(0.5, 0, 0.3, 0)
+fovSlider.BackgroundColor3 = Color3.fromRGB(100, 100, 150)
+fovSlider.BorderSizePixel = 0
+fovSlider.Parent = fovContainer
+
+local fovFill = Instance.new("Frame")
+fovFill.Size = UDim2.new(Settings.FOV / 180, 0, 1, 0) -- 180 максимум
+fovFill.BackgroundColor3 = style.AccentColor
+fovFill.BorderSizePixel = 0
+fovFill.Parent = fovSlider
+
+local function updateFOV(value)
+    value = math.clamp(value, 0, 180)
+    Settings.FOV = value
+    fovLabel.Text = "FOV: " .. math.floor(value)
+    fovFill.Size = UDim2.new(value / 180, 0, 1, 0)
 end
 
--- ========== WALLCHECK ==========
-local function IsVisible(targetPosition)
-    if not env.WallCheckEnabled then return true end
-    local character = LocalPlayer.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
-    
-    local origin = Camera.CFrame.Position
-    local direction = targetPosition - origin
-    local distance = direction.Magnitude
-    
-    if distance == 0 then return true end
-    
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-    raycastParams.FilterDescendantsInstances = {character}
-    
-    local result = workspace:Raycast(origin, direction.Unit * (distance + 5), raycastParams)
-    
-    if not result then return true end
-    local hitInstance = result.Instance
-    if not hitInstance then return true end
-    
-    local hitPlayer = Players:GetPlayerFromCharacter(hitInstance:FindFirstAncestorOfClass("Model"))
-    return hitPlayer and IsEnemy(hitPlayer)
+-- Перетаскивание ползунка (для телефона)
+local draggingFOV = false
+local dragStartX = 0
+local sliderPos = 0
+
+fovSlider.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        draggingFOV = true
+        dragStartX = input.Position.X
+        sliderPos = fovFill.Size.X.Scale * 180
+    end
+end)
+
+fovSlider.InputChanged:Connect(function(input)
+    if draggingFOV and input.UserInputType == Enum.UserInputType.Touch then
+        local delta = input.Position.X - dragStartX
+        local newVal = math.clamp(sliderPos + delta / fovSlider.AbsoluteSize.X * 180, 0, 180)
+        updateFOV(newVal)
+    end
+end)
+
+fovSlider.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        draggingFOV = false
+    end
+end)
+
+-- Кнопка закрытия меню
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -40, 0, 5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.new(1,1,1)
+closeBtn.TextSize = 20
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.Parent = menuFrame
+closeBtn.MouseButton1Click:Connect(function()
+    menuFrame.Visible = false
+end)
+closeBtn.TouchTap:Connect(function()
+    menuFrame.Visible = false
+end)
+
+-- Открытие/закрытие меню по кнопке
+toggleButton.MouseButton1Click:Connect(function()
+    menuFrame.Visible = not menuFrame.Visible
+end)
+toggleButton.TouchTap:Connect(function()
+    menuFrame.Visible = not menuFrame.Visible
+end)
+
+-- // СКИН ЧЕНДЖЕР // --
+local function applySkinToWeapon()
+    -- Ищем оружие в руках игрока
+    local char = player.Character
+    if not char then return end
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    if not tool then return end
+    -- Пытаемся изменить текстуру или MeshId, в зависимости от структуры
+    -- Часто оружие состоит из Parts с SurfaceAppearance
+    for _, part in ipairs(tool:GetDescendants()) do
+        if part:IsA("BasePart") then
+            -- Меняем TextureID у SurfaceAppearance если есть
+            local appearance = part:FindFirstChildWhichIsA("SurfaceAppearance")
+            if appearance and appearance:IsA("SurfaceAppearance") then
+                appearance.ColorMap = Settings.SkinID
+            end
+            -- или меняем у Texture
+            if part:IsA("Part") and part.Material == Enum.Material.SmoothPlastic then
+                -- некоторые используют TextureId в свойствах
+                -- например, если есть Decal
+                for _, decal in ipairs(part:GetChildren()) do
+                    if decal:IsA("Decal") then
+                        decal.Texture = Settings.SkinID
+                    end
+                end
+            end
+        end
+    end
 end
 
--- ========== AIMBOT ==========
-local function GetClosestEnemyInFOV()
-    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+-- Вызываем при активации скинченджера или при смене оружия
+player.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    if Settings.SkinChanger then
+        applySkinToWeapon()
+    end
+end)
+
+-- Обработка смены инструмента
+player:GetPropertyChangedSignal("Character"):Connect(function()
+    if Settings.SkinChanger then
+        task.wait(0.5)
+        applySkinToWeapon()
+    end
+end)
+
+-- // ОСНОВНЫЕ ФУНКЦИИ: AIMBOT + WALLCHECK + ESP // --
+
+-- Функция получения ближайшего врага в FOV
+local function getClosestEnemy()
+    local char = player.Character
+    if not char or not char:FindFirstChild("Humanoid") or char.Humanoid.Health <= 0 then
+        return nil
+    end
+    local cameraPos = camera.CFrame.Position
+    local cameraLook = camera.CFrame.LookVector
+
     local closest = nil
-    local minDist = env.FOV
+    local closestAngle = math.rad(Settings.FOV) -- в радианах
 
-    for _, player in ipairs(GetAliveEnemies()) do
-        local part = player.Character:FindFirstChild("Head")
-        if not part then part = player.Character:FindFirstChild("HumanoidRootPart") end
-        
-        if part then
-            local screenPos, onScreen = Camera:WorldToScreenPoint(part.Position)
-            if onScreen then
-                local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-                if dist <= minDist and IsVisible(part.Position) then
-                    minDist = dist
-                    closest = player
+    for _, plr in ipairs(game.Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+            local targetChar = plr.Character
+            -- голова или торс
+            local head = targetChar:FindFirstChild("Head")
+            local torso = targetChar:FindFirstChild("UpperTorso") or targetChar:FindFirstChild("Torso")
+            local targetPart = head or torso or targetChar.PrimaryPart
+            if targetPart then
+                local targetPos = targetPart.Position
+                local dirToTarget = (targetPos - cameraPos).Unit
+                local angle = math.acos(math.clamp(cameraLook:Dot(dirToTarget), -1, 1))
+
+                -- WallCheck
+                if Settings.WallCheck then
+                    local ray = Ray.new(cameraPos, (targetPos - cameraPos))
+                    local hit, position = workspace:FindPartOnRay(ray, char, false, true)
+                    if hit and hit:IsDescendantOf(targetChar) then
+                        -- видим, нет стены
+                    else
+                        -- стена закрывает
+                        continue
+                    end
+                end
+
+                if angle <= closestAngle then
+                    closestAngle = angle
+                    closest = {Player = plr, Part = targetPart}
                 end
             end
         end
@@ -478,183 +390,61 @@ local function GetClosestEnemyInFOV()
     return closest
 end
 
-local lastAimbotCFrame = Camera.CFrame
-local function SmoothAimbot(targetPlayer)
-    if not targetPlayer or not targetPlayer.Character then return end
-    local targetPart = targetPlayer.Character:FindFirstChild("Head") or targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not targetPart then return end
-    
-    local targetCFrame = CFrame.lookAt(Camera.CFrame.Position, targetPart.Position)
-    lastAimbotCFrame = Camera.CFrame:Lerp(targetCFrame, env.AimbotSmoothness)
-    Camera.CFrame = lastAimbotCFrame
-end
-
--- ========== CHAMS ==========
-local chamsHighlights = {}
-
-local function CreateChamsForPlayer(player)
-    if chamsHighlights[player] then return end
-    local character = player.Character
-    if not character then return end
-    
-    local oldHighlight = character:FindFirstChild("ChamsHighlight")
-    if oldHighlight then oldHighlight:Destroy() end
-    
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "ChamsHighlight"
-    highlight.FillColor = Color3.fromRGB(255, 80, 80)
-    highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
-    highlight.FillTransparency = 0.25
-    highlight.OutlineTransparency = 0.0
-    highlight.DepthMode = Enum.HighlightDepthMode.Always
-    highlight.Parent = character
-    
-    chamsHighlights[player] = highlight
-end
-
-local function ClearChamsForPlayer(player)
-    if chamsHighlights[player] then
-        pcall(function()
-            chamsHighlights[player]:Destroy()
-        end)
-        chamsHighlights[player] = nil
+-- Aimbot: наводим камеру на цель
+local function aimbot()
+    if not Settings.Aimbot then return end
+    local target = getClosestEnemy()
+    if target then
+        local targetPos = target.Part.Position
+        -- вычисляем направление от камеры к цели
+        local camCF = camera.CFrame
+        local direction = (targetPos - camCF.Position).Unit
+        local newCF = CFrame.lookAt(camCF.Position, camCF.Position + direction)
+        camera.CFrame = newCF
     end
 end
 
-local function CreateAllChams()
-    for _, player in ipairs(GetAliveEnemies()) do
-        CreateChamsForPlayer(player)
-    end
-end
-
-local function ClearAllChams()
-    for player, hl in pairs(chamsHighlights) do
-        pcall(function()
-            if hl then hl:Destroy() end
-        end)
-    end
-    chamsHighlights = {}
-end
-
-local function UpdateChams()
-    if not env.ChamsEnabled then 
-        ClearAllChams()
-        return 
-    end
-    
-    local aliveEnemies = {}
-    for _, player in ipairs(GetAliveEnemies()) do
-        aliveEnemies[player] = true
-    end
-    
-    for player in pairs(chamsHighlights) do
-        if not aliveEnemies[player] then
-            ClearChamsForPlayer(player)
+-- ESP (VH Charms) - добавляем Highlight всем игрокам
+local function updateESP()
+    if not Settings.ESP then return end
+    for _, plr in ipairs(game.Players:GetPlayers()) do
+        if plr ~= player and plr.Character then
+            local char = plr.Character
+            local highlight = char:FindFirstChild("ESP_Highlight")
+            if not highlight then
+                highlight = Instance.new("Highlight")
+                highlight.Name = "ESP_Highlight"
+                highlight.FillColor = Color3.fromRGB(0, 255, 0)
+                highlight.FillTransparency = 0.5
+                highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+                highlight.OutlineTransparency = 0.3
+                highlight.Parent = char
+            end
         end
     end
-    
-    for _, player in ipairs(GetAliveEnemies()) do
-        CreateChamsForPlayer(player)
-    end
 end
 
--- ========== FOV CIRCLE ==========
-local fovCircle
-pcall(function()
-    if Drawing then
-        fovCircle = Drawing.new("Circle")
-        fovCircle.Thickness = 2
-        fovCircle.Color = Color3.fromRGB(0, 200, 255)
-        fovCircle.Filled = false
-        fovCircle.Transparency = 0.7
-        fovCircle.Visible = false
+-- Цикл обновления (каждый кадр)
+game:GetService("RunService").RenderStepped:Connect(function()
+    -- Aimbot
+    if Settings.Aimbot then
+        aimbot()
     end
-end)
-
--- ========== NO RECOIL ==========
-local lastCameraLookVector = Camera.CFrame.LookVector
-local recoilAccumulation = Vector3.new(0, 0, 0)
-
--- ========== PRO SPREAD ==========
-local lastCameraDirection = Camera.CFrame.LookVector
-
-local function ApplyProSpread()
-    if not env.ProSpreadEnabled then return end
-    
-    local character = LocalPlayer.Character
-    if not character then return end
-    
-    local humanoid = character:FindFirstChild("Humanoid")
-    
-    if not humanoid then return end
-    
-    local isInAir = humanoid:GetState() == Enum.HumanoidStateType.Freefall or 
-                    humanoid:GetState() == Enum.HumanoidStateType.Flying or
-                    humanoid:GetState() == Enum.HumanoidStateType.Jumping
-    
-    if isInAir then
-        local currentLook = Camera.CFrame.LookVector
-        local lookDifference = (currentLook - lastCameraDirection).Magnitude
-        
-        if lookDifference > 0.001 then
-            local targetCFrame = CFrame.lookAt(Camera.CFrame.Position, Camera.CFrame.Position + lastCameraDirection)
-            Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, 0.6)
-        end
+    -- ESP
+    if Settings.ESP then
+        updateESP()
     else
-        lastCameraDirection = Camera.CFrame.LookVector
+        -- удаляем старые, если отключено (уже удаляем при отключении)
     end
-end
-
--- ========== ГЛАВНЫЙ ИГРОВОЙ ЦИКЛ ==========
-RunService.RenderStepped:Connect(function()
-    ApplyProSpread()
-    
-    if env.AimbotEnabled then
-        local target = GetClosestEnemyInFOV()
-        if target then
-            SmoothAimbot(target)
-        end
-    end
-
-    if env.NoRecoilEnabled then
-        local currentCFrame = Camera.CFrame
-        local currentLookVector = currentCFrame.LookVector
-        
-        local lookDifference = currentLookVector - lastCameraLookVector
-        
-        if lookDifference.Magnitude > 0.001 then
-            recoilAccumulation = recoilAccumulation + (lookDifference * env.NoRecoilStrength)
-        end
-        
-        recoilAccumulation = recoilAccumulation * 0.88
-        
-        if recoilAccumulation.Magnitude > 0.0001 then
-            local compensatedLook = currentLookVector - recoilAccumulation
-            Camera.CFrame = CFrame.lookAt(currentCFrame.Position, currentCFrame.Position + compensatedLook)
-        end
-        
-        lastCameraLookVector = Camera.CFrame.LookVector
-    else
-        lastCameraLookVector = Camera.CFrame.LookVector
-        recoilAccumulation = Vector3.new(0, 0, 0)
-    end
-
-    if fovCircle then
-        fovCircle.Visible = env.ShowFOV and env.AimbotEnabled
-        if fovCircle.Visible then
-            fovCircle.Radius = env.FOV
-            fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-        end
-    end
-
-    UpdateChams()
 end)
 
-LocalPlayer.CharacterAdded:Connect(function()
-    ClearAllChams()
+-- Дополнительно: обновление ESP при добавлении/удалении игроков
+game.Players.PlayerAdded:Connect(function()
+    if Settings.ESP then updateESP() end
+end)
+game.Players.PlayerRemoving:Connect(function()
+    -- ничего не делаем
 end)
 
-print("✅ TECHY SCRIPT МОБИЛЬНАЯ v1 загружена!")
-print("📱 Для телефона - все работает через сенсор!")
-print("🎮 Тапни кнопку ⚙️ чтобы открыть меню")
-print("👆 Тащи меню за заголовок")
+-- // ИНИЦИАЛИЗАЦИЯ // --
+print("BloxStrike Mobile Script loaded successfully!")
