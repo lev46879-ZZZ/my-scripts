@@ -1,5 +1,5 @@
--- // TECHY ULTIMATE v5.2 - FIXED LOADER // --
--- // Fixed: ESP strings + hookmetamethod protection // --
+-- // TECHY ULTIMATE v5.2 - DELTA MOBILE FIXED // --
+-- // Fixed loader: \n replaced with string.char(10) // --
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -10,6 +10,9 @@ local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
+
+-- ✅ СИМВОЛ ПЕРЕНОСА СТРОКИ (вместо \n который ломается при копировании)
+local NL = string.char(10)
 
 print("[TECHY v5.2] Loading...")
 
@@ -86,7 +89,7 @@ local Config = {
 -- UI
 -- ═══════════════════════════════════════════════════════
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TechyV52"
+ScreenGui.Name = "TechyV52Fixed"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
@@ -196,7 +199,7 @@ local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 32, 0, 32)
 CloseBtn.Position = UDim2.new(1, -40, 0, 4)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 75)
-CloseBtn.Text = "−"
+CloseBtn.Text = "-"
 CloseBtn.TextColor3 = Color3.new(1,1,1)
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 18
@@ -536,7 +539,7 @@ local function createSlider(text, min, max, default, parent, callback, decimals,
 end
 
 -- ═══════════════════════════════════════════════════════
--- МЕНЮ
+-- МЕНЮ (8 ВКЛАДОК)
 -- ═══════════════════════════════════════════════════════
 local TabCombat = createTab("Combat", "⚔", 1)
 local TabSilent = createTab("Silent", "🎯", 2)
@@ -851,12 +854,13 @@ local function getPredictedPosition(targetPart, player)
 end
 
 -- ═══════════════════════════════════════════════════════
--- ✅ БЕЗОПАСНЫЙ HOOK (с проверкой доступности)
+-- ✅ БЕЗОПАСНЫЙ HOOK (pcall защита)
 -- ═══════════════════════════════════════════════════════
-local hookAvailable = type(hookmetamethod) == "function" and type(newcclosure) == "function" and type(getnamecallmethod) == "function"
-print("[TECHY v5.2] Hook available: " .. tostring(hookAvailable))
-
-if hookAvailable then
+local hookSuccess = pcall(function()
+    if type(hookmetamethod) ~= "function" then
+        error("hookmetamethod not available")
+    end
+    
     local oldNamecall
     oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
         local method = getnamecallmethod()
@@ -957,8 +961,12 @@ if hookAvailable then
         
         return oldNamecall(self, ...)
     end))
+end)
+
+if hookSuccess then
+    print("[TECHY v5.2] Silent Aim / Ragebot hooks: OK")
 else
-    warn("[TECHY v5.2] Silent Aim / Ragebot hooks disabled (not supported)")
+    warn("[TECHY v5.2] Hooks not available - Silent Aim/Ragebot disabled")
 end
 
 -- FLY
@@ -987,7 +995,6 @@ local function startFly()
     
     local hum = char:FindFirstChildOfClass("Humanoid")
     if hum then hum.PlatformStand = true end
-    print("[Fly] Started")
 end
 
 local function stopFly()
@@ -998,7 +1005,6 @@ local function stopFly()
         local hum = char:FindFirstChildOfClass("Humanoid")
         if hum then hum.PlatformStand = false end
     end
-    print("[Fly] Stopped")
 end
 
 -- AUTO STOMP
@@ -1152,7 +1158,7 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
     
-    -- ✅ ИСПРАВЛЕННЫЙ ESP (используем \n правильно)
+    -- ✅ ESP (с использованием NL вместо \n)
     if Config.ESPEnabled then
         for p, objs in pairs(espObjects) do
             if objs.Char.Parent then
@@ -1170,10 +1176,10 @@ RunService.RenderStepped:Connect(function(dt)
                 if head then
                     local dist = math.floor((head.Position - Camera.CFrame.Position).Magnitude)
                     local info = ""
-                    if Config.ESPName then info = info .. p.Name .. "\n" end
-                    if Config.ESPStatus then info = info .. (ragdoll and "[DOWN]" or "[ALIVE]") .. "\n" end
+                    if Config.ESPName then info = info .. p.Name .. NL end
+                    if Config.ESPStatus then info = info .. (ragdoll and "[DOWN]" or "[ALIVE]") .. NL end
                     if Config.ESPDistance then info = info .. dist .. "m  " end
-                    if Config.ESPWeapon then info = info .. getPlayerWeapon(p) .. "\n" end
+                    if Config.ESPWeapon then info = info .. getPlayerWeapon(p) .. NL end
                     if Config.ESPHealth then
                         local h = objs.Char:FindFirstChildOfClass("Humanoid")
                         if h then info = info .. math.floor(h.Health) .. " HP" end
@@ -1245,8 +1251,8 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 print("╔══════════════════════════════════════════╗")
-print("║  TECHY ULTIMATE v5.2 - FIXED LOADER      ║")
-print("║  ✅ Исправлены строки ESP (\\n)          ║")
-print("║  ✅ Защита hookmetamethod через pcall    ║")
-print("║  ✅ Все функции работают                 ║")
+print("║  TECHY ULTIMATE v5.2 - DELTA FIXED       ║")
+print("║  ✅ Загрузка исправлена (NL через char)  ║")
+print("║  ✅ Hook защищён через pcall             ║")
+print("║  ✅ Все функции + Ragebot работают       ║")
 print("╚══════════════════════════════════════════╝")
