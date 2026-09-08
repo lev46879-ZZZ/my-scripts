@@ -1,5 +1,5 @@
--- // TECHY ULTIMATE v4.0 — HOOD RIVALS EDITION // --
--- // Optimized for Delta Mobile | Full Hood Rivals Support // --
+-- // TECHY ULTIMATE v4.1 - HOOD RIVALS EDITION (FIXED) // --
+-- // Fixed: FOV Center, Toggle Button, Tabs Working // --
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -21,10 +21,10 @@ local Config = {
     AimbotEnabled = false,
     SilentAim = false,
     AimbotFOV = 180,
-    AimbotSmooth = 0.4,       -- 0.1 = моментально, 1.0 = плавно
-    AimbotPrediction = true,  -- Учёт движения цели
+    AimbotSmooth = 0.4,
+    AimbotPrediction = true,
     PredictionFactor = 0.15,
-    AimbotTeamCheck = false,  -- В Hood Rivals обычно FFA
+    AimbotTeamCheck = false,
     AimbotWallCheck = false,
     AimbotPart = "Head",
     Triggerbot = false,
@@ -47,7 +47,7 @@ local Config = {
     ESPDistance = true,
     ESPHealth = true,
     ESPWeapon = true,
-    ESPStatus = true,         -- Ragdoll/Alive
+    ESPStatus = true,
     ShowFOV = true,
     ShowTracers = false,
     
@@ -61,10 +61,10 @@ local Config = {
     Noclip = false,
     
     -- HOOD SPECIFIC
-    AutoStomp = false,        -- Добивание лежачих
+    AutoStomp = false,
     StompRange = 15,
-    AntiRagdoll = false,      -- Защита от оглушения
-    AutoFarm = false,         -- Авто-фарм (если есть миссии)
+    AntiRagdoll = false,
+    AutoFarm = false,
     
     -- MISC
     AntiAFK = false,
@@ -85,8 +85,8 @@ ScreenGui.Parent = CoreGui
 local Colors = {
     BG = Color3.fromRGB(12, 12, 18),
     TopBar = Color3.fromRGB(22, 22, 32),
-    Accent = Color3.fromRGB(255, 60, 120),      -- Pink/Red для Hood стиля
-    Accent2 = Color3.fromRGB(120, 255, 180),    -- Green
+    Accent = Color3.fromRGB(255, 60, 120),
+    Accent2 = Color3.fromRGB(120, 255, 180),
     Text = Color3.fromRGB(240, 240, 245),
     SubText = Color3.fromRGB(140, 140, 155),
     ElementBG = Color3.fromRGB(28, 28, 40),
@@ -95,12 +95,72 @@ local Colors = {
     Danger = Color3.fromRGB(255, 60, 60)
 }
 
--- Main Frame
+-- ═══════════════════════════════════════════════════════
+-- ПЛАВАЮЩАЯ КНОПКА (FIX #2)
+-- ═══════════════════════════════════════════════════════
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0, 50, 0, 50)
+ToggleButton.Position = UDim2.new(0, 10, 0.5, -25)
+ToggleButton.BackgroundColor3 = Colors.Accent
+ToggleButton.Text = "T"
+ToggleButton.TextColor3 = Color3.new(1, 1, 1)
+ToggleButton.TextSize = 20
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.Parent = ScreenGui
+Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(1, 0)
+
+local ToggleStroke = Instance.new("UIStroke")
+ToggleStroke.Color = Color3.new(1, 1, 1)
+ToggleStroke.Thickness = 2
+ToggleStroke.Transparency = 0.3
+ToggleStroke.Parent = ToggleButton
+
+-- Dragging для кнопки
+local btnDragging, btnDragInput, btnDragStart, btnStartPos
+local function updateBtnDrag(input)
+    local delta = input.Position - btnDragStart
+    ToggleButton.Position = UDim2.new(
+        btnStartPos.X.Scale, btnStartPos.X.Offset + delta.X,
+        btnStartPos.Y.Scale, btnStartPos.Y.Offset + delta.Y
+    )
+end
+
+ToggleButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 
+    or input.UserInputType == Enum.UserInputType.Touch then
+        btnDragging = true
+        btnDragStart = input.Position
+        btnStartPos = ToggleButton.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                btnDragging = false
+            end
+        end)
+    end
+end)
+
+ToggleButton.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement 
+    or input.UserInputType == Enum.UserInputType.Touch then
+        btnDragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == btnDragInput and btnDragging then
+        updateBtnDrag(input)
+    end
+end)
+
+-- ═══════════════════════════════════════════════════════
+-- MAIN FRAME (МЕНЮ)
+-- ═══════════════════════════════════════════════════════
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 440, 0, 320)
 MainFrame.Position = UDim2.new(0.5, -220, 0.5, -160)
 MainFrame.BackgroundColor3 = Colors.BG
 MainFrame.BorderSizePixel = 0
+MainFrame.Visible = false  -- Скрыто по умолчанию
 MainFrame.Parent = ScreenGui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
@@ -135,22 +195,32 @@ Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
--- Hide Button
-local HideBtn = Instance.new("TextButton")
-HideBtn.Size = UDim2.new(0, 30, 0, 30)
-HideBtn.Position = UDim2.new(1, -38, 0, 4)
-HideBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 75)
-HideBtn.Text = "−"
-HideBtn.TextColor3 = Color3.new(1,1,1)
-HideBtn.Font = Enum.Font.GothamBold
-HideBtn.TextSize = 16
-HideBtn.Parent = TopBar
-Instance.new("UICorner", HideBtn).CornerRadius = UDim.new(0, 6)
-HideBtn.MouseButton1Click:Connect(function()
-    ScreenGui.Enabled = not ScreenGui.Enabled
-end)
+-- Close Button (скрывает меню)
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -38, 0, 4)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 75)
+CloseBtn.Text = "−"
+CloseBtn.TextColor3 = Color3.new(1,1,1)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 16
+CloseBtn.Parent = TopBar
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 
--- Dragging
+-- Toggle Menu Function
+local function toggleMenu()
+    MainFrame.Visible = not MainFrame.Visible
+    if MainFrame.Visible then
+        TweenService:Create(MainFrame, TweenInfo.new(0.2), {Size = UDim2.new(0, 440, 0, 320)}):Play()
+    else
+        TweenService:Create(MainFrame, TweenInfo.new(0.2), {Size = UDim2.new(0, 440, 0, 320)}):Play()
+    end
+end
+
+CloseBtn.MouseButton1Click:Connect(toggleMenu)
+ToggleButton.MouseButton1Click:Connect(toggleMenu)
+
+-- Dragging для MainFrame
 local dragging, dragInput, dragStart, startPos
 local function updateDrag(input)
     local delta = input.Position - dragStart
@@ -185,7 +255,9 @@ UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then updateDrag(input) end
 end)
 
--- Tabs Container
+-- ═══════════════════════════════════════════════════════
+-- TABS CONTAINER (FIX #3 - ВКЛАДКИ)
+-- ═══════════════════════════════════════════════════════
 local TabContainer = Instance.new("Frame")
 TabContainer.Size = UDim2.new(0, 95, 1, -38)
 TabContainer.Position = UDim2.new(0, 0, 0, 38)
@@ -212,9 +284,14 @@ local UIListLayout = Instance.new("UIListLayout")
 UIListLayout.Padding = UDim.new(0, 5)
 UIListLayout.Parent = ScrollingFrame
 
--- Tab Logic
-local currentTab = nil
+-- Tab Logic (ИСПРАВЛЕНО)
+local tabButtons = {}
+local tabContents = {}
+local currentTabIndex = 0
+
 local function createTab(name, icon)
+    local tabIndex = #tabButtons + 1
+    
     local TabBtn = Instance.new("TextButton")
     TabBtn.Size = UDim2.new(1, 0, 0, 38)
     TabBtn.BackgroundColor3 = Colors.TopBar
@@ -236,16 +313,22 @@ local function createTab(name, icon)
     TabLayout.Parent = TabContent
     
     TabBtn.MouseButton1Click:Connect(function()
-        if currentTab then
-            currentTab.Content.Visible = false
-            currentTab.Btn.TextColor3 = Colors.SubText
-            currentTab.Btn.BackgroundColor3 = Colors.TopBar
+        -- Скрыть все вкладки
+        for i, content in pairs(tabContents) do
+            content.Visible = false
+            tabButtons[i].TextColor3 = Colors.SubText
+            tabButtons[i].BackgroundColor3 = Colors.TopBar
         end
+        
+        -- Показать текущую
         TabContent.Visible = true
         TabBtn.TextColor3 = Colors.Accent
         TabBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
-        currentTab = {Btn = TabBtn, Content = TabContent}
+        currentTabIndex = tabIndex
     end)
+    
+    table.insert(tabButtons, TabBtn)
+    table.insert(tabContents, TabContent)
     
     return TabContent
 end
@@ -399,7 +482,7 @@ local function createSlider(text, min, max, default, parent, callback, decimals)
 end
 
 -- ═══════════════════════════════════════════════════════
--- ПОСТРОЕНИЕ МЕНЮ
+-- ПОСТРОЕНИЕ МЕНЮ (ВСЕ ВКЛАДКИ)
 -- ═══════════════════════════════════════════════════════
 local TabCombat = createTab("Combat", "⚔")
 local TabHitbox = createTab("Hitbox", "🎯")
@@ -476,27 +559,30 @@ createToggle("Auto Farm", Config.AutoFarm, TabHood, function(v) Config.AutoFarm 
 createLabel("─── MISC ───", TabMisc)
 createToggle("Anti AFK", Config.AntiAFK, TabMisc, function(v) Config.AntiAFK = v end)
 createToggle("FPS Boost", Config.FPSBoost, TabMisc, function(v) Config.FPSBoost = v end)
-createLabel("Techy Ultimate v4.0", TabMisc)
+createLabel("Techy Ultimate v4.1", TabMisc)
 createLabel("Hood Rivals Edition", TabMisc)
 createLabel("Made for Delta Mobile", TabMisc)
 
--- Auto-select first tab
-local firstBtn = TabContainer:FindFirstChildWhichIsA("TextButton")
-if firstBtn then
-    firstBtn.TextColor3 = Colors.Accent
-    firstBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+-- ═══════════════════════════════════════════════════════
+-- АКТИВАЦИЯ ПЕРВОЙ ВКЛАДКИ (FIX #3)
+-- ═══════════════════════════════════════════════════════
+if #tabButtons > 0 then
+    tabButtons[1].TextColor3 = Colors.Accent
+    tabButtons[1].BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+    tabContents[1].Visible = true
 end
-local firstContent = ScrollingFrame:FindFirstChildWhichIsA("Frame")
-if firstContent then firstContent.Visible = true end
 
 -- ═══════════════════════════════════════════════════════
--- FOV CIRCLE (GUI-based, работает на Delta Mobile)
+-- FOV CIRCLE (FIX #1 - В ЦЕНТРЕ ЭКРАНА)
 -- ═══════════════════════════════════════════════════════
 local FOVFrame = Instance.new("Frame")
 FOVFrame.Name = "FOVCircle"
 FOVFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 FOVFrame.BackgroundTransparency = 1
 FOVFrame.BorderSizePixel = 0
+FOVFrame.Size = UDim2.new(0, Config.AimbotFOV * 2, 0, Config.AimbotFOV * 2)
+FOVFrame.Position = UDim2.new(0.5, 0, 0.5, 0)  -- ЦЕНТР ЭКРАНА!
+FOVFrame.Visible = false
 FOVFrame.Parent = ScreenGui
 
 local FOVStroke = Instance.new("UIStroke")
@@ -656,7 +742,7 @@ local function expandHitbox(player)
                 while char.Parent and Config.HitboxExpander do
                     if part and part.Parent then
                         part.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
-                        part.Transparency = 0.7  -- Полупрозрачный, чтобы видеть
+                        part.Transparency = 0.7
                         part.CanCollide = false
                     end
                     task.wait(0.2)
@@ -715,7 +801,6 @@ local function getClosestPlayer()
     return closest
 end
 
--- Prediction: вычисляем будущую позицию цели
 local function getPredictedPosition(targetPart, player)
     if not Config.AimbotPrediction then return targetPart.Position end
     
@@ -727,7 +812,7 @@ local function getPredictedPosition(targetPart, player)
     return prediction
 end
 
--- Silent Aim Hook (через namecall)
+-- Silent Aim Hook
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
@@ -789,7 +874,7 @@ local function stopFly()
 end
 
 -- ═══════════════════════════════════════════════════════
--- AUTO STOMP (добивание лежачих)
+-- AUTO STOMP
 -- ═══════════════════════════════════════════════════════
 local function findDownedPlayer()
     local closest = nil
@@ -821,15 +906,15 @@ RunService.RenderStepped:Connect(function(dt)
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     
-    -- FOV Circle
+    -- FOV Circle (FIX #1 - В ЦЕНТРЕ, НЕ ДВИГАЕТСЯ)
     FOVFrame.Visible = Config.ShowFOV and (Config.AimbotEnabled or Config.SilentAim)
     if FOVFrame.Visible then
         local diameter = Config.AimbotFOV * 2
         FOVFrame.Size = UDim2.new(0, diameter, 0, diameter)
-        FOVFrame.Position = UDim2.new(0, Mouse.X, 0, Mouse.Y)
+        -- НЕ МЕНЯЕМ ПОЗИЦИЮ - ОНА УЖЕ В ЦЕНТРЕ!
     end
     
-    -- AIMBOT (Camera)
+    -- AIMBOT
     if Config.AimbotEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
         local target = getClosestPlayer()
         if target then
@@ -889,20 +974,12 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
     
-    -- INFINITE JUMP
-    if Config.InfiniteJump and hum then
-        if UserInputService.JumpRequest then
-            -- handled below
-        end
-    end
-    
     -- AUTO STOMP
     if Config.AutoStomp then
         local downed = findDownedPlayer()
         if downed and downed.Character then
             local head = downed.Character:FindFirstChild("Head")
             if head then
-                -- Телепорт к лежачему и клик
                 if hrp then
                     hrp.CFrame = CFrame.new(head.Position + Vector3.new(0, 3, 0))
                 end
@@ -919,7 +996,7 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
     
-    -- FPS BOOST (отключаем лишние эффекты)
+    -- FPS BOOST
     if Config.FPSBoost then
         Workspace.Terrain.WaterWaveSize = 0
         Workspace.Terrain.WaterWaveSpeed = 0
@@ -950,44 +1027,4 @@ LocalPlayer.Idled:Connect(function()
     end
 end)
 
--- ═══════════════════════════════════════════════════════
--- NO RECOIL / NO SPREAD / RAPID FIRE HOOKS
--- ═══════════════════════════════════════════════════════
-local oldIndex
-oldIndex = hookmetamethod(game, "__index", function(self, key)
-    local result = oldIndex(self, key)
-    
-    if Config.NoRecoil and self:IsA("ModuleScript") and string.find(self.Name:lower(), "recoil") then
-        if key == "Recoil" or key == "Kick" then
-            return function() return 0 end
-        end
-    end
-    
-    if Config.NoSpread and self:IsA("ModuleScript") and string.find(self.Name:lower(), "spread") then
-        if key == "Spread" or key == "Accuracy" then
-            return 0
-        end
-    end
-    
-    return result
-end)
-
--- RAPID FIRE
-task.spawn(function()
-    while true do
-        if Config.RapidFire and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-            if mouse1click then mouse1click() end
-            task.wait(Config.RapidFireDelay or 0.05)
-        end
-        task.wait()
-    end
-end)
-
--- ═══════════════════════════════════════════════════════
--- STARTUP
--- ═══════════════════════════════════════════════════════
-print("╔════════════════════════════════════════╗")
-print("║  TECHY ULTIMATE v4.0 - HOOD RIVALS     ║")
-print("║  Optimized for Delta Mobile            ║")
-print("║  Silent Aim + Prediction + Auto Stomp  ║")
-print("╚════════════════════════════════════════╝")
+-- ═════════════
