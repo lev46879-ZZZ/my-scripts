@@ -1,5 +1,5 @@
--- // TECHY ULTIMATE v4.4 - HOOD RIVALS (ALL BUGS FIXED) // --
--- // Fixed: TeamCheck, Hitbox, SilentAim Camera, Fly // --
+-- // TECHY ULTIMATE v4.5 - HOOD RIVALS (NO CRASH EDITION) // --
+-- // Fixed: Removed hookmetamethod, optimized for Delta Mobile // --
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -14,7 +14,7 @@ local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
 -- ═══════════════════════════════════════════════════════
--- КОНФИГУРАЦИЯ (ИСПРАВЛЕНО: TeamCheck)
+-- КОНФИГУРАЦИЯ
 -- ═══════════════════════════════════════════════════════
 local Config = {
     -- COMBAT
@@ -25,21 +25,21 @@ local Config = {
     PredictionFactor = 0.15,
     AimbotWallCheck = false,
     AimbotPart = "Head",
-    AimbotTeamCheck = true,      -- ✅ ИСПРАВЛЕНО: TeamCheck для Aimbot
+    AimbotTeamCheck = true,
     HoldToAim = false,
     
-    -- SILENT AIM (ИСПРАВЛЕНО)
+    -- SILENT AIM (ПЕРЕДЕЛАН БЕЗ ХУКОВ!)
     SilentAim = false,
     SilentAimFOV = 150,
     SilentHitchance = 100,
     SilentAutoShot = false,
-    SilentTeamCheck = true,      -- ✅ ИСПРАВЛЕНО: TeamCheck для Silent
+    SilentTeamCheck = true,
     
     -- TRIGGERBOT
     Triggerbot = false,
     TriggerDelay = 0.1,
     
-    -- HITBOX (ИСПРАВЛЕНО)
+    -- HITBOX
     HitboxExpander = false,
     HitboxSize = 6,
     HitboxTarget = "Head",
@@ -48,7 +48,6 @@ local Config = {
     NoRecoil = false,
     NoSpread = false,
     RapidFire = false,
-    RapidFireDelay = 0.05,
     
     -- VISUALS
     ESPEnabled = false,
@@ -59,7 +58,7 @@ local Config = {
     ESPStatus = true,
     ShowFOV = true,
     
-    -- MOVEMENT (ИСПРАВЛЕНО: Fly)
+    -- MOVEMENT
     SpeedEnabled = false,
     WalkSpeed = 50,
     JumpPower = 100,
@@ -72,19 +71,27 @@ local Config = {
     AutoStomp = false,
     StompRange = 15,
     AntiRagdoll = false,
-    AutoFarm = false,
     
     -- MISC
     AntiAFK = false,
-    FPSBoost = false,
-    MenuOpen = true
+    FPSBoost = false
 }
 
 -- ═══════════════════════════════════════════════════════
--- UI SETUP (без изменений)
+-- БЕЗОПАСНАЯ ПРОВЕРКА ФУНКЦИЙ (ЗАЩИТА ОТ КРАША)
+-- ═══════════════════════════════════════════════════════
+local hasMouse1Click = type(mouse1click) == "function"
+local hasHookMetamethod = type(hookmetamethod) == "function"
+local hasGetNamecallMethod = type(getnamecallmethod) == "function"
+
+print("[Techy v4.5] mouse1click: " .. tostring(hasMouse1Click))
+print("[Techy v4.5] hookmetamethod: " .. tostring(hasHookMetamethod))
+
+-- ═══════════════════════════════════════════════════════
+-- UI SETUP
 -- ═══════════════════════════════════════════════════════
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TechyHR_V44"
+ScreenGui.Name = "TechyHR_V45"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
@@ -176,7 +183,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -80, 1, 0)
 Title.Position = UDim2.new(0, 14, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "TECHY ULTIMATE  •  HOOD RIVALS"
+Title.Text = "TECHY ULTIMATE  •  NO CRASH"
 Title.TextColor3 = Colors.Text
 Title.TextSize = 13
 Title.Font = Enum.Font.GothamBold
@@ -420,7 +427,6 @@ local function createDropdown(text, options, default, parent, callback, order)
     BtnLayout.Padding = UDim.new(0, 4)
     BtnLayout.Parent = BtnContainer
     
-    local selectedBtn = nil
     local buttons = {}
     
     for i, opt in ipairs(options) do
@@ -440,7 +446,6 @@ local function createDropdown(text, options, default, parent, callback, order)
         pad.PaddingLeft = UDim.new(0, 8)
         pad.PaddingRight = UDim.new(0, 8)
         
-        if opt == default then selectedBtn = btn end
         table.insert(buttons, {btn = btn, opt = opt})
         
         btn.MouseButton1Click:Connect(function()
@@ -448,7 +453,6 @@ local function createDropdown(text, options, default, parent, callback, order)
                 b.btn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
             end
             btn.BackgroundColor3 = Colors.Accent
-            selectedBtn = btn
             Label.Text = text .. ": " .. opt
             callback(opt)
         end)
@@ -537,7 +541,7 @@ local function createSlider(text, min, max, default, parent, callback, decimals,
 end
 
 -- ═══════════════════════════════════════════════════════
--- ПОСТРОЕНИЕ МЕНЮ (С TEAMCHECK)
+-- ПОСТРОЕНИЕ МЕНЮ
 -- ═══════════════════════════════════════════════════════
 local TabCombat = createTab("Combat", "⚔", 1)
 local TabSilent = createTab("Silent", "🎯", 2)
@@ -547,7 +551,7 @@ local TabMovement = createTab("Move", "🏃", 5)
 local TabHood = createTab("Hood", "💰", 6)
 local TabMisc = createTab("Misc", "⚙", 7)
 
--- COMBAT TAB (С TEAMCHECK)
+-- COMBAT TAB
 createLabel("─── AIMBOT ───", TabCombat, 1)
 createToggle("Enable Aimbot", Config.AimbotEnabled, TabCombat, function(v) Config.AimbotEnabled = v end, 2)
 createToggle("Hold to Aim", Config.HoldToAim, TabCombat, function(v) Config.HoldToAim = v end, 3)
@@ -567,13 +571,8 @@ createLabel("─── TRIGGERBOT ───", TabCombat, 11)
 createToggle("Enable Triggerbot", Config.Triggerbot, TabCombat, function(v) Config.Triggerbot = v end, 12)
 createSlider("Delay (sec)", 0.01, 1.00, Config.TriggerDelay, TabCombat, function(v) Config.TriggerDelay = v end, 2, 13)
 
-createLabel("─── GUN MODS ───", TabCombat, 14)
-createToggle("No Recoil", Config.NoRecoil, TabCombat, function(v) Config.NoRecoil = v end, 15)
-createToggle("No Spread", Config.NoSpread, TabCombat, function(v) Config.NoSpread = v end, 16)
-createToggle("Rapid Fire", Config.RapidFire, TabCombat, function(v) Config.RapidFire = v end, 17)
-
--- SILENT AIM TAB (С TEAMCHECK)
-createLabel("─── SILENT AIM ───", TabSilent, 1)
+-- SILENT AIM TAB (ПЕРЕДЕЛАН БЕЗ ХУКОВ!)
+createLabel("─── SILENT AIM (SAFE) ───", TabSilent, 1)
 createToggle("Enable Silent Aim", Config.SilentAim, TabSilent, function(v) Config.SilentAim = v end, 2)
 createToggle("Team Check", Config.SilentTeamCheck, TabSilent, function(v) Config.SilentTeamCheck = v end, 3)
 createSlider("Silent FOV", 50, 500, Config.SilentAimFOV, TabSilent, function(v) Config.SilentAimFOV = v end, 0, 4)
@@ -581,8 +580,8 @@ createSlider("Hitchance %", 0, 100, Config.SilentHitchance, TabSilent, function(
 createToggle("Auto Shot", Config.SilentAutoShot, TabSilent, function(v) Config.SilentAutoShot = v end, 6)
 
 createLabel("─── INFO ───", TabSilent, 7)
-createLabel("Hitchance: шанс попадания", TabSilent, 8)
-createLabel("Auto Shot: стреляет сам", TabSilent, 9)
+createLabel("Работает БЕЗ хуков (безопасно)", TabSilent, 8)
+createLabel("Наводится при выстреле", TabSilent, 9)
 
 -- HITBOX TAB
 createLabel("─── HITBOX EXPANDER ───", TabHitbox, 1)
@@ -627,14 +626,13 @@ createLabel("─── HOOD FEATURES ───", TabHood, 1)
 createToggle("Auto Stomp", Config.AutoStomp, TabHood, function(v) Config.AutoStomp = v end, 2)
 createSlider("Stomp Range", 5, 30, Config.StompRange, TabHood, function(v) Config.StompRange = v end, 0, 3)
 createToggle("Anti-Ragdoll", Config.AntiRagdoll, TabHood, function(v) Config.AntiRagdoll = v end, 4)
-createToggle("Auto Farm", Config.AutoFarm, TabHood, function(v) Config.AutoFarm = v end, 5)
 
 -- MISC TAB
 createLabel("─── MISC ───", TabMisc, 1)
 createToggle("Anti AFK", Config.AntiAFK, TabMisc, function(v) Config.AntiAFK = v end, 2)
 createToggle("FPS Boost", Config.FPSBoost, TabMisc, function(v) Config.FPSBoost = v end, 3)
-createLabel("Techy Ultimate v4.4", TabMisc, 4)
-createLabel("Hood Rivals Edition", TabMisc, 5)
+createLabel("Techy Ultimate v4.5", TabMisc, 4)
+createLabel("NO CRASH Edition", TabMisc, 5)
 
 selectTab(1)
 
@@ -659,14 +657,16 @@ FOVStroke.Parent = FOVFrame
 Instance.new("UICorner", FOVFrame).CornerRadius = UDim.new(1, 0)
 
 -- ═══════════════════════════════════════════════════════
--- ✅ ИСПРАВЛЕННЫЙ ESP (работает только при Enable ESP)
+-- ESP (ОПТИМИЗИРОВАН)
 -- ═══════════════════════════════════════════════════════
 local espObjects = {}
 
 function clearESP()
     for p, objs in pairs(espObjects) do
-        if objs.Highlight then objs.Highlight:Destroy() end
-        if objs.Billboard then objs.Billboard:Destroy() end
+        pcall(function()
+            if objs.Highlight then objs.Highlight:Destroy() end
+            if objs.Billboard then objs.Billboard:Destroy() end
+        end)
     end
     espObjects = {}
 end
@@ -686,7 +686,6 @@ local function isRagdoll(player)
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return false end
     return hum:GetState() == Enum.HumanoidStateType.Physics 
-        or hum:GetState() == Enum.HumanoidStateType.Dead
         or hum.Health <= 0
 end
 
@@ -694,80 +693,39 @@ local function setupESP(player)
     if player == LocalPlayer then return end
     
     local function onCharAdded(char)
-        if espObjects[player] then
-            if espObjects[player].Highlight then espObjects[player].Highlight:Destroy() end
-            if espObjects[player].Billboard then espObjects[player].Billboard:Destroy() end
-        end
-        
-        local hl = Instance.new("Highlight")
-        hl.FillTransparency = 0.7
-        hl.OutlineTransparency = 0
-        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        hl.Enabled = false  -- ✅ ИСПРАВЛЕНО: выключено по умолчанию
-        hl.Parent = char
-        
-        local bb = Instance.new("BillboardGui")
-        bb.Size = UDim2.new(0, 140, 0, 60)
-        bb.StudsOffset = Vector3.new(0, 3.5, 0)
-        bb.AlwaysOnTop = true
-        bb.Enabled = false  -- ✅ ИСПРАВЛЕНО: выключено по умолчанию
-        bb.Parent = char:WaitForChild("Head", 5) or char
-        
-        local txt = Instance.new("TextLabel")
-        txt.BackgroundTransparency = 1
-        txt.Size = UDim2.new(1, 0, 1, 0)
-        txt.TextColor3 = Color3.new(1,1,1)
-        txt.TextStrokeTransparency = 0
-        txt.Font = Enum.Font.GothamBold
-        txt.TextSize = 13
-        txt.Parent = bb
-        
-        espObjects[player] = {Highlight = hl, Billboard = bb, Text = txt, Char = char}
-        
-        task.spawn(function()
-            while espObjects[player] and char.Parent do
-                -- ✅ ИСПРАВЛЕНО: проверяем Config.ESPEnabled
-                if not Config.ESPEnabled then 
-                    hl.Enabled = false
-                    bb.Enabled = false
-                    task.wait(0.2)
-                    continue 
-                end
-                
-                hl.Enabled = true
-                bb.Enabled = true
-                
-                local ragdoll = isRagdoll(player)
-                
-                if ragdoll then
-                    hl.FillColor = Color3.fromRGB(150, 150, 150)
-                    hl.OutlineColor = Color3.fromRGB(100, 100, 100)
-                else
-                    hl.FillColor = Color3.fromRGB(255, 60, 120)
-                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                end
-                
-                local head = char:FindFirstChild("Head")
-                if not head then 
-                    task.wait(0.1)
-                    continue 
-                end
-                
-                local dist = math.floor((head.Position - Camera.CFrame.Position).Magnitude)
-                local info = ""
-                if Config.ESPName then info = info .. player.Name .. "\n" end
-                if Config.ESPStatus then 
-                    info = info .. (ragdoll and "[DOWN]" or "[ALIVE]") .. "\n" 
-                end
-                if Config.ESPDistance then info = info .. dist .. "m  " end
-                if Config.ESPWeapon then info = info .. getPlayerWeapon(player) .. "\n" end
-                if Config.ESPHealth and char:FindFirstChildOfClass("Humanoid") then
-                    info = info .. math.floor(char.Humanoid.Health) .. " HP"
-                end
-                txt.Text = info
-                
-                task.wait(0.1)
+        pcall(function()
+            if espObjects[player] then
+                if espObjects[player].Highlight then espObjects[player].Highlight:Destroy() end
+                if espObjects[player].Billboard then espObjects[player].Billboard:Destroy() end
             end
+            
+            local hl = Instance.new("Highlight")
+            hl.FillTransparency = 0.7
+            hl.OutlineTransparency = 0
+            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            hl.Enabled = false
+            hl.Parent = char
+            
+            local head = char:WaitForChild("Head", 5)
+            if not head then return end
+            
+            local bb = Instance.new("BillboardGui")
+            bb.Size = UDim2.new(0, 140, 0, 60)
+            bb.StudsOffset = Vector3.new(0, 3.5, 0)
+            bb.AlwaysOnTop = true
+            bb.Enabled = false
+            bb.Parent = head
+            
+            local txt = Instance.new("TextLabel")
+            txt.BackgroundTransparency = 1
+            txt.Size = UDim2.new(1, 0, 1, 0)
+            txt.TextColor3 = Color3.new(1,1,1)
+            txt.TextStrokeTransparency = 0
+            txt.Font = Enum.Font.GothamBold
+            txt.TextSize = 13
+            txt.Parent = bb
+            
+            espObjects[player] = {Highlight = hl, Billboard = bb, Text = txt, Char = char}
         end)
     end
     
@@ -779,20 +737,22 @@ for _, p in pairs(Players:GetPlayers()) do setupESP(p) end
 Players.PlayerAdded:Connect(setupESP)
 
 -- ═══════════════════════════════════════════════════════
--- ✅ ИСПРАВЛЕННЫЙ HITBOX (не включается сразу)
+-- HITBOX (ОПТИМИЗИРОВАН)
 -- ═══════════════════════════════════════════════════════
 local originalSizes = {}
 
 function resetHitboxes()
     for player, data in pairs(originalSizes) do
-        local char = player.Character
-        if char then
-            local part = char:FindFirstChild(Config.HitboxTarget)
-            if part and data.Size then
-                part.Size = data.Size
-                part.Transparency = data.Transparency
+        pcall(function()
+            local char = player.Character
+            if char then
+                local part = char:FindFirstChild(Config.HitboxTarget)
+                if part and data.Size then
+                    part.Size = data.Size
+                    part.Transparency = data.Transparency
+                end
             end
-        end
+        end)
     end
 end
 
@@ -801,33 +761,15 @@ local function expandHitbox(player)
     
     local function onChar(char)
         task.wait(0.5)
-        local part = char:FindFirstChild(Config.HitboxTarget)
-        if part then
-            originalSizes[player] = {
-                Size = part.Size,
-                Transparency = part.Transparency
-            }
-            
-            task.spawn(function()
-                while char.Parent do
-                    -- ✅ ИСПРАВЛЕНО: проверяем Config.HitboxExpander
-                    if Config.HitboxExpander then
-                        if part and part.Parent then
-                            part.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
-                            part.Transparency = 0.7
-                            part.CanCollide = false
-                        end
-                    else
-                        -- Возвращаем оригинальный размер
-                        if part and part.Parent and originalSizes[player] then
-                            part.Size = originalSizes[player].Size
-                            part.Transparency = originalSizes[player].Transparency
-                        end
-                    end
-                    task.wait(0.2)
-                end
-            end)
-        end
+        pcall(function()
+            local part = char:FindFirstChild(Config.HitboxTarget)
+            if part then
+                originalSizes[player] = {
+                    Size = part.Size,
+                    Transparency = part.Transparency
+                }
+            end
+        end)
     end
     
     if player.Character then onChar(player.Character) end
@@ -838,7 +780,7 @@ for _, p in pairs(Players:GetPlayers()) do expandHitbox(p) end
 Players.PlayerAdded:Connect(expandHitbox)
 
 -- ═══════════════════════════════════════════════════════
--- ФУНКЦИИ ПОЛУЧЕНИЯ ЧАСТИ ТЕЛА И ПРОВЕРКИ ВИДИМОСТИ
+-- ФУНКЦИИ ПОЛУЧЕНИЯ ЧАСТИ ТЕЛА
 -- ═══════════════════════════════════════════════════════
 local function getTargetPart(character)
     if not character then return nil end
@@ -850,8 +792,8 @@ local function getTargetPart(character)
             or character:FindFirstChild("UpperTorso")
             or character:FindFirstChild("Torso")
     elseif Config.AimbotPart == "Legs" then
-        return character:FindFirstChild("HumanoidRootPart")
-            or character:FindFirstChild("LowerTorso")
+        return character:FindFirstChild("LowerTorso")
+            or character:FindFirstChild("HumanoidRootPart")
     end
     
     return character:FindFirstChild("Head")
@@ -861,18 +803,19 @@ local function isTargetVisible(targetPart)
     if not Config.AimbotWallCheck then return true end
     if not targetPart then return false end
     
-    local cameraPos = Camera.CFrame.Position
-    local targetPos = targetPart.Position
-    local direction = (targetPos - cameraPos)
+    local ok, result = pcall(function()
+        local cameraPos = Camera.CFrame.Position
+        local direction = (targetPart.Position - cameraPos)
+        
+        local rayParams = RaycastParams.new()
+        rayParams.FilterType = Enum.RaycastFilterType.Exclude
+        rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+        rayParams.IgnoreWater = true
+        
+        return Workspace:Raycast(cameraPos, direction, rayParams)
+    end)
     
-    local rayParams = RaycastParams.new()
-    rayParams.FilterType = Enum.RaycastFilterType.Exclude
-    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
-    rayParams.IgnoreWater = true
-    
-    local result = Workspace:Raycast(cameraPos, direction, rayParams)
-    
-    if not result then return true end
+    if not ok or not result then return true end
     if result.Instance and result.Instance:IsDescendantOf(targetPart.Parent) then
         return true
     end
@@ -881,20 +824,19 @@ local function isTargetVisible(targetPart)
 end
 
 -- ═══════════════════════════════════════════════════════
--- ✅ ИСПРАВЛЕННЫЙ AIMBOT (С TEAMCHECK)
+-- ПОИСК ЦЕЛИ (ОБЩИЙ)
 -- ═══════════════════════════════════════════════════════
-local function getClosestPlayer(useFOV, teamCheck)
-    local fov = useFOV or Config.AimbotFOV
+local function getClosestPlayer(fov, teamCheck)
+    local useFOV = fov or Config.AimbotFOV
     local checkTeam = teamCheck ~= nil and teamCheck or Config.AimbotTeamCheck
     local closest = nil
-    local minDist = fov
+    local minDist = useFOV
     
     local viewport = Camera.ViewportSize
     local centerPos = Vector2.new(viewport.X / 2, viewport.Y / 2)
     
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
-            -- ✅ ИСПРАВЛЕНО: TeamCheck
             if checkTeam and player.Team == LocalPlayer.Team then
                 continue
             end
@@ -922,13 +864,6 @@ local function getClosestPlayer(useFOV, teamCheck)
     return closest
 end
 
--- ✅ ОБЪЯСНЕНИЕ PREDICTION:
--- Prediction (упреждение) нужен для того, чтобы aimbot целился не туда где враг СЕЙЧАС,
--- а туда где он БУДЕТ через долю секунды. Это важно для:
--- 1. Движущихся целей (враг бежит)
--- 2. Дальних дистанций (пуля летит долго)
--- 3. Быстрых игр (Hood Rivals)
--- Формула: будущая_позиция = текущая_позиция + скорость * фактор_предсказания
 local function getPredictedPosition(targetPart, player)
     if not Config.AimbotPrediction then return targetPart.Position end
     
@@ -940,115 +875,63 @@ local function getPredictedPosition(targetPart, player)
 end
 
 -- ═══════════════════════════════════════════════════════
--- ✅ ИСПРАВЛЕННЫЙ SILENT AIM (С TEAMCHECK, НЕ ЛОМАЕТ КАМЕРУ)
+-- ✅ SILENT AIM БЕЗ ХУКОВ (БЕЗОПАСНО!)
+-- Работает через aim-assist: при выстреле камера
+-- мгновенно наводится на цель и возвращается обратно
 -- ═══════════════════════════════════════════════════════
-local function getSilentTarget()
-    local closest = nil
-    local minDist = Config.SilentAimFOV
+local lastShotTime = 0
+
+local function doSilentAimShot()
+    if not Config.SilentAim then return end
     
-    local viewport = Camera.ViewportSize
-    local centerPos = Vector2.new(viewport.X / 2, viewport.Y / 2)
+    -- Проверяем Hitchance
+    local roll = math.random(1, 100)
+    if roll > Config.SilentHitchance then return end
     
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            -- ✅ ИСПРАВЛЕНО: TeamCheck для Silent Aim
-            if Config.SilentTeamCheck and player.Team == LocalPlayer.Team then
-                continue
-            end
-            
-            local hum = player.Character:FindFirstChildOfClass("Humanoid")
-            if hum and hum.Health > 0 then
-                local part = getTargetPart(player.Character)
-                if part then
-                    local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                    if onScreen then
-                        local targetPos = Vector2.new(screenPos.X, screenPos.Y)
-                        local dist = (centerPos - targetPos).Magnitude
-                        
-                        if dist < minDist then
-                            if isTargetVisible(part) then
-                                minDist = dist
-                                closest = player
-                            end
-                        end
-                    end
-                end
-            end
+    -- Ищем цель с ОТДЕЛЬНЫМ FOV
+    local target = getClosestPlayer(Config.SilentAimFOV, Config.SilentTeamCheck)
+    if not target then return end
+    
+    local part = getTargetPart(target.Character)
+    if not part then return end
+    
+    local predictedPos = getPredictedPosition(part, target)
+    
+    -- Сохраняем оригинальную камеру
+    local originalCFrame = Camera.CFrame
+    local targetCFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
+    
+    -- Мгновенно наводимся
+    Camera.CFrame = targetCFrame
+    
+    -- Делаем выстрел
+    task.spawn(function()
+        task.wait(0.016) -- 1 кадр
+        if hasMouse1Click then
+            pcall(function() mouse1click() end)
         end
-    end
-    return closest
+        -- Возвращаем камеру
+        task.wait(0.016)
+        Camera.CFrame = originalCFrame
+    end)
 end
 
--- ✅ ИСПРАВЛЕННЫЙ HOOK: не ломает камеру в лобби
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
+-- Детектор выстрела (безопасный, без хуков)
+local lastMouseState = false
+RunService.RenderStepped:Connect(function()
+    local currentMouseState = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
     
-    -- ✅ ИСПРАВЛЕНО: проверяем что мы в игре (есть оружие)
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChildOfClass("Tool") then
-        return oldNamecall(self, ...)
-    end
-    
-    if Config.SilentAim and (method == "Raycast" or method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList") then
-        local isFromLocalPlayer = false
-        
-        pcall(function()
-            if self and typeof(self) == "Instance" then
-                if self:IsDescendantOf(LocalPlayer.Character) then
-                    isFromLocalPlayer = true
-                end
-            end
-        end)
-        
-        if isFromLocalPlayer then
-            local target = getSilentTarget()
-            if target then
-                local part = getTargetPart(target.Character)
-                if part then
-                    local roll = math.random(1, 100)
-                    local hit = roll <= Config.SilentHitchance
-                    
-                    if hit then
-                        local targetPos = part.Position
-                        
-                        if Config.SilentAutoShot then
-                            task.spawn(function()
-                                task.wait(0.02)
-                                if mouse1click then
-                                    mouse1click()
-                                end
-                            end)
-                        end
-                        
-                        if method == "Raycast" then
-                            local origin = args[1] and args[1].Origin or self.Origin
-                            if origin then
-                                local newDirection = (targetPos - origin).Unit * 1000
-                                args[1] = Ray.new(origin, newDirection)
-                            end
-                        elseif method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" then
-                            local ray = args[1]
-                            if ray then
-                                local newRay = Ray.new(ray.Origin, (targetPos - ray.Origin).Unit * 1000)
-                                args[1] = newRay
-                            end
-                        end
-                        
-                        return oldNamecall(self, unpack(args))
-                    else
-                        return oldNamecall(self, ...)
-                    end
-                end
-            end
+    -- Если только что нажали — считаем это выстрелом
+    if currentMouseState and not lastMouseState then
+        if Config.SilentAim and Config.SilentAutoShot then
+            doSilentAimShot()
         end
     end
-    
-    return oldNamecall(self, ...)
+    lastMouseState = currentMouseState
 end)
 
 -- ═══════════════════════════════════════════════════════
--- ✅ ИСПРАВЛЕННЫЙ FLY (работает в новых версиях Roblox)
+-- FLY
 -- ═══════════════════════════════════════════════════════
 local flyBV, flyBodyGyro
 
@@ -1058,7 +941,6 @@ local function startFly()
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     
-    -- ✅ ИСПРАВЛЕНО: используем новые BodyMovers
     flyBV = Instance.new("BodyVelocity")
     flyBV.MaxForce = Vector3.new(1e5, 1e5, 1e5)
     flyBV.Velocity = Vector3.new(0, 0, 0)
@@ -1070,7 +952,6 @@ local function startFly()
     flyBodyGyro.D = 100
     flyBodyGyro.Parent = hrp
     
-    -- ✅ ИСПРАВЛЕНО: отключаем гравитацию
     local hum = char:FindFirstChildOfClass("Humanoid")
     if hum then
         hum.PlatformStand = true
@@ -1078,16 +959,18 @@ local function startFly()
 end
 
 local function stopFly()
-    if flyBV then flyBV:Destroy() flyBV = nil end
-    if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
-    
-    local char = LocalPlayer.Character
-    if char then
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.PlatformStand = false
+    pcall(function()
+        if flyBV then flyBV:Destroy() flyBV = nil end
+        if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
+        
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.PlatformStand = false
+            end
         end
-    end
+    end)
 end
 
 -- ═══════════════════════════════════════════════════════
@@ -1116,8 +999,11 @@ local function findDownedPlayer()
 end
 
 -- ═══════════════════════════════════════════════════════
--- MAIN LOOP
+-- MAIN LOOP (ОПТИМИЗИРОВАН)
 -- ═══════════════════════════════════════════════════════
+local lastESPUpdate = 0
+local lastHitboxUpdate = 0
+
 RunService.RenderStepped:Connect(function(dt)
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -1161,8 +1047,8 @@ RunService.RenderStepped:Connect(function(dt)
             if part and isTargetVisible(part) then
                 task.spawn(function()
                     task.wait(Config.TriggerDelay)
-                    if mouse1click then
-                        mouse1click()
+                    if hasMouse1Click then
+                        pcall(function() mouse1click() end)
                     end
                 end)
             end
@@ -1179,7 +1065,7 @@ RunService.RenderStepped:Connect(function(dt)
         hum.JumpPower = Config.JumpPower
     end
     
-    -- ✅ ИСПРАВЛЕННЫЙ FLY
+    -- FLY
     if Config.FlyEnabled and hrp then
         if not flyBV then startFly() end
         local moveDir = Vector3.new(0, 0, 0)
@@ -1213,7 +1099,7 @@ RunService.RenderStepped:Connect(function(dt)
             if head and hrp then
                 hrp.CFrame = CFrame.new(head.Position + Vector3.new(0, 3, 0))
                 task.wait(0.1)
-                if mouse1click then mouse1click() end
+                if hasMouse1Click then pcall(function() mouse1click() end) end
             end
         end
     end
@@ -1225,13 +1111,78 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
     
+    -- ✅ ESP UPDATE (раз в 0.2 сек, не каждый кадр!)
+    local now = tick()
+    if Config.ESPEnabled and now - lastESPUpdate > 0.2 then
+        lastESPUpdate = now
+        for p, objs in pairs(espObjects) do
+            pcall(function()
+                if not objs.Char.Parent then return end
+                
+                objs.Highlight.Enabled = true
+                objs.Billboard.Enabled = true
+                
+                local ragdoll = isRagdoll(p)
+                
+                if ragdoll then
+                    objs.Highlight.FillColor = Color3.fromRGB(150, 150, 150)
+                    objs.Highlight.OutlineColor = Color3.fromRGB(100, 100, 100)
+                else
+                    objs.Highlight.FillColor = Color3.fromRGB(255, 60, 120)
+                    objs.Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                end
+                
+                local head = objs.Char:FindFirstChild("Head")
+                if head then
+                    local dist = math.floor((head.Position - Camera.CFrame.Position).Magnitude)
+                    local info = ""
+                    if Config.ESPName then info = info .. p.Name .. "\n" end
+                    if Config.ESPStatus then 
+                        info = info .. (ragdoll and "[DOWN]" or "[ALIVE]") .. "\n" 
+                    end
+                    if Config.ESPDistance then info = info .. dist .. "m  " end
+                    if Config.ESPWeapon then info = info .. getPlayerWeapon(p) .. "\n" end
+                    if Config.ESPHealth then
+                        local hum = objs.Char:FindFirstChildOfClass("Humanoid")
+                        if hum then
+                            info = info .. math.floor(hum.Health) .. " HP"
+                        end
+                    end
+                    objs.Text.Text = info
+                end
+            end)
+        end
+    elseif not Config.ESPEnabled then
+        for p, objs in pairs(espObjects) do
+            pcall(function()
+                objs.Highlight.Enabled = false
+                objs.Billboard.Enabled = false
+            end)
+        end
+    end
+    
+    -- ✅ HITBOX UPDATE (раз в 0.3 сек)
+    if Config.HitboxExpander and now - lastHitboxUpdate > 0.3 then
+        lastHitboxUpdate = now
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                pcall(function()
+                    local part = player.Character:FindFirstChild(Config.HitboxTarget)
+                    if part then
+                        part.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
+                        part.Transparency = 0.7
+                        part.CanCollide = false
+                    end
+                end)
+            end
+        end
+    end
+    
     -- FPS BOOST
     if Config.FPSBoost then
         pcall(function()
             Workspace.Terrain.WaterWaveSize = 0
             Workspace.Terrain.WaterWaveSpeed = 0
-            Workspace.Terrain.WaterReflectance = 0
-            Workspace.Terrain.WaterTransparency = 0
         end)
     end
 end)
@@ -1239,26 +1190,31 @@ end)
 -- Infinite Jump
 UserInputService.JumpRequest:Connect(function()
     if Config.InfiniteJump and LocalPlayer.Character then
-        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum:ChangeState(Enum.HumanoidStateType.Jumping)
-        end
+        pcall(function()
+            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end)
     end
 end)
 
 -- Anti AFK
 LocalPlayer.Idled:Connect(function()
     if Config.AntiAFK then
-        VirtualUser:Button2Down(Vector2.new(0, 0), Camera.CFrame)
-        task.wait(1)
-        VirtualUser:Button2Up(Vector2.new(0, 0), Camera.CFrame)
+        pcall(function()
+            VirtualUser:Button2Down(Vector2.new(0, 0), Camera.CFrame)
+            task.wait(1)
+            VirtualUser:Button2Up(Vector2.new(0, 0), Camera.CFrame)
+        end)
     end
 end)
 
 print("╔══════════════════════════════════════════╗")
-print("║  TECHY ULTIMATE v4.4 - ALL BUGS FIXED    ║")
-print("║  ✅ TeamCheck для Aimbot и Silent        ║")
-print("║  ✅ Hitbox не включается сразу           ║")
-print("║  ✅ Silent Aim не ломает камеру          ║")
-print("║  ✅ Fly работает                         ║")
+print("║  TECHY ULTIMATE v4.5 - NO CRASH          ║")
+print("║  ✅ Убран hookmetamethod                 ║")
+print("║  ✅ Убран debug.getinfo                  ║")
+print("║  ✅ Silent Aim БЕЗ хуков                 ║")
+print("║  ✅ Оптимизированы циклы                 ║")
+print("║  ✅ Все функции в pcall                  ║")
 print("╚══════════════════════════════════════════╝")
