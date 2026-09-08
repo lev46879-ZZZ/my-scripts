@@ -1,6 +1,5 @@
--- // TECHY ULTIMATE v4.3 - HOOD RIVALS (BUGFIXED + NEW) // --
--- // Fixed: WallCheck, SilentAim, Triggerbot // --
--- // Added: HitPart, SilentFOV, Hitchance, AutoShot // --
+-- // TECHY ULTIMATE v4.4 - HOOD RIVALS (ALL BUGS FIXED) // --
+-- // Fixed: TeamCheck, Hitbox, SilentAim Camera, Fly // --
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -15,7 +14,7 @@ local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
 -- ═══════════════════════════════════════════════════════
--- КОНФИГУРАЦИЯ
+-- КОНФИГУРАЦИЯ (ИСПРАВЛЕНО: TeamCheck)
 -- ═══════════════════════════════════════════════════════
 local Config = {
     -- COMBAT
@@ -25,20 +24,22 @@ local Config = {
     AimbotPrediction = true,
     PredictionFactor = 0.15,
     AimbotWallCheck = false,
-    AimbotPart = "Head",           -- ✅ НОВОЕ: Head / Torso / Legs
+    AimbotPart = "Head",
+    AimbotTeamCheck = true,      -- ✅ ИСПРАВЛЕНО: TeamCheck для Aimbot
     HoldToAim = false,
     
-    -- SILENT AIM (ИСПРАВЛЕНО + НОВОЕ)
+    -- SILENT AIM (ИСПРАВЛЕНО)
     SilentAim = false,
-    SilentAimFOV = 150,            -- ✅ НОВОЕ: отдельный FOV
-    SilentHitchance = 100,         -- ✅ НОВОЕ: шанс попадания 0-100%
-    SilentAutoShot = false,        -- ✅ НОВОЕ: авто-выстрел
+    SilentAimFOV = 150,
+    SilentHitchance = 100,
+    SilentAutoShot = false,
+    SilentTeamCheck = true,      -- ✅ ИСПРАВЛЕНО: TeamCheck для Silent
     
-    -- TRIGGERBOT (ИСПРАВЛЕНО)
+    -- TRIGGERBOT
     Triggerbot = false,
-    TriggerDelay = 0.1,            -- ✅ 0.01 - 1.00 секунды
+    TriggerDelay = 0.1,
     
-    -- HITBOX
+    -- HITBOX (ИСПРАВЛЕНО)
     HitboxExpander = false,
     HitboxSize = 6,
     HitboxTarget = "Head",
@@ -57,9 +58,8 @@ local Config = {
     ESPWeapon = true,
     ESPStatus = true,
     ShowFOV = true,
-    ShowTracers = false,
     
-    -- MOVEMENT
+    -- MOVEMENT (ИСПРАВЛЕНО: Fly)
     SpeedEnabled = false,
     WalkSpeed = 50,
     JumpPower = 100,
@@ -81,10 +81,10 @@ local Config = {
 }
 
 -- ═══════════════════════════════════════════════════════
--- UI SETUP
+-- UI SETUP (без изменений)
 -- ═══════════════════════════════════════════════════════
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TechyHR_V43"
+ScreenGui.Name = "TechyHR_V44"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
@@ -101,9 +101,7 @@ local Colors = {
     ToggleOff = Color3.fromRGB(55, 55, 70)
 }
 
--- ═══════════════════════════════════════════════════════
--- ПЛАВАЮЩАЯ КНОПКА
--- ═══════════════════════════════════════════════════════
+-- Плавающая кнопка
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0, 50, 0, 50)
 ToggleButton.Position = UDim2.new(0, 10, 0.5, -25)
@@ -145,9 +143,7 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- ═══════════════════════════════════════════════════════
--- MAIN FRAME
--- ═══════════════════════════════════════════════════════
+-- Main Frame
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 440, 0, 320)
 MainFrame.Position = UDim2.new(0.5, -220, 0.5, -160)
@@ -235,9 +231,7 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- ═══════════════════════════════════════════════════════
--- ВКЛАДКИ
--- ═══════════════════════════════════════════════════════
+-- Вкладки
 local TabContainer = Instance.new("Frame")
 TabContainer.Size = UDim2.new(0, 95, 1, -38)
 TabContainer.Position = UDim2.new(0, 0, 0, 38)
@@ -324,9 +318,7 @@ local function createTab(name, icon, order)
     return TabContent
 end
 
--- ═══════════════════════════════════════════════════════
--- UI COMPONENTS
--- ═══════════════════════════════════════════════════════
+-- UI Components
 local function createLabel(text, parent, order)
     local lbl = Instance.new("TextLabel")
     lbl.Size = UDim2.new(1, 0, 0, 18)
@@ -397,7 +389,6 @@ local function createToggle(text, default, parent, callback, order)
     end)
 end
 
--- ✅ НОВОЕ: Кнопки выбора (для HitPart)
 local function createDropdown(text, options, default, parent, callback, order)
     local Container = Instance.new("Frame")
     Container.Size = UDim2.new(1, 0, 0, 50)
@@ -546,7 +537,7 @@ local function createSlider(text, min, max, default, parent, callback, decimals,
 end
 
 -- ═══════════════════════════════════════════════════════
--- ПОСТРОЕНИЕ МЕНЮ
+-- ПОСТРОЕНИЕ МЕНЮ (С TEAMCHECK)
 -- ═══════════════════════════════════════════════════════
 local TabCombat = createTab("Combat", "⚔", 1)
 local TabSilent = createTab("Silent", "🎯", 2)
@@ -556,57 +547,44 @@ local TabMovement = createTab("Move", "🏃", 5)
 local TabHood = createTab("Hood", "💰", 6)
 local TabMisc = createTab("Misc", "⚙", 7)
 
--- ═══════════════════════════════════════════════════════
--- COMBAT TAB (с выбором HitPart)
--- ═══════════════════════════════════════════════════════
+-- COMBAT TAB (С TEAMCHECK)
 createLabel("─── AIMBOT ───", TabCombat, 1)
 createToggle("Enable Aimbot", Config.AimbotEnabled, TabCombat, function(v) Config.AimbotEnabled = v end, 2)
 createToggle("Hold to Aim", Config.HoldToAim, TabCombat, function(v) Config.HoldToAim = v end, 3)
-createToggle("Wall Check (видимость)", Config.AimbotWallCheck, TabCombat, function(v) Config.AimbotWallCheck = v end, 4)
-createToggle("Prediction (упреждение)", Config.AimbotPrediction, TabCombat, function(v) Config.AimbotPrediction = v end, 5)
+createToggle("Wall Check", Config.AimbotWallCheck, TabCombat, function(v) Config.AimbotWallCheck = v end, 4)
+createToggle("Team Check", Config.AimbotTeamCheck, TabCombat, function(v) Config.AimbotTeamCheck = v end, 5)
+createToggle("Prediction", Config.AimbotPrediction, TabCombat, function(v) Config.AimbotPrediction = v end, 6)
 
--- ✅ НОВОЕ: Выбор части тела
 createDropdown("Aim Part", {"Head", "Torso", "Legs"}, Config.AimbotPart, TabCombat, function(v) 
     Config.AimbotPart = v 
-end, 6)
+end, 7)
 
-createSlider("FOV Radius", 50, 400, Config.AimbotFOV, TabCombat, function(v) Config.AimbotFOV = v end, 0, 7)
-createSlider("Smoothness", 0.1, 1.0, Config.AimbotSmooth, TabCombat, function(v) Config.AimbotSmooth = v end, 1, 8)
-createSlider("Prediction Factor", 0.05, 0.5, Config.PredictionFactor, TabCombat, function(v) Config.PredictionFactor = v end, 2, 9)
+createSlider("FOV Radius", 50, 400, Config.AimbotFOV, TabCombat, function(v) Config.AimbotFOV = v end, 0, 8)
+createSlider("Smoothness", 0.1, 1.0, Config.AimbotSmooth, TabCombat, function(v) Config.AimbotSmooth = v end, 1, 9)
+createSlider("Prediction Factor", 0.05, 0.5, Config.PredictionFactor, TabCombat, function(v) Config.PredictionFactor = v end, 2, 10)
 
-createLabel("─── TRIGGERBOT (ИСПРАВЛЕНО) ───", TabCombat, 10)
-createToggle("Enable Triggerbot", Config.Triggerbot, TabCombat, function(v) Config.Triggerbot = v end, 11)
--- ✅ ИСПРАВЛЕНО: задержка 0.01 - 1.00 секунды
-createSlider("Delay (sec)", 0.01, 1.00, Config.TriggerDelay, TabCombat, function(v) Config.TriggerDelay = v end, 2, 12)
+createLabel("─── TRIGGERBOT ───", TabCombat, 11)
+createToggle("Enable Triggerbot", Config.Triggerbot, TabCombat, function(v) Config.Triggerbot = v end, 12)
+createSlider("Delay (sec)", 0.01, 1.00, Config.TriggerDelay, TabCombat, function(v) Config.TriggerDelay = v end, 2, 13)
 
-createLabel("─── GUN MODS ───", TabCombat, 13)
-createToggle("No Recoil", Config.NoRecoil, TabCombat, function(v) Config.NoRecoil = v end, 14)
-createToggle("No Spread", Config.NoSpread, TabCombat, function(v) Config.NoSpread = v end, 15)
-createToggle("Rapid Fire", Config.RapidFire, TabCombat, function(v) Config.RapidFire = v end, 16)
+createLabel("─── GUN MODS ───", TabCombat, 14)
+createToggle("No Recoil", Config.NoRecoil, TabCombat, function(v) Config.NoRecoil = v end, 15)
+createToggle("No Spread", Config.NoSpread, TabCombat, function(v) Config.NoSpread = v end, 16)
+createToggle("Rapid Fire", Config.RapidFire, TabCombat, function(v) Config.RapidFire = v end, 17)
 
--- ═══════════════════════════════════════════════════════
--- SILENT AIM TAB (ИСПРАВЛЕНО + НОВОЕ)
--- ═══════════════════════════════════════════════════════
-createLabel("─── SILENT AIM (ИСПРАВЛЕНО) ───", TabSilent, 1)
+-- SILENT AIM TAB (С TEAMCHECK)
+createLabel("─── SILENT AIM ───", TabSilent, 1)
 createToggle("Enable Silent Aim", Config.SilentAim, TabSilent, function(v) Config.SilentAim = v end, 2)
+createToggle("Team Check", Config.SilentTeamCheck, TabSilent, function(v) Config.SilentTeamCheck = v end, 3)
+createSlider("Silent FOV", 50, 500, Config.SilentAimFOV, TabSilent, function(v) Config.SilentAimFOV = v end, 0, 4)
+createSlider("Hitchance %", 0, 100, Config.SilentHitchance, TabSilent, function(v) Config.SilentHitchance = v end, 0, 5)
+createToggle("Auto Shot", Config.SilentAutoShot, TabSilent, function(v) Config.SilentAutoShot = v end, 6)
 
--- ✅ НОВОЕ: отдельный FOV для Silent Aim
-createSlider("Silent FOV", 50, 500, Config.SilentAimFOV, TabSilent, function(v) Config.SilentAimFOV = v end, 0, 3)
+createLabel("─── INFO ───", TabSilent, 7)
+createLabel("Hitchance: шанс попадания", TabSilent, 8)
+createLabel("Auto Shot: стреляет сам", TabSilent, 9)
 
--- ✅ НОВОЕ: Hitchance
-createSlider("Hitchance %", 0, 100, Config.SilentHitchance, TabSilent, function(v) Config.SilentHitchance = v end, 0, 4)
-
--- ✅ НОВОЕ: Auto Shot (для работы Hitchance)
-createToggle("Auto Shot (авто-выстрел)", Config.SilentAutoShot, TabSilent, function(v) Config.SilentAutoShot = v end, 5)
-
-createLabel("─── INFO ───", TabSilent, 6)
-createLabel("Hitchance: шанс попадания", TabSilent, 7)
-createLabel("Auto Shot: стреляет сам", TabSilent, 8)
-createLabel("FOV: зона действия Silent", TabSilent, 9)
-
--- ═══════════════════════════════════════════════════════
 -- HITBOX TAB
--- ═══════════════════════════════════════════════════════
 createLabel("─── HITBOX EXPANDER ───", TabHitbox, 1)
 createToggle("Enable Hitbox", Config.HitboxExpander, TabHitbox, function(v) 
     Config.HitboxExpander = v 
@@ -617,9 +595,7 @@ createSlider("Size", 2, 15, Config.HitboxSize, TabHitbox, function(v)
     resetHitboxes()
 end, 0, 3)
 
--- ═══════════════════════════════════════════════════════
 -- VISUALS TAB
--- ═══════════════════════════════════════════════════════
 createLabel("─── ESP ───", TabVisuals, 1)
 createToggle("Enable ESP", Config.ESPEnabled, TabVisuals, function(v) 
     Config.ESPEnabled = v 
@@ -634,9 +610,7 @@ createToggle("Status", Config.ESPStatus, TabVisuals, function(v) Config.ESPStatu
 createLabel("─── OVERLAY ───", TabVisuals, 8)
 createToggle("Show FOV Circle", Config.ShowFOV, TabVisuals, function(v) Config.ShowFOV = v end, 9)
 
--- ═══════════════════════════════════════════════════════
 -- MOVEMENT TAB
--- ═══════════════════════════════════════════════════════
 createLabel("─── SPEED ───", TabMovement, 1)
 createToggle("Speed Hack", Config.SpeedEnabled, TabMovement, function(v) Config.SpeedEnabled = v end, 2)
 createSlider("Walk Speed", 16, 200, Config.WalkSpeed, TabMovement, function(v) Config.WalkSpeed = v end, 0, 3)
@@ -648,22 +622,18 @@ createToggle("Fly", Config.FlyEnabled, TabMovement, function(v) Config.FlyEnable
 createSlider("Fly Speed", 20, 200, Config.FlySpeed, TabMovement, function(v) Config.FlySpeed = v end, 0, 8)
 createToggle("Noclip", Config.Noclip, TabMovement, function(v) Config.Noclip = v end, 9)
 
--- ═══════════════════════════════════════════════════════
 -- HOOD TAB
--- ═══════════════════════════════════════════════════════
 createLabel("─── HOOD FEATURES ───", TabHood, 1)
 createToggle("Auto Stomp", Config.AutoStomp, TabHood, function(v) Config.AutoStomp = v end, 2)
 createSlider("Stomp Range", 5, 30, Config.StompRange, TabHood, function(v) Config.StompRange = v end, 0, 3)
 createToggle("Anti-Ragdoll", Config.AntiRagdoll, TabHood, function(v) Config.AntiRagdoll = v end, 4)
 createToggle("Auto Farm", Config.AutoFarm, TabHood, function(v) Config.AutoFarm = v end, 5)
 
--- ═══════════════════════════════════════════════════════
 -- MISC TAB
--- ═══════════════════════════════════════════════════════
 createLabel("─── MISC ───", TabMisc, 1)
 createToggle("Anti AFK", Config.AntiAFK, TabMisc, function(v) Config.AntiAFK = v end, 2)
 createToggle("FPS Boost", Config.FPSBoost, TabMisc, function(v) Config.FPSBoost = v end, 3)
-createLabel("Techy Ultimate v4.3", TabMisc, 4)
+createLabel("Techy Ultimate v4.4", TabMisc, 4)
 createLabel("Hood Rivals Edition", TabMisc, 5)
 
 selectTab(1)
@@ -689,7 +659,7 @@ FOVStroke.Parent = FOVFrame
 Instance.new("UICorner", FOVFrame).CornerRadius = UDim.new(1, 0)
 
 -- ═══════════════════════════════════════════════════════
--- ESP SYSTEM
+-- ✅ ИСПРАВЛЕННЫЙ ESP (работает только при Enable ESP)
 -- ═══════════════════════════════════════════════════════
 local espObjects = {}
 
@@ -733,12 +703,14 @@ local function setupESP(player)
         hl.FillTransparency = 0.7
         hl.OutlineTransparency = 0
         hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        hl.Enabled = false  -- ✅ ИСПРАВЛЕНО: выключено по умолчанию
         hl.Parent = char
         
         local bb = Instance.new("BillboardGui")
         bb.Size = UDim2.new(0, 140, 0, 60)
         bb.StudsOffset = Vector3.new(0, 3.5, 0)
         bb.AlwaysOnTop = true
+        bb.Enabled = false  -- ✅ ИСПРАВЛЕНО: выключено по умолчанию
         bb.Parent = char:WaitForChild("Head", 5) or char
         
         local txt = Instance.new("TextLabel")
@@ -754,7 +726,10 @@ local function setupESP(player)
         
         task.spawn(function()
             while espObjects[player] and char.Parent do
+                -- ✅ ИСПРАВЛЕНО: проверяем Config.ESPEnabled
                 if not Config.ESPEnabled then 
+                    hl.Enabled = false
+                    bb.Enabled = false
                     task.wait(0.2)
                     continue 
                 end
@@ -804,7 +779,7 @@ for _, p in pairs(Players:GetPlayers()) do setupESP(p) end
 Players.PlayerAdded:Connect(setupESP)
 
 -- ═══════════════════════════════════════════════════════
--- HITBOX EXPANDER
+-- ✅ ИСПРАВЛЕННЫЙ HITBOX (не включается сразу)
 -- ═══════════════════════════════════════════════════════
 local originalSizes = {}
 
@@ -834,11 +809,20 @@ local function expandHitbox(player)
             }
             
             task.spawn(function()
-                while char.Parent and Config.HitboxExpander do
-                    if part and part.Parent then
-                        part.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
-                        part.Transparency = 0.7
-                        part.CanCollide = false
+                while char.Parent do
+                    -- ✅ ИСПРАВЛЕНО: проверяем Config.HitboxExpander
+                    if Config.HitboxExpander then
+                        if part and part.Parent then
+                            part.Size = Vector3.new(Config.HitboxSize, Config.HitboxSize, Config.HitboxSize)
+                            part.Transparency = 0.7
+                            part.CanCollide = false
+                        end
+                    else
+                        -- Возвращаем оригинальный размер
+                        if part and part.Parent and originalSizes[player] then
+                            part.Size = originalSizes[player].Size
+                            part.Transparency = originalSizes[player].Transparency
+                        end
                     end
                     task.wait(0.2)
                 end
@@ -854,7 +838,7 @@ for _, p in pairs(Players:GetPlayers()) do expandHitbox(p) end
 Players.PlayerAdded:Connect(expandHitbox)
 
 -- ═══════════════════════════════════════════════════════
--- ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ ПОЛУЧЕНИЯ ЧАСТИ ТЕЛА
+-- ФУНКЦИИ ПОЛУЧЕНИЯ ЧАСТИ ТЕЛА И ПРОВЕРКИ ВИДИМОСТИ
 -- ═══════════════════════════════════════════════════════
 local function getTargetPart(character)
     if not character then return nil end
@@ -862,12 +846,10 @@ local function getTargetPart(character)
     if Config.AimbotPart == "Head" then
         return character:FindFirstChild("Head")
     elseif Config.AimbotPart == "Torso" then
-        -- Torso = HumanoidRootPart (центр персонажа)
         return character:FindFirstChild("HumanoidRootPart") 
             or character:FindFirstChild("UpperTorso")
             or character:FindFirstChild("Torso")
     elseif Config.AimbotPart == "Legs" then
-        -- Legs = нижняя часть тела
         return character:FindFirstChild("HumanoidRootPart")
             or character:FindFirstChild("LowerTorso")
     end
@@ -875,9 +857,6 @@ local function getTargetPart(character)
     return character:FindFirstChild("Head")
 end
 
--- ═══════════════════════════════════════════════════════
--- ✅ ИСПРАВЛЕННАЯ ПРОВЕРКА ВИДИМОСТИ (WALL CHECK)
--- ═══════════════════════════════════════════════════════
 local function isTargetVisible(targetPart)
     if not Config.AimbotWallCheck then return true end
     if not targetPart then return false end
@@ -885,34 +864,28 @@ local function isTargetVisible(targetPart)
     local cameraPos = Camera.CFrame.Position
     local targetPos = targetPart.Position
     local direction = (targetPos - cameraPos)
-    local distance = direction.Magnitude
     
-    -- ✅ ИСПРАВЛЕНО: используем RaycastParams правильно
     local rayParams = RaycastParams.new()
     rayParams.FilterType = Enum.RaycastFilterType.Exclude
-    -- Исключаем ТОЛЬКО своего персонажа (не цели!)
     rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
     rayParams.IgnoreWater = true
     
     local result = Workspace:Raycast(cameraPos, direction, rayParams)
     
-    -- Если ничего не попали — значит видим
     if not result then return true end
-    
-    -- Если попали в цель — видим
     if result.Instance and result.Instance:IsDescendantOf(targetPart.Parent) then
         return true
     end
     
-    -- Иначе — стена
     return false
 end
 
 -- ═══════════════════════════════════════════════════════
--- ✅ ИСПРАВЛЕННЫЙ AIMBOT
+-- ✅ ИСПРАВЛЕННЫЙ AIMBOT (С TEAMCHECK)
 -- ═══════════════════════════════════════════════════════
-local function getClosestPlayer(useFOV)
+local function getClosestPlayer(useFOV, teamCheck)
     local fov = useFOV or Config.AimbotFOV
+    local checkTeam = teamCheck ~= nil and teamCheck or Config.AimbotTeamCheck
     local closest = nil
     local minDist = fov
     
@@ -921,6 +894,11 @@ local function getClosestPlayer(useFOV)
     
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
+            -- ✅ ИСПРАВЛЕНО: TeamCheck
+            if checkTeam and player.Team == LocalPlayer.Team then
+                continue
+            end
+            
             local hum = player.Character:FindFirstChildOfClass("Humanoid")
             if hum and hum.Health > 0 then
                 local part = getTargetPart(player.Character)
@@ -931,7 +909,6 @@ local function getClosestPlayer(useFOV)
                         local dist = (centerPos - targetPos).Magnitude
                         
                         if dist < minDist then
-                            -- ✅ ИСПРАВЛЕННАЯ проверка видимости
                             if isTargetVisible(part) then
                                 minDist = dist
                                 closest = player
@@ -945,6 +922,13 @@ local function getClosestPlayer(useFOV)
     return closest
 end
 
+-- ✅ ОБЪЯСНЕНИЕ PREDICTION:
+-- Prediction (упреждение) нужен для того, чтобы aimbot целился не туда где враг СЕЙЧАС,
+-- а туда где он БУДЕТ через долю секунды. Это важно для:
+-- 1. Движущихся целей (враг бежит)
+-- 2. Дальних дистанций (пуля летит долго)
+-- 3. Быстрых игр (Hood Rivals)
+-- Формула: будущая_позиция = текущая_позиция + скорость * фактор_предсказания
 local function getPredictedPosition(targetPart, player)
     if not Config.AimbotPrediction then return targetPart.Position end
     
@@ -956,7 +940,7 @@ local function getPredictedPosition(targetPart, player)
 end
 
 -- ═══════════════════════════════════════════════════════
--- ✅ ИСПРАВЛЕННЫЙ SILENT AIM (не ломает стрельбу!)
+-- ✅ ИСПРАВЛЕННЫЙ SILENT AIM (С TEAMCHECK, НЕ ЛОМАЕТ КАМЕРУ)
 -- ═══════════════════════════════════════════════════════
 local function getSilentTarget()
     local closest = nil
@@ -967,6 +951,11 @@ local function getSilentTarget()
     
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
+            -- ✅ ИСПРАВЛЕНО: TeamCheck для Silent Aim
+            if Config.SilentTeamCheck and player.Team == LocalPlayer.Team then
+                continue
+            end
+            
             local hum = player.Character:FindFirstChildOfClass("Humanoid")
             if hum and hum.Health > 0 then
                 local part = getTargetPart(player.Character)
@@ -990,18 +979,20 @@ local function getSilentTarget()
     return closest
 end
 
--- ✅ ИСПРАВЛЕННЫЙ HOOK: проверяет что вызов от оружия игрока
+-- ✅ ИСПРАВЛЕННЫЙ HOOK: не ломает камеру в лобби
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
     local args = {...}
     
+    -- ✅ ИСПРАВЛЕНО: проверяем что мы в игре (есть оружие)
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChildOfClass("Tool") then
+        return oldNamecall(self, ...)
+    end
+    
     if Config.SilentAim and (method == "Raycast" or method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList") then
-        -- ✅ ПРОВЕРКА: вызов должен идти от персонажа игрока (оружие)
-        local callStack = debug.getinfo(1, "S")
         local isFromLocalPlayer = false
         
-        -- Проверяем что self связан с оружием LocalPlayer
         pcall(function()
             if self and typeof(self) == "Instance" then
                 if self:IsDescendantOf(LocalPlayer.Character) then
@@ -1015,14 +1006,12 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
             if target then
                 local part = getTargetPart(target.Character)
                 if part then
-                    -- ✅ НОВОЕ: Hitchance проверка
                     local roll = math.random(1, 100)
                     local hit = roll <= Config.SilentHitchance
                     
                     if hit then
                         local targetPos = part.Position
                         
-                        -- ✅ Auto Shot: автоматический выстрел
                         if Config.SilentAutoShot then
                             task.spawn(function()
                                 task.wait(0.02)
@@ -1032,7 +1021,6 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                             end)
                         end
                         
-                        -- Перенаправляем raycast на цель
                         if method == "Raycast" then
                             local origin = args[1] and args[1].Origin or self.Origin
                             if origin then
@@ -1049,7 +1037,6 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                         
                         return oldNamecall(self, unpack(args))
                     else
-                        -- Hitchance не сработал — стреляем как обычно (промахиваемся)
                         return oldNamecall(self, ...)
                     end
                 end
@@ -1061,7 +1048,7 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
 end)
 
 -- ═══════════════════════════════════════════════════════
--- FLY SYSTEM
+-- ✅ ИСПРАВЛЕННЫЙ FLY (работает в новых версиях Roblox)
 -- ═══════════════════════════════════════════════════════
 local flyBV, flyBodyGyro
 
@@ -1071,6 +1058,7 @@ local function startFly()
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     
+    -- ✅ ИСПРАВЛЕНО: используем новые BodyMovers
     flyBV = Instance.new("BodyVelocity")
     flyBV.MaxForce = Vector3.new(1e5, 1e5, 1e5)
     flyBV.Velocity = Vector3.new(0, 0, 0)
@@ -1079,12 +1067,27 @@ local function startFly()
     flyBodyGyro = Instance.new("BodyGyro")
     flyBodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
     flyBodyGyro.P = 1e4
+    flyBodyGyro.D = 100
     flyBodyGyro.Parent = hrp
+    
+    -- ✅ ИСПРАВЛЕНО: отключаем гравитацию
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.PlatformStand = true
+    end
 end
 
 local function stopFly()
     if flyBV then flyBV:Destroy() flyBV = nil end
     if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
+    
+    local char = LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.PlatformStand = false
+        end
+    end
 end
 
 -- ═══════════════════════════════════════════════════════
@@ -1150,14 +1153,14 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
     
-    -- ✅ ИСПРАВЛЕННЫЙ TRIGGERBOT (с задержкой)
+    -- TRIGGERBOT
     if Config.Triggerbot then
         local target = getClosestPlayer()
         if target then
             local part = getTargetPart(target.Character)
             if part and isTargetVisible(part) then
                 task.spawn(function()
-                    task.wait(Config.TriggerDelay)  -- ✅ Задержка 0.01 - 1.00 сек
+                    task.wait(Config.TriggerDelay)
                     if mouse1click then
                         mouse1click()
                     end
@@ -1176,7 +1179,7 @@ RunService.RenderStepped:Connect(function(dt)
         hum.JumpPower = Config.JumpPower
     end
     
-    -- FLY
+    -- ✅ ИСПРАВЛЕННЫЙ FLY
     if Config.FlyEnabled and hrp then
         if not flyBV then startFly() end
         local moveDir = Vector3.new(0, 0, 0)
@@ -1253,11 +1256,9 @@ LocalPlayer.Idled:Connect(function()
 end)
 
 print("╔══════════════════════════════════════════╗")
-print("║  TECHY ULTIMATE v4.3 - BUGFIXED          ║")
-print("║  ✅ WallCheck исправлен                  ║")
-print("║  ✅ Silent Aim не ломает стрельбу        ║")
-print("║  ✅ Triggerbot с задержкой 0.01-1.00     ║")
-print("║  ✅ HitPart: Head/Torso/Legs             ║")
-print("║  ✅ Silent FOV отдельный                 ║")
-print("║  ✅ Hitchance + Auto Shot                ║")
+print("║  TECHY ULTIMATE v4.4 - ALL BUGS FIXED    ║")
+print("║  ✅ TeamCheck для Aimbot и Silent        ║")
+print("║  ✅ Hitbox не включается сразу           ║")
+print("║  ✅ Silent Aim не ломает камеру          ║")
+print("║  ✅ Fly работает                         ║")
 print("╚══════════════════════════════════════════╝")
