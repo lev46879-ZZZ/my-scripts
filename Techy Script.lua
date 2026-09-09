@@ -1,5 +1,5 @@
--- // TECHY ULTIMATE v5.4 - AUTO SHOT FIXED // --
--- // Auto Shot: автономный (сам ищет и стреляет) // --
+-- // TECHY ULTIMATE v5.5 - NO RAGEBOT // --
+-- // Убран Ragebot, всё остальное работает // --
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -11,10 +11,10 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
-print("[TECHY v5.4] Loading...")
+print("[TECHY v5.5] Loading...")
 
 -- ═══════════════════════════════════════════════════════
--- КОНФИГУРАЦИЯ
+-- КОНФИГУРАЦИЯ (БЕЗ RAGEBOT!)
 -- ═══════════════════════════════════════════════════════
 local Config = {
     AimbotEnabled = false,
@@ -32,17 +32,7 @@ local Config = {
     SilentHitchance = 100,
     SilentAutoShot = false,
     SilentTeamCheck = true,
-    SilentFireRate = 0.15,  -- Задержка между авто-выстрелами
-    
-    RagebotEnabled = false,
-    DoubleTap = false,
-    SilentRage = false,
-    RageNoSpread = false,
-    AntiAim = false,
-    AntiAimSpeed = 15,
-    AntiAimType = "Spin",
-    InstantHit = false,
-    RageFOV = 9999,
+    SilentFireRate = 0.15,
     
     Triggerbot = false,
     TriggerDelay = 0.05,
@@ -84,10 +74,10 @@ local Config = {
 }
 
 -- ═══════════════════════════════════════════════════════
--- UI (БЕЗ ИЗМЕНЕНИЙ)
+-- UI
 -- ═══════════════════════════════════════════════════════
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TechyV54"
+ScreenGui.Name = "TechyV55"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
@@ -97,7 +87,6 @@ local Colors = {
     BG = Color3.fromRGB(10, 10, 15),
     TopBar = Color3.fromRGB(20, 20, 30),
     Accent = Color3.fromRGB(255, 50, 100),
-    Rage = Color3.fromRGB(255, 0, 0),
     Text = Color3.fromRGB(240, 240, 245),
     SubText = Color3.fromRGB(140, 140, 155),
     ElementBG = Color3.fromRGB(25, 25, 35),
@@ -186,7 +175,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -80, 1, 0)
 Title.Position = UDim2.new(0, 14, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "⚡ TECHY ULTIMATE v5.4"
+Title.Text = "⚡ TECHY ULTIMATE v5.5"
 Title.TextColor3 = Colors.Text
 Title.TextSize = 13
 Title.Font = Enum.Font.GothamBold
@@ -537,16 +526,15 @@ local function createSlider(text, min, max, default, parent, callback, decimals,
 end
 
 -- ═══════════════════════════════════════════════════════
--- МЕНЮ (8 ВКЛАДОК)
+-- МЕНЮ (7 ВКЛАДОК - БЕЗ RAGEBOT!)
 -- ═══════════════════════════════════════════════════════
 local TabCombat = createTab("Combat", "⚔", 1)
 local TabSilent = createTab("Silent", "🎯", 2)
-local TabRage = createTab("Ragebot", "🔥", 3)
-local TabHitbox = createTab("Hitbox", "💢", 4)
-local TabVisuals = createTab("Visuals", "👁", 5)
-local TabMovement = createTab("Move", "🏃", 6)
-local TabHood = createTab("Hood", "💰", 7)
-local TabMisc = createTab("Misc", "⚙", 8)
+local TabHitbox = createTab("Hitbox", "💢", 3)
+local TabVisuals = createTab("Visuals", "👁", 4)
+local TabMovement = createTab("Move", "🏃", 5)
+local TabHood = createTab("Hood", "💰", 6)
+local TabMisc = createTab("Misc", "⚙", 7)
 
 -- COMBAT
 createLabel("─── AIMBOT ───", TabCombat, 1)
@@ -567,7 +555,7 @@ createToggle("No Recoil", Config.NoRecoil, TabCombat, function(v) Config.NoRecoi
 createToggle("No Spread", Config.NoSpread, TabCombat, function(v) Config.NoSpread = v end, 16)
 createToggle("Rapid Fire", Config.RapidFire, TabCombat, function(v) Config.RapidFire = v end, 17)
 
--- SILENT AIM (ИСПРАВЛЕННЫЙ AUTO SHOT)
+-- SILENT AIM (с автономным Auto Shot)
 createLabel("─── SILENT AIM (AUTO) ───", TabSilent, 1)
 createToggle("Enable Silent Aim", Config.SilentAim, TabSilent, function(v) Config.SilentAim = v end, 2)
 createToggle("Team Check", Config.SilentTeamCheck, TabSilent, function(v) Config.SilentTeamCheck = v end, 3)
@@ -577,22 +565,6 @@ createSlider("Hitchance %", 0, 100, Config.SilentHitchance, TabSilent, function(
 createSlider("Fire Rate (sec)", 0.05, 1.0, Config.SilentFireRate, TabSilent, function(v) Config.SilentFireRate = v end, 2, 7)
 createLabel("Auto Shot: скрипт САМ стреляет", TabSilent, 8)
 createLabel("когда враг в Silent FOV", TabSilent, 9)
-
--- RAGEBOT
-createLabel("─── MASTER SWITCH ───", TabRage, 1)
-createToggle("Enable Ragebot", Config.RagebotEnabled, TabRage, function(v) Config.RagebotEnabled = v end, 2)
-createLabel("─── DOUBLE TAP ───", TabRage, 3)
-createToggle("Double Tap (x2 урон)", Config.DoubleTap, TabRage, function(v) Config.DoubleTap = v end, 4)
-createLabel("─── SILENT AIM (RAGE) ───", TabRage, 6)
-createToggle("Silent Rage", Config.SilentRage, TabRage, function(v) Config.SilentRage = v end, 7)
-createLabel("─── NO SPREAD (RAGE) ───", TabRage, 9)
-createToggle("Rage No Spread", Config.RageNoSpread, TabRage, function(v) Config.RageNoSpread = v end, 10)
-createLabel("─── ANTI-AIM ───", TabRage, 12)
-createToggle("Anti-Aim", Config.AntiAim, TabRage, function(v) Config.AntiAim = v end, 13)
-createDropdown("Type", {"Spin", "Jitter", "Down"}, Config.AntiAimType, TabRage, function(v) Config.AntiAimType = v end, 14)
-createSlider("Speed", 1, 50, Config.AntiAimSpeed, TabRage, function(v) Config.AntiAimSpeed = v end, 0, 15)
-createLabel("─── INSTANT HIT ───", TabRage, 16)
-createToggle("Instant Hit", Config.InstantHit, TabRage, function(v) Config.InstantHit = v end, 17)
 
 -- HITBOX
 createLabel("─── HITBOX EXPANDER ───", TabHitbox, 1)
@@ -660,7 +632,8 @@ createToggle("Anti AFK", Config.AntiAFK, TabMisc, function(v) Config.AntiAFK = v
 createToggle("FPS Boost", Config.FPSBoost, TabMisc, function(v) Config.FPSBoost = v end, 3)
 createToggle("FOV Changer", Config.FovChanger, TabMisc, function(v) Config.FovChanger = v end, 4)
 createSlider("FOV Value", 60, 120, Config.FovValue, TabMisc, function(v) Config.FovValue = v end, 0, 5)
-createLabel("Techy Ultimate v5.4", TabMisc, 6)
+createLabel("Techy Ultimate v5.5", TabMisc, 6)
+createLabel("NO RAGEBOT EDITION", TabMisc, 7)
 
 selectTab(1)
 
@@ -859,29 +832,20 @@ local function getPredictedPosition(targetPart, player)
 end
 
 -- ═══════════════════════════════════════════════════════
--- ✅ НОВЫЙ AUTO SHOT (АВТОНОМНЫЙ)
+-- ✅ SILENT AIM (МАТЕМАТИЧЕСКИЙ) + AUTO SHOT
 -- ═══════════════════════════════════════════════════════
--- Логика:
--- 1. Постоянно проверяем есть ли враг в Silent FOV
--- 2. Если есть → проверяем Hitchance
--- 3. Если Hitchance сработал → mouse1click()
--- 4. Ждём SilentFireRate перед следующим выстрелом
--- НЕ ТРЕБУЕТ НАЖАТИЯ МЫШИ!
-
 local lastAutoShotTime = 0
 
 task.spawn(function()
-    while task.wait(0.05) do  -- Проверка 20 раз в секунду
+    while task.wait(0.05) do
         if not Config.SilentAim then continue end
         if not Config.SilentAutoShot then continue end
         
-        -- Кулдаун между выстрелами
         local now = tick()
         if now - lastAutoShotTime < Config.SilentFireRate then
             continue
         end
         
-        -- Проверяем что у нас есть оружие
         local char = LocalPlayer.Character
         if not char then continue end
         local hasWeapon = false
@@ -890,112 +854,33 @@ task.spawn(function()
         end
         if not hasWeapon then continue end
         
-        -- Ищем врага в Silent FOV
         local target = getClosestPlayer(Config.SilentFOV, Config.SilentTeamCheck)
         if not target then continue end
         
-        -- Проверка Hitchance
         local roll = math.random(1, 100)
         if roll > Config.SilentHitchance then continue end
         
-        -- ✅ АВТОМАТИЧЕСКИЙ ВЫСТРЕЛ!
         lastAutoShotTime = now
         
-        -- Наводим камеру на цель (мгновенно)
         local part = getTargetPart(target.Character)
         if part then
             local predictedPos = getPredictedPosition(part, target)
             local targetCFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
             local originalCFrame = Camera.CFrame
             
-            -- Наводимся
             Camera.CFrame = targetCFrame
             
-            -- Стреляем
             task.spawn(function()
                 task.wait(0.016)
                 if mouse1click then
                     pcall(function() mouse1click() end)
                 end
-                -- Возвращаем камеру
                 task.wait(0.032)
                 Camera.CFrame = originalCFrame
             end)
         end
     end
 end)
-
--- ═══════════════════════════════════════════════════════
--- RAGEBOT HOOK (в pcall)
--- ═══════════════════════════════════════════════════════
-local rageHookSuccess = pcall(function()
-    if type(hookmetamethod) ~= "function" then
-        error("hookmetamethod not available")
-    end
-    
-    local oldNamecall
-    oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-        local method = getnamecallmethod()
-        local args = {...}
-        
-        if not Config.RagebotEnabled then
-            return oldNamecall(self, ...)
-        end
-        
-        local isFromWeapon = false
-        pcall(function()
-            if self and typeof(self) == "Instance" then
-                local current = self
-                while current do
-                    if current:IsA("Tool") then
-                        isFromWeapon = true
-                        break
-                    end
-                    current = current.Parent
-                end
-            end
-        end)
-        
-        if not isFromWeapon then
-            return oldNamecall(self, ...)
-        end
-        
-        if Config.DoubleTap and method == "FireServer" then
-            local result1 = oldNamecall(self, ...)
-            task.spawn(function()
-                oldNamecall(self, ...)
-            end)
-            return result1
-        end
-        
-        if (Config.SilentRage or Config.InstantHit) and (method == "Raycast" or method == "FindPartOnRay") then
-            local target = getClosestPlayer(Config.RageFOV, true)
-            if target then
-                local part = getTargetPart(target.Character)
-                if part then
-                    local targetPos = getPredictedPosition(part, target)
-                    if method == "Raycast" and args[1] then
-                        local origin = args[1].Origin
-                        args[1] = Ray.new(origin, (targetPos - origin).Unit * 1000)
-                        return oldNamecall(self, unpack(args))
-                    elseif method == "FindPartOnRay" and args[1] then
-                        local ray = args[1]
-                        args[1] = Ray.new(ray.Origin, (targetPos - ray.Origin).Unit * 1000)
-                        return oldNamecall(self, unpack(args))
-                    end
-                end
-            end
-        end
-        
-        return oldNamecall(self, ...)
-    end))
-end)
-
-if rageHookSuccess then
-    print("[TECHY v5.4] Ragebot hook: OK")
-else
-    warn("[TECHY v5.4] Ragebot hook not available")
-end
 
 -- FLY
 local flyBodyVelocity, flyBodyGyro
@@ -1070,8 +955,6 @@ task.spawn(function()
 end)
 
 -- MAIN LOOP
-local antiAimAngle = 0
-
 RunService.RenderStepped:Connect(function(dt)
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -1104,23 +987,6 @@ RunService.RenderStepped:Connect(function(dt)
                 local alpha = (1 - Config.AimbotSmooth) + 0.05
                 Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, alpha)
             end
-        end
-    end
-    
-    -- ANTI-AIM
-    if Config.RagebotEnabled and Config.AntiAim and hrp then
-        antiAimAngle = antiAimAngle + Config.AntiAimSpeed
-        if Config.AntiAimType == "Spin" then
-            local spinCFrame = CFrame.Angles(0, math.rad(antiAimAngle), 0)
-            hrp.CFrame = CFrame.new(hrp.Position) * spinCFrame
-        elseif Config.AntiAimType == "Jitter" then
-            local jitterX = math.random(-180, 180)
-            local jitterY = math.random(-180, 180)
-            local jitterCFrame = CFrame.Angles(math.rad(jitterX), math.rad(jitterY), 0)
-            hrp.CFrame = CFrame.new(hrp.Position) * jitterCFrame
-        elseif Config.AntiAimType == "Down" then
-            local downCFrame = CFrame.Angles(math.rad(90), 0, 0)
-            hrp.CFrame = CFrame.new(hrp.Position) * downCFrame
         end
     end
     
@@ -1281,8 +1147,8 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 print("╔══════════════════════════════════════════╗")
-print("║  TECHY ULTIMATE v5.4 - AUTO SHOT FIXED   ║")
-print("║  ✅ Auto Shot: САМ ищет врагов в FOV     ║")
-print("║  ✅ Auto Shot: САМ стреляет              ║")
-print("║  ✅ Fire Rate: настройка скорости        ║")
+print("║  TECHY ULTIMATE v5.5 - NO RAGEBOT        ║")
+print("║  ✅ Убран Ragebot (не крашит)            ║")
+print("║  ✅ Silent Aim + Auto Shot работают      ║")
+print("║  ✅ Все остальные функции работают       ║")
 print("╚══════════════════════════════════════════╝")
