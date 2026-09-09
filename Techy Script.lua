@@ -1,5 +1,6 @@
--- // TECHY ULTIMATE v5.0 - FULL POWER // --
--- // Все функции работают, без оптимизации // --
+-- // TECHY ULTIMATE v6.0 - DELTA MOBILE FIXED // --
+-- // Fixed: Silent Aim (camera safe) + Fly (touch buttons) // --
+-- // Removed: Ragebot (caused crashes) // --
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -8,19 +9,16 @@ local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local CoreGui = game:GetService("CoreGui")
 local VirtualUser = game:GetService("VirtualUser")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
-print("[TECHY v5.0] Loading...")
+print("[TECHY v6.0] Loading...")
 
 -- ═══════════════════════════════════════════════════════
 -- КОНФИГУРАЦИЯ
 -- ═══════════════════════════════════════════════════════
 local Config = {
-    -- AIMBOT
     AimbotEnabled = false,
     AimbotFOV = 150,
     AimbotSmooth = 0.3,
@@ -30,32 +28,25 @@ local Config = {
     AimbotPart = "Head",
     AimbotTeamCheck = true,
     HoldToAim = false,
-    AimbotVisible = false,
     
-    -- SILENT AIM
     SilentAim = false,
     SilentFOV = 300,
     SilentHitchance = 100,
     SilentAutoShot = false,
     SilentTeamCheck = true,
     
-    -- TRIGGERBOT
     Triggerbot = false,
     TriggerDelay = 0.05,
     
-    -- HITBOX
     HitboxExpander = false,
     HitboxSize = 8,
     HitboxTarget = "Head",
     
-    -- GUN MODS
     NoRecoil = false,
     NoSpread = false,
     RapidFire = false,
     RapidFireDelay = 0.03,
-    NoReload = false,
     
-    -- VISUALS
     ESPEnabled = false,
     ESPName = true,
     ESPDistance = true,
@@ -63,10 +54,8 @@ local Config = {
     ESPWeapon = true,
     ESPStatus = true,
     ShowFOV = true,
-    ShowTracers = false,
     Fullbright = false,
     
-    -- MOVEMENT
     SpeedEnabled = false,
     WalkSpeed = 60,
     JumpPower = 120,
@@ -75,13 +64,10 @@ local Config = {
     FlySpeed = 80,
     Noclip = false,
     
-    -- HOOD
     AutoStomp = false,
     StompRange = 20,
     AntiRagdoll = false,
-    AutoFarm = false,
     
-    -- MISC
     AntiAFK = false,
     FPSBoost = false,
     FovChanger = false,
@@ -89,20 +75,21 @@ local Config = {
 }
 
 -- ═══════════════════════════════════════════════════════
--- UI
+-- ✅ GUI СОЗДАЁТСЯ ПЕРВЫМ!
 -- ═══════════════════════════════════════════════════════
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TechyV5"
+ScreenGui.Name = "TechyV6"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.Parent = CoreGui
 
+print("[TECHY v6.0] GUI создан")
+
 local Colors = {
     BG = Color3.fromRGB(10, 10, 15),
     TopBar = Color3.fromRGB(20, 20, 30),
     Accent = Color3.fromRGB(255, 50, 100),
-    Accent2 = Color3.fromRGB(0, 200, 255),
     Text = Color3.fromRGB(240, 240, 245),
     SubText = Color3.fromRGB(140, 140, 155),
     ElementBG = Color3.fromRGB(25, 25, 35),
@@ -126,6 +113,8 @@ local btnStroke = Instance.new("UIStroke")
 btnStroke.Color = Color3.new(1,1,1)
 btnStroke.Thickness = 2
 btnStroke.Parent = ToggleButton
+
+print("[TECHY v6.0] Кнопка создана")
 
 local btnDragging, btnDragInput, btnDragStart, btnStartPos
 ToggleButton.InputBegan:Connect(function(input)
@@ -191,9 +180,9 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -80, 1, 0)
 Title.Position = UDim2.new(0, 14, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "⚡ TECHY ULTIMATE v5.0"
+Title.Text = "⚡ TECHY ULTIMATE v6.0"
 Title.TextColor3 = Colors.Text
-Title.TextSize = 14
+Title.TextSize = 13
 Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
@@ -202,7 +191,7 @@ local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 32, 0, 32)
 CloseBtn.Position = UDim2.new(1, -40, 0, 4)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 75)
-CloseBtn.Text = "−"
+CloseBtn.Text = "-"
 CloseBtn.TextColor3 = Color3.new(1,1,1)
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 18
@@ -299,7 +288,6 @@ end
 
 local function createTab(name, icon, order)
     local tabIndex = #tabButtons + 1
-    
     local TabBtn = Instance.new("TextButton")
     TabBtn.Size = UDim2.new(1, 0, 0, 36)
     TabBtn.BackgroundColor3 = Colors.TopBar
@@ -330,7 +318,6 @@ local function createTab(name, icon, order)
     
     table.insert(tabButtons, TabBtn)
     table.insert(tabContents, TabContent)
-    
     return TabContent
 end
 
@@ -437,7 +424,6 @@ local function createDropdown(text, options, default, parent, callback, order)
     BtnLayout.Parent = BtnContainer
     
     local buttons = {}
-    
     for i, opt in ipairs(options) do
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(0, 0, 1, 0)
@@ -450,13 +436,10 @@ local function createDropdown(text, options, default, parent, callback, order)
         btn.BorderSizePixel = 0
         btn.Parent = BtnContainer
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-        
         local pad = Instance.new("UIPadding", btn)
         pad.PaddingLeft = UDim.new(0, 8)
         pad.PaddingRight = UDim.new(0, 8)
-        
         table.insert(buttons, {btn = btn, opt = opt})
-        
         btn.MouseButton1Click:Connect(function()
             for _, b in ipairs(buttons) do
                 b.btn.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
@@ -533,14 +516,12 @@ local function createSlider(text, min, max, default, parent, callback, decimals,
             update(input)
         end
     end)
-    
     UserInputService.InputChanged:Connect(function(input)
         if draggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement 
         or input.UserInputType == Enum.UserInputType.Touch) then
             update(input)
         end
     end)
-    
     UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 
         or input.UserInputType == Enum.UserInputType.Touch then
@@ -550,7 +531,71 @@ local function createSlider(text, min, max, default, parent, callback, decimals,
 end
 
 -- ═══════════════════════════════════════════════════════
--- МЕНЮ
+-- ✅ СЕНСОРНЫЕ КНОПКИ ДЛЯ FLY (для телефона!)
+-- ═══════════════════════════════════════════════════════
+local FlyControls = Instance.new("Frame")
+FlyControls.Name = "FlyControls"
+FlyControls.Size = UDim2.new(0, 180, 0, 180)
+FlyControls.Position = UDim2.new(1, -200, 1, -200)
+FlyControls.BackgroundTransparency = 1
+FlyControls.Visible = false
+FlyControls.Parent = ScreenGui
+
+-- Флаги нажатий
+local flyKeys = {
+    W = false, S = false, A = false, D = false, E = false, Q = false
+}
+
+local function createFlyButton(text, posX, posY, key)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 55, 0, 55)
+    btn.Position = UDim2.new(0, posX, 0, posY)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+    btn.BackgroundTransparency = 0.3
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.TextSize = 18
+    btn.Font = Enum.Font.GothamBold
+    btn.BorderSizePixel = 0
+    btn.Parent = FlyControls
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Colors.Accent
+    stroke.Thickness = 1.5
+    stroke.Parent = btn
+    
+    btn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch 
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            flyKeys[key] = true
+            btn.BackgroundColor3 = Colors.Accent
+        end
+    end)
+    
+    btn.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch 
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            flyKeys[key] = false
+            btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+        end
+    end)
+    
+    return btn
+end
+
+-- Раскладка кнопок (WASD + E/Q)
+createFlyButton("W", 62, 0, "W")
+createFlyButton("A", 0, 62, "A")
+createFlyButton("S", 62, 62, "S")
+createFlyButton("D", 124, 62, "D")
+createFlyButton("E", 62, 124, "E")  -- Вверх
+createFlyButton("Q", 0, 124, "Q")   -- Вниз
+
+print("[TECHY v6.0] Fly кнопки созданы")
+
+-- ═══════════════════════════════════════════════════════
+-- МЕНЮ (7 ВКЛАДОК - без Ragebot!)
 -- ═══════════════════════════════════════════════════════
 local TabCombat = createTab("Combat", "⚔", 1)
 local TabSilent = createTab("Silent", "🎯", 2)
@@ -567,25 +612,17 @@ createToggle("Hold to Aim", Config.HoldToAim, TabCombat, function(v) Config.Hold
 createToggle("Wall Check", Config.AimbotWallCheck, TabCombat, function(v) Config.AimbotWallCheck = v end, 4)
 createToggle("Team Check", Config.AimbotTeamCheck, TabCombat, function(v) Config.AimbotTeamCheck = v end, 5)
 createToggle("Prediction", Config.AimbotPrediction, TabCombat, function(v) Config.AimbotPrediction = v end, 6)
-createToggle("Visible Check", Config.AimbotVisible, TabCombat, function(v) Config.AimbotVisible = v end, 7)
-
-createDropdown("Aim Part", {"Head", "Torso", "Legs"}, Config.AimbotPart, TabCombat, function(v) 
-    Config.AimbotPart = v 
-end, 8)
-
-createSlider("FOV Radius", 50, 400, Config.AimbotFOV, TabCombat, function(v) Config.AimbotFOV = v end, 0, 9)
-createSlider("Smoothness", 0.1, 1.0, Config.AimbotSmooth, TabCombat, function(v) Config.AimbotSmooth = v end, 1, 10)
-createSlider("Prediction", 0.05, 0.5, Config.PredictionFactor, TabCombat, function(v) Config.PredictionFactor = v end, 2, 11)
-
-createLabel("─── TRIGGERBOT ───", TabCombat, 12)
-createToggle("Enable Triggerbot", Config.Triggerbot, TabCombat, function(v) Config.Triggerbot = v end, 13)
-createSlider("Delay (sec)", 0.01, 1.00, Config.TriggerDelay, TabCombat, function(v) Config.TriggerDelay = v end, 2, 14)
-
-createLabel("─── GUN MODS ───", TabCombat, 15)
-createToggle("No Recoil", Config.NoRecoil, TabCombat, function(v) Config.NoRecoil = v end, 16)
-createToggle("No Spread", Config.NoSpread, TabCombat, function(v) Config.NoSpread = v end, 17)
-createToggle("Rapid Fire", Config.RapidFire, TabCombat, function(v) Config.RapidFire = v end, 18)
-createToggle("No Reload", Config.NoReload, TabCombat, function(v) Config.NoReload = v end, 19)
+createDropdown("Aim Part", {"Head", "Torso", "Legs"}, Config.AimbotPart, TabCombat, function(v) Config.AimbotPart = v end, 7)
+createSlider("FOV Radius", 50, 400, Config.AimbotFOV, TabCombat, function(v) Config.AimbotFOV = v end, 0, 8)
+createSlider("Smoothness", 0.1, 1.0, Config.AimbotSmooth, TabCombat, function(v) Config.AimbotSmooth = v end, 1, 9)
+createSlider("Prediction", 0.05, 0.5, Config.PredictionFactor, TabCombat, function(v) Config.PredictionFactor = v end, 2, 10)
+createLabel("─── TRIGGERBOT ───", TabCombat, 11)
+createToggle("Enable Triggerbot", Config.Triggerbot, TabCombat, function(v) Config.Triggerbot = v end, 12)
+createSlider("Delay (sec)", 0.01, 1.00, Config.TriggerDelay, TabCombat, function(v) Config.TriggerDelay = v end, 2, 13)
+createLabel("─── GUN MODS ───", TabCombat, 14)
+createToggle("No Recoil", Config.NoRecoil, TabCombat, function(v) Config.NoRecoil = v end, 15)
+createToggle("No Spread", Config.NoSpread, TabCombat, function(v) Config.NoSpread = v end, 16)
+createToggle("Rapid Fire", Config.RapidFire, TabCombat, function(v) Config.RapidFire = v end, 17)
 
 -- SILENT AIM
 createLabel("─── SILENT AIM ───", TabSilent, 1)
@@ -617,21 +654,24 @@ createToggle("Distance", Config.ESPDistance, TabVisuals, function(v) Config.ESPD
 createToggle("Health", Config.ESPHealth, TabVisuals, function(v) Config.ESPHealth = v end, 5)
 createToggle("Weapon", Config.ESPWeapon, TabVisuals, function(v) Config.ESPWeapon = v end, 6)
 createToggle("Status", Config.ESPStatus, TabVisuals, function(v) Config.ESPStatus = v end, 7)
-
 createLabel("─── OVERLAY ───", TabVisuals, 8)
 createToggle("Show FOV Circle", Config.ShowFOV, TabVisuals, function(v) Config.ShowFOV = v end, 9)
 createToggle("Fullbright", Config.Fullbright, TabVisuals, function(v) 
     Config.Fullbright = v 
     if v then
-        game.Lighting.Brightness = 2
-        game.Lighting.ClockTime = 14
-        game.Lighting.FogEnd = 100000
-        game.Lighting.GlobalShadows = false
-        game.Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        pcall(function()
+            game.Lighting.Brightness = 2
+            game.Lighting.ClockTime = 14
+            game.Lighting.FogEnd = 100000
+            game.Lighting.GlobalShadows = false
+            game.Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        end)
     else
-        game.Lighting.Brightness = 1
-        game.Lighting.GlobalShadows = true
-        game.Lighting.OutdoorAmbient = Color3.fromRGB(70, 70, 70)
+        pcall(function()
+            game.Lighting.Brightness = 1
+            game.Lighting.GlobalShadows = true
+            game.Lighting.OutdoorAmbient = Color3.fromRGB(70, 70, 70)
+        end)
     end
 end, 10)
 
@@ -641,9 +681,11 @@ createToggle("Speed Hack", Config.SpeedEnabled, TabMovement, function(v) Config.
 createSlider("Walk Speed", 16, 300, Config.WalkSpeed, TabMovement, function(v) Config.WalkSpeed = v end, 0, 3)
 createSlider("Jump Power", 50, 500, Config.JumpPower, TabMovement, function(v) Config.JumpPower = v end, 0, 4)
 createToggle("Infinite Jump", Config.InfiniteJump, TabMovement, function(v) Config.InfiniteJump = v end, 5)
-
 createLabel("─── FLY / NOCLIP ───", TabMovement, 6)
-createToggle("Fly", Config.FlyEnabled, TabMovement, function(v) Config.FlyEnabled = v end, 7)
+createToggle("Fly (touch buttons)", Config.FlyEnabled, TabMovement, function(v) 
+    Config.FlyEnabled = v 
+    FlyControls.Visible = v  -- Показываем/скрываем кнопки
+end, 7)
 createSlider("Fly Speed", 20, 300, Config.FlySpeed, TabMovement, function(v) Config.FlySpeed = v end, 0, 8)
 createToggle("Noclip", Config.Noclip, TabMovement, function(v) Config.Noclip = v end, 9)
 
@@ -652,7 +694,6 @@ createLabel("─── HOOD FEATURES ───", TabHood, 1)
 createToggle("Auto Stomp", Config.AutoStomp, TabHood, function(v) Config.AutoStomp = v end, 2)
 createSlider("Stomp Range", 5, 50, Config.StompRange, TabHood, function(v) Config.StompRange = v end, 0, 3)
 createToggle("Anti-Ragdoll", Config.AntiRagdoll, TabHood, function(v) Config.AntiRagdoll = v end, 4)
-createToggle("Auto Farm", Config.AutoFarm, TabHood, function(v) Config.AutoFarm = v end, 5)
 
 -- MISC
 createLabel("─── MISC ───", TabMisc, 1)
@@ -660,14 +701,12 @@ createToggle("Anti AFK", Config.AntiAFK, TabMisc, function(v) Config.AntiAFK = v
 createToggle("FPS Boost", Config.FPSBoost, TabMisc, function(v) Config.FPSBoost = v end, 3)
 createToggle("FOV Changer", Config.FovChanger, TabMisc, function(v) Config.FovChanger = v end, 4)
 createSlider("FOV Value", 60, 120, Config.FovValue, TabMisc, function(v) Config.FovValue = v end, 0, 5)
-createLabel("Techy Ultimate v5.0", TabMisc, 6)
-createLabel("FULL POWER EDITION", TabMisc, 7)
+createLabel("Techy Ultimate v6.0", TabMisc, 6)
+createLabel("DELTA MOBILE FIXED", TabMisc, 7)
 
 selectTab(1)
 
--- ═══════════════════════════════════════════════════════
--- FOV CIRCLE (GUI)
--- ═══════════════════════════════════════════════════════
+-- FOV CIRCLE
 local FOVFrame = Instance.new("Frame")
 FOVFrame.Name = "FOVCircle"
 FOVFrame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -685,9 +724,7 @@ FOVStroke.Parent = FOVFrame
 
 Instance.new("UICorner", FOVFrame).CornerRadius = UDim.new(1, 0)
 
--- ═══════════════════════════════════════════════════════
 -- ESP
--- ═══════════════════════════════════════════════════════
 local espObjects = {}
 
 function clearESP()
@@ -712,8 +749,7 @@ local function isRagdoll(player)
     if not char then return false end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return false end
-    return hum:GetState() == Enum.HumanoidStateType.Physics 
-        or hum.Health <= 0
+    return hum:GetState() == Enum.HumanoidStateType.Physics or hum.Health <= 0
 end
 
 local function setupESP(player)
@@ -761,9 +797,7 @@ end
 for _, p in pairs(Players:GetPlayers()) do setupESP(p) end
 Players.PlayerAdded:Connect(setupESP)
 
--- ═══════════════════════════════════════════════════════
--- HITBOX EXPANDER
--- ═══════════════════════════════════════════════════════
+-- HITBOX
 local originalSizes = {}
 
 function resetHitboxes()
@@ -781,18 +815,13 @@ end
 
 local function expandHitbox(player)
     if player == LocalPlayer then return end
-    
     local function onChar(char)
         task.wait(0.5)
         local part = char:FindFirstChild(Config.HitboxTarget)
         if part then
-            originalSizes[player] = {
-                Size = part.Size,
-                Transparency = part.Transparency
-            }
+            originalSizes[player] = {Size = part.Size, Transparency = part.Transparency}
         end
     end
-    
     if player.Character then onChar(player.Character) end
     player.CharacterAdded:Connect(onChar)
 end
@@ -800,12 +829,9 @@ end
 for _, p in pairs(Players:GetPlayers()) do expandHitbox(p) end
 Players.PlayerAdded:Connect(expandHitbox)
 
--- ═══════════════════════════════════════════════════════
 -- ПОМОЩНИКИ
--- ═══════════════════════════════════════════════════════
 local function getTargetPart(character)
     if not character then return nil end
-    
     if Config.AimbotPart == "Head" then
         return character:FindFirstChild("Head")
     elseif Config.AimbotPart == "Torso" then
@@ -813,32 +839,23 @@ local function getTargetPart(character)
             or character:FindFirstChild("UpperTorso")
             or character:FindFirstChild("Torso")
     elseif Config.AimbotPart == "Legs" then
-        return character:FindFirstChild("LowerTorso")
-            or character:FindFirstChild("HumanoidRootPart")
+        return character:FindFirstChild("LowerTorso") or character:FindFirstChild("HumanoidRootPart")
     end
-    
     return character:FindFirstChild("Head")
 end
 
 local function isTargetVisible(targetPart)
-    if not Config.AimbotWallCheck and not Config.AimbotVisible then return true end
+    if not Config.AimbotWallCheck then return true end
     if not targetPart then return false end
-    
     local cameraPos = Camera.CFrame.Position
     local direction = (targetPart.Position - cameraPos)
-    
     local rayParams = RaycastParams.new()
     rayParams.FilterType = Enum.RaycastFilterType.Exclude
     rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
     rayParams.IgnoreWater = true
-    
     local result = Workspace:Raycast(cameraPos, direction, rayParams)
-    
     if not result then return true end
-    if result.Instance and result.Instance:IsDescendantOf(targetPart.Parent) then
-        return true
-    end
-    
+    if result.Instance and result.Instance:IsDescendantOf(targetPart.Parent) then return true end
     return false
 end
 
@@ -847,16 +864,12 @@ local function getClosestPlayer(fov, teamCheck)
     local checkTeam = teamCheck ~= nil and teamCheck or Config.AimbotTeamCheck
     local closest = nil
     local minDist = useFOV
-    
     local viewport = Camera.ViewportSize
     local centerPos = Vector2.new(viewport.X / 2, viewport.Y / 2)
     
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
-            if checkTeam and player.Team == LocalPlayer.Team then
-                continue
-            end
-            
+            if checkTeam and player.Team == LocalPlayer.Team then continue end
             local hum = player.Character:FindFirstChildOfClass("Humanoid")
             if hum and hum.Health > 0 then
                 local part = getTargetPart(player.Character)
@@ -865,7 +878,6 @@ local function getClosestPlayer(fov, teamCheck)
                     if onScreen then
                         local targetPos = Vector2.new(screenPos.X, screenPos.Y)
                         local dist = (centerPos - targetPos).Magnitude
-                        
                         if dist < minDist then
                             if isTargetVisible(part) then
                                 minDist = dist
@@ -882,33 +894,68 @@ end
 
 local function getPredictedPosition(targetPart, player)
     if not Config.AimbotPrediction then return targetPart.Position end
-    
     local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
     if not hum then return targetPart.Position end
-    
     local velocity = hum.MoveDirection * hum.WalkSpeed
     return targetPart.Position + velocity * Config.PredictionFactor
 end
 
 -- ═══════════════════════════════════════════════════════
--- HOOKMETAMETHOD (Silent Aim + Gun Mods)
+-- ✅ БЕЗОПАСНЫЙ HOOK (ТОЛЬКО от оружия!)
 -- ═══════════════════════════════════════════════════════
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
+local function isFromWeapon(instance)
+    if not instance or typeof(instance) ~= "Instance" then return false end
     
-    -- SILENT AIM
-    if Config.SilentAim and (method == "Raycast" or method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList") then
-        local isFromLocalPlayer = false
-        
-        if self and typeof(self) == "Instance" then
-            if LocalPlayer.Character and self:IsDescendantOf(LocalPlayer.Character) then
-                isFromLocalPlayer = true
+    -- Проверка 1: сам instance это Tool
+    if instance:IsA("Tool") then return true end
+    
+    -- Проверка 2: parent это Tool
+    local p = instance.Parent
+    while p do
+        if p:IsA("Tool") then
+            -- Проверка 3: этот Tool в руках LocalPlayer
+            if p.Parent == LocalPlayer.Character then
+                return true
             end
+            return false
+        end
+        p = p.Parent
+    end
+    
+    return false
+end
+
+local function hasWeaponEquipped()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    for _, tool in pairs(char:GetChildren()) do
+        if tool:IsA("Tool") then return true end
+    end
+    return false
+end
+
+local hookSuccess = pcall(function()
+    if type(hookmetamethod) ~= "function" then
+        error("hookmetamethod not available")
+    end
+    
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        
+        -- ✅ ПРОВЕРКА: только если вызов от оружия!
+        if not isFromWeapon(self) then
+            return oldNamecall(self, ...)
         end
         
-        if isFromLocalPlayer then
+        -- ✅ ПРОВЕРКА: только если у игрока есть оружие в руках
+        if not hasWeaponEquipped() then
+            return oldNamecall(self, ...)
+        end
+        
+        -- SILENT AIM
+        if Config.SilentAim and (method == "Raycast" or method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList") then
+            local args = {...}
             local target = getClosestPlayer(Config.SilentFOV, Config.SilentTeamCheck)
             if target then
                 local part = getTargetPart(target.Character)
@@ -920,58 +967,36 @@ oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
                         if Config.SilentAutoShot then
                             task.spawn(function()
                                 task.wait(0.016)
-                                if mouse1click then mouse1click() end
+                                if mouse1click then pcall(function() mouse1click() end) end
                             end)
                         end
                         
-                        if method == "Raycast" then
-                            local origin = args[1] and args[1].Origin or self.Origin
-                            if origin then
-                                local newDirection = (targetPos - origin).Unit * 1000
-                                args[1] = Ray.new(origin, newDirection)
-                                return oldNamecall(self, unpack(args))
-                            end
-                        elseif method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" then
+                        if method == "Raycast" and args[1] then
+                            local origin = args[1].Origin
+                            args[1] = Ray.new(origin, (targetPos - origin).Unit * 1000)
+                            return oldNamecall(self, unpack(args))
+                        elseif (method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList") and args[1] then
                             local ray = args[1]
-                            if ray then
-                                local newRay = Ray.new(ray.Origin, (targetPos - ray.Origin).Unit * 1000)
-                                args[1] = newRay
-                                return oldNamecall(self, unpack(args))
-                            end
+                            args[1] = Ray.new(ray.Origin, (targetPos - ray.Origin).Unit * 1000)
+                            return oldNamecall(self, unpack(args))
                         end
                     end
                 end
             end
         end
-    end
-    
-    -- NO RECOIL / NO SPREAD
-    if method == "FireServer" or method == "InvokeServer" then
-        if Config.NoRecoil or Config.NoSpread then
-            -- Перехватываем аргументы стрельбы
-            for i, arg in ipairs(args) do
-                if typeof(arg) == "Vector3" then
-                    -- Можно модифицировать направление
-                end
-            end
-        end
-    end
-    
-    -- NO RELOAD
-    if Config.NoReload and method == "FireServer" then
-        local callPath = tostring(self)
-        if string.find(callPath:lower(), "reload") or string.find(callPath:lower(), "ammo") then
-            return
-        end
-    end
-    
-    return oldNamecall(self, ...)
-end))
+        
+        return oldNamecall(self, ...)
+    end))
+end)
 
--- ═══════════════════════════════════════════════════════
--- FLY (НОВЫЙ СПОСОБ - LinearVelocity)
--- ═══════════════════════════════════════════════════════
-local flyAttachment, flyLinearVel, flyAlignOrient
+if hookSuccess then
+    print("[TECHY v6.0] Silent Aim hook: OK")
+else
+    warn("[TECHY v6.0] Silent Aim hook not available")
+end
+
+-- FLY
+local flyBodyVelocity, flyBodyGyro
 
 local function startFly()
     local char = LocalPlayer.Character
@@ -979,53 +1004,39 @@ local function startFly()
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     
-    -- Удаляем старые
-    if flyAttachment then flyAttachment:Destroy() end
-    if flyLinearVel then flyLinearVel:Destroy() end
-    if flyAlignOrient then flyAlignOrient:Destroy() end
+    if flyBodyVelocity then flyBodyVelocity:Destroy() end
+    if flyBodyGyro then flyBodyGyro:Destroy() end
     
-    flyAttachment = Instance.new("Attachment")
-    flyAttachment.Parent = hrp
+    flyBodyVelocity = Instance.new("BodyVelocity")
+    flyBodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    flyBodyVelocity.P = 1e4
+    flyBodyVelocity.Parent = hrp
     
-    flyLinearVel = Instance.new("LinearVelocity")
-    flyLinearVel.Attachment0 = flyAttachment
-    flyLinearVel.MaxForce = 100000
-    flyLinearVel.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
-    flyLinearVel.Parent = hrp
-    
-    flyAlignOrient = Instance.new("AlignOrientation")
-    flyAlignOrient.Attachment0 = flyAttachment
-    flyAlignOrient.Mode = Enum.OrientationAlignmentMode.OneAttachment
-    flyAlignOrient.Responsiveness = 200
-    flyAlignOrient.Parent = hrp
+    flyBodyGyro = Instance.new("BodyGyro")
+    flyBodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    flyBodyGyro.P = 1e4
+    flyBodyGyro.D = 100
+    flyBodyGyro.Parent = hrp
     
     local hum = char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        hum.PlatformStand = true
-    end
+    if hum then hum.PlatformStand = true end
 end
 
 local function stopFly()
-    if flyAttachment then flyAttachment:Destroy() flyAttachment = nil end
-    if flyLinearVel then flyLinearVel:Destroy() flyLinearVel = nil end
-    if flyAlignOrient then flyAlignOrient:Destroy() flyAlignOrient = nil end
-    
+    if flyBodyVelocity then flyBodyVelocity:Destroy() flyBodyVelocity = nil end
+    if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
     local char = LocalPlayer.Character
     if char then
         local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.PlatformStand = false
-        end
+        if hum then hum.PlatformStand = false end
     end
 end
 
--- ═══════════════════════════════════════════════════════
 -- AUTO STOMP
--- ═══════════════════════════════════════════════════════
 local function findDownedPlayer()
     local closest = nil
     local minDist = Config.StompRange
-    
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             if isRagdoll(player) then
@@ -1044,9 +1055,7 @@ local function findDownedPlayer()
     return closest
 end
 
--- ═══════════════════════════════════════════════════════
 -- RAPID FIRE
--- ═══════════════════════════════════════════════════════
 task.spawn(function()
     while task.wait() do
         if Config.RapidFire and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
@@ -1058,9 +1067,7 @@ task.spawn(function()
     end
 end)
 
--- ═══════════════════════════════════════════════════════
 -- MAIN LOOP
--- ═══════════════════════════════════════════════════════
 RunService.RenderStepped:Connect(function(dt)
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -1120,38 +1127,37 @@ RunService.RenderStepped:Connect(function(dt)
         hum.JumpPower = Config.JumpPower
     end
     
-    -- FLY
+    -- ✅ FLY С СЕНСОРНЫМИ КНОПКАМИ
     if Config.FlyEnabled and hrp then
-        if not flyLinearVel then startFly() end
+        if not flyBodyVelocity then startFly() end
         
+        -- ✅ Используем сенсорные кнопки вместо клавиатуры!
         local moveDir = Vector3.new(0, 0, 0)
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Camera.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - Camera.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - Camera.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + Camera.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.E) then moveDir = moveDir + Vector3.new(0, 1, 0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Q) then moveDir = moveDir - Vector3.new(0, 1, 0) end
+        if flyKeys.W then moveDir = moveDir + Camera.CFrame.LookVector end
+        if flyKeys.S then moveDir = moveDir - Camera.CFrame.LookVector end
+        if flyKeys.A then moveDir = moveDir - Camera.CFrame.RightVector end
+        if flyKeys.D then moveDir = moveDir + Camera.CFrame.RightVector end
+        if flyKeys.E then moveDir = moveDir + Vector3.new(0, 1, 0) end  -- Вверх
+        if flyKeys.Q then moveDir = moveDir - Vector3.new(0, 1, 0) end  -- Вниз
         
         if moveDir.Magnitude > 0 then
             moveDir = moveDir.Unit
         end
         
-        flyLinearVel.VectorVelocity = moveDir * Config.FlySpeed
-        flyAlignOrient.CFrame = Camera.CFrame
+        flyBodyVelocity.Velocity = moveDir * Config.FlySpeed
+        flyBodyGyro.CFrame = Camera.CFrame
     else
-        if flyLinearVel then stopFly() end
+        if flyBodyVelocity then stopFly() end
     end
     
     -- NOCLIP
     if Config.Noclip and char then
         for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
+            if part:IsA("BasePart") then part.CanCollide = false end
         end
     end
     
-    -- HITBOX EXPANDER
+    -- HITBOX
     if Config.HitboxExpander then
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character then
@@ -1165,15 +1171,13 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
     
-    -- ESP UPDATE
+    -- ESP
     if Config.ESPEnabled then
         for p, objs in pairs(espObjects) do
             if objs.Char.Parent then
                 objs.Highlight.Enabled = true
                 objs.Billboard.Enabled = true
-                
                 local ragdoll = isRagdoll(p)
-                
                 if ragdoll then
                     objs.Highlight.FillColor = Color3.fromRGB(150, 150, 150)
                     objs.Highlight.OutlineColor = Color3.fromRGB(100, 100, 100)
@@ -1181,22 +1185,17 @@ RunService.RenderStepped:Connect(function(dt)
                     objs.Highlight.FillColor = Color3.fromRGB(255, 50, 100)
                     objs.Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
                 end
-                
                 local head = objs.Char:FindFirstChild("Head")
                 if head then
                     local dist = math.floor((head.Position - Camera.CFrame.Position).Magnitude)
                     local info = ""
-                    if Config.ESPName then info = info .. p.Name .. "\n" end
-                    if Config.ESPStatus then 
-                        info = info .. (ragdoll and "[DOWN]" or "[ALIVE]") .. "\n" 
-                    end
+                    if Config.ESPName then info = info .. p.Name .. string.char(10) end
+                    if Config.ESPStatus then info = info .. (ragdoll and "[DOWN]" or "[ALIVE]") .. string.char(10) end
                     if Config.ESPDistance then info = info .. dist .. "m  " end
-                    if Config.ESPWeapon then info = info .. getPlayerWeapon(p) .. "\n" end
+                    if Config.ESPWeapon then info = info .. getPlayerWeapon(p) .. string.char(10) end
                     if Config.ESPHealth then
-                        local hum = objs.Char:FindFirstChildOfClass("Humanoid")
-                        if hum then
-                            info = info .. math.floor(hum.Health) .. " HP"
-                        end
+                        local h = objs.Char:FindFirstChildOfClass("Humanoid")
+                        if h then info = info .. math.floor(h.Health) .. " HP" end
                     end
                     objs.Text.Text = info
                 end
@@ -1230,16 +1229,16 @@ RunService.RenderStepped:Connect(function(dt)
     end
     
     -- FOV CHANGER
-    if Config.FovChanger then
-        Camera.FieldOfView = Config.FovValue
-    end
+    if Config.FovChanger then Camera.FieldOfView = Config.FovValue end
     
     -- FPS BOOST
     if Config.FPSBoost then
-        Workspace.Terrain.WaterWaveSize = 0
-        Workspace.Terrain.WaterWaveSpeed = 0
-        Workspace.Terrain.WaterReflectance = 0
-        Workspace.Terrain.WaterTransparency = 0
+        pcall(function()
+            Workspace.Terrain.WaterWaveSize = 0
+            Workspace.Terrain.WaterWaveSpeed = 0
+            Workspace.Terrain.WaterReflectance = 0
+            Workspace.Terrain.WaterTransparency = 0
+        end)
     end
 end)
 
@@ -1247,9 +1246,7 @@ end)
 UserInputService.JumpRequest:Connect(function()
     if Config.InfiniteJump and LocalPlayer.Character then
         local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum:ChangeState(Enum.HumanoidStateType.Jumping)
-        end
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
     end
 end)
 
@@ -1262,20 +1259,15 @@ LocalPlayer.Idled:Connect(function()
     end
 end)
 
--- Character respawn handler
+-- Respawn handler
 LocalPlayer.CharacterAdded:Connect(function(char)
     task.wait(1)
-    if Config.FlyEnabled then
-        startFly()
-    end
+    if Config.FlyEnabled then startFly() end
 end)
 
 print("╔══════════════════════════════════════════╗")
-print("║  TECHY ULTIMATE v5.0 - FULL POWER        ║")
-print("║  ✅ Aimbot + Silent Aim + Hook           ║")
-print("║  ✅ Triggerbot + Rapid Fire              ║")
-print("║  ✅ Hitbox + ESP + Fullbright            ║")
-print("║  ✅ Fly (LinearVelocity) + Noclip        ║")
-print("║  ✅ AutoStomp + AntiRagdoll              ║")
-print("║  ✅ NoRecoil + NoSpread + NoReload       ║")
+print("║  TECHY ULTIMATE v6.0 - DELTA FIXED       ║")
+print("║  ✅ Silent Aim: только от оружия         ║")
+print("║  ✅ Fly: сенсорные кнопки W/A/S/D/E/Q    ║")
+print("║  ✅ Ragebot удалён (стабильно)           ║")
 print("╚══════════════════════════════════════════╝")
