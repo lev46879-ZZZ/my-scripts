@@ -1,7 +1,5 @@
--- // TECHY ULTIMATE v6.0 - DELTA MOBILE FIXED // --
--- // Fixed: Silent Aim (camera safe) + Fly (touch buttons) // --
--- // Removed: Ragebot (caused crashes) // --
-
+-- // TECHY ULTIMATE v5.4 - AUTO SHOT FIXED // --
+-- // Auto Shot: автономный (сам ищет и стреляет) // --
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -13,7 +11,7 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
-print("[TECHY v6.0] Loading...")
+print("[TECHY v5.4] Loading...")
 
 -- ═══════════════════════════════════════════════════════
 -- КОНФИГУРАЦИЯ
@@ -34,6 +32,17 @@ local Config = {
     SilentHitchance = 100,
     SilentAutoShot = false,
     SilentTeamCheck = true,
+    SilentFireRate = 0.15,  -- Задержка между авто-выстрелами
+    
+    RagebotEnabled = false,
+    DoubleTap = false,
+    SilentRage = false,
+    RageNoSpread = false,
+    AntiAim = false,
+    AntiAimSpeed = 15,
+    AntiAimType = "Spin",
+    InstantHit = false,
+    RageFOV = 9999,
     
     Triggerbot = false,
     TriggerDelay = 0.05,
@@ -75,21 +84,20 @@ local Config = {
 }
 
 -- ═══════════════════════════════════════════════════════
--- ✅ GUI СОЗДАЁТСЯ ПЕРВЫМ!
+-- UI (БЕЗ ИЗМЕНЕНИЙ)
 -- ═══════════════════════════════════════════════════════
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TechyV6"
+ScreenGui.Name = "TechyV54"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.Parent = CoreGui
 
-print("[TECHY v6.0] GUI создан")
-
 local Colors = {
     BG = Color3.fromRGB(10, 10, 15),
     TopBar = Color3.fromRGB(20, 20, 30),
     Accent = Color3.fromRGB(255, 50, 100),
+    Rage = Color3.fromRGB(255, 0, 0),
     Text = Color3.fromRGB(240, 240, 245),
     SubText = Color3.fromRGB(140, 140, 155),
     ElementBG = Color3.fromRGB(25, 25, 35),
@@ -113,8 +121,6 @@ local btnStroke = Instance.new("UIStroke")
 btnStroke.Color = Color3.new(1,1,1)
 btnStroke.Thickness = 2
 btnStroke.Parent = ToggleButton
-
-print("[TECHY v6.0] Кнопка создана")
 
 local btnDragging, btnDragInput, btnDragStart, btnStartPos
 ToggleButton.InputBegan:Connect(function(input)
@@ -180,7 +186,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -80, 1, 0)
 Title.Position = UDim2.new(0, 14, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "⚡ TECHY ULTIMATE v6.0"
+Title.Text = "⚡ TECHY ULTIMATE v5.4"
 Title.TextColor3 = Colors.Text
 Title.TextSize = 13
 Title.Font = Enum.Font.GothamBold
@@ -531,79 +537,16 @@ local function createSlider(text, min, max, default, parent, callback, decimals,
 end
 
 -- ═══════════════════════════════════════════════════════
--- ✅ СЕНСОРНЫЕ КНОПКИ ДЛЯ FLY (для телефона!)
--- ═══════════════════════════════════════════════════════
-local FlyControls = Instance.new("Frame")
-FlyControls.Name = "FlyControls"
-FlyControls.Size = UDim2.new(0, 180, 0, 180)
-FlyControls.Position = UDim2.new(1, -200, 1, -200)
-FlyControls.BackgroundTransparency = 1
-FlyControls.Visible = false
-FlyControls.Parent = ScreenGui
-
--- Флаги нажатий
-local flyKeys = {
-    W = false, S = false, A = false, D = false, E = false, Q = false
-}
-
-local function createFlyButton(text, posX, posY, key)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 55, 0, 55)
-    btn.Position = UDim2.new(0, posX, 0, posY)
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-    btn.BackgroundTransparency = 0.3
-    btn.Text = text
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.TextSize = 18
-    btn.Font = Enum.Font.GothamBold
-    btn.BorderSizePixel = 0
-    btn.Parent = FlyControls
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
-    
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Colors.Accent
-    stroke.Thickness = 1.5
-    stroke.Parent = btn
-    
-    btn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch 
-        or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            flyKeys[key] = true
-            btn.BackgroundColor3 = Colors.Accent
-        end
-    end)
-    
-    btn.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch 
-        or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            flyKeys[key] = false
-            btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-        end
-    end)
-    
-    return btn
-end
-
--- Раскладка кнопок (WASD + E/Q)
-createFlyButton("W", 62, 0, "W")
-createFlyButton("A", 0, 62, "A")
-createFlyButton("S", 62, 62, "S")
-createFlyButton("D", 124, 62, "D")
-createFlyButton("E", 62, 124, "E")  -- Вверх
-createFlyButton("Q", 0, 124, "Q")   -- Вниз
-
-print("[TECHY v6.0] Fly кнопки созданы")
-
--- ═══════════════════════════════════════════════════════
--- МЕНЮ (7 ВКЛАДОК - без Ragebot!)
+-- МЕНЮ (8 ВКЛАДОК)
 -- ═══════════════════════════════════════════════════════
 local TabCombat = createTab("Combat", "⚔", 1)
 local TabSilent = createTab("Silent", "🎯", 2)
-local TabHitbox = createTab("Hitbox", "💢", 3)
-local TabVisuals = createTab("Visuals", "👁", 4)
-local TabMovement = createTab("Move", "🏃", 5)
-local TabHood = createTab("Hood", "💰", 6)
-local TabMisc = createTab("Misc", "⚙", 7)
+local TabRage = createTab("Ragebot", "🔥", 3)
+local TabHitbox = createTab("Hitbox", "💢", 4)
+local TabVisuals = createTab("Visuals", "👁", 5)
+local TabMovement = createTab("Move", "🏃", 6)
+local TabHood = createTab("Hood", "💰", 7)
+local TabMisc = createTab("Misc", "⚙", 8)
 
 -- COMBAT
 createLabel("─── AIMBOT ───", TabCombat, 1)
@@ -624,13 +567,32 @@ createToggle("No Recoil", Config.NoRecoil, TabCombat, function(v) Config.NoRecoi
 createToggle("No Spread", Config.NoSpread, TabCombat, function(v) Config.NoSpread = v end, 16)
 createToggle("Rapid Fire", Config.RapidFire, TabCombat, function(v) Config.RapidFire = v end, 17)
 
--- SILENT AIM
-createLabel("─── SILENT AIM ───", TabSilent, 1)
+-- SILENT AIM (ИСПРАВЛЕННЫЙ AUTO SHOT)
+createLabel("─── SILENT AIM (AUTO) ───", TabSilent, 1)
 createToggle("Enable Silent Aim", Config.SilentAim, TabSilent, function(v) Config.SilentAim = v end, 2)
 createToggle("Team Check", Config.SilentTeamCheck, TabSilent, function(v) Config.SilentTeamCheck = v end, 3)
-createToggle("Auto Shot", Config.SilentAutoShot, TabSilent, function(v) Config.SilentAutoShot = v end, 4)
+createToggle("Auto Shot (сам стреляет)", Config.SilentAutoShot, TabSilent, function(v) Config.SilentAutoShot = v end, 4)
 createSlider("Silent FOV", 50, 500, Config.SilentFOV, TabSilent, function(v) Config.SilentFOV = v end, 0, 5)
 createSlider("Hitchance %", 0, 100, Config.SilentHitchance, TabSilent, function(v) Config.SilentHitchance = v end, 0, 6)
+createSlider("Fire Rate (sec)", 0.05, 1.0, Config.SilentFireRate, TabSilent, function(v) Config.SilentFireRate = v end, 2, 7)
+createLabel("Auto Shot: скрипт САМ стреляет", TabSilent, 8)
+createLabel("когда враг в Silent FOV", TabSilent, 9)
+
+-- RAGEBOT
+createLabel("─── MASTER SWITCH ───", TabRage, 1)
+createToggle("Enable Ragebot", Config.RagebotEnabled, TabRage, function(v) Config.RagebotEnabled = v end, 2)
+createLabel("─── DOUBLE TAP ───", TabRage, 3)
+createToggle("Double Tap (x2 урон)", Config.DoubleTap, TabRage, function(v) Config.DoubleTap = v end, 4)
+createLabel("─── SILENT AIM (RAGE) ───", TabRage, 6)
+createToggle("Silent Rage", Config.SilentRage, TabRage, function(v) Config.SilentRage = v end, 7)
+createLabel("─── NO SPREAD (RAGE) ───", TabRage, 9)
+createToggle("Rage No Spread", Config.RageNoSpread, TabRage, function(v) Config.RageNoSpread = v end, 10)
+createLabel("─── ANTI-AIM ───", TabRage, 12)
+createToggle("Anti-Aim", Config.AntiAim, TabRage, function(v) Config.AntiAim = v end, 13)
+createDropdown("Type", {"Spin", "Jitter", "Down"}, Config.AntiAimType, TabRage, function(v) Config.AntiAimType = v end, 14)
+createSlider("Speed", 1, 50, Config.AntiAimSpeed, TabRage, function(v) Config.AntiAimSpeed = v end, 0, 15)
+createLabel("─── INSTANT HIT ───", TabRage, 16)
+createToggle("Instant Hit", Config.InstantHit, TabRage, function(v) Config.InstantHit = v end, 17)
 
 -- HITBOX
 createLabel("─── HITBOX EXPANDER ───", TabHitbox, 1)
@@ -682,10 +644,7 @@ createSlider("Walk Speed", 16, 300, Config.WalkSpeed, TabMovement, function(v) C
 createSlider("Jump Power", 50, 500, Config.JumpPower, TabMovement, function(v) Config.JumpPower = v end, 0, 4)
 createToggle("Infinite Jump", Config.InfiniteJump, TabMovement, function(v) Config.InfiniteJump = v end, 5)
 createLabel("─── FLY / NOCLIP ───", TabMovement, 6)
-createToggle("Fly (touch buttons)", Config.FlyEnabled, TabMovement, function(v) 
-    Config.FlyEnabled = v 
-    FlyControls.Visible = v  -- Показываем/скрываем кнопки
-end, 7)
+createToggle("Fly", Config.FlyEnabled, TabMovement, function(v) Config.FlyEnabled = v end, 7)
 createSlider("Fly Speed", 20, 300, Config.FlySpeed, TabMovement, function(v) Config.FlySpeed = v end, 0, 8)
 createToggle("Noclip", Config.Noclip, TabMovement, function(v) Config.Noclip = v end, 9)
 
@@ -701,8 +660,7 @@ createToggle("Anti AFK", Config.AntiAFK, TabMisc, function(v) Config.AntiAFK = v
 createToggle("FPS Boost", Config.FPSBoost, TabMisc, function(v) Config.FPSBoost = v end, 3)
 createToggle("FOV Changer", Config.FovChanger, TabMisc, function(v) Config.FovChanger = v end, 4)
 createSlider("FOV Value", 60, 120, Config.FovValue, TabMisc, function(v) Config.FovValue = v end, 0, 5)
-createLabel("Techy Ultimate v6.0", TabMisc, 6)
-createLabel("DELTA MOBILE FIXED", TabMisc, 7)
+createLabel("Techy Ultimate v5.4", TabMisc, 6)
 
 selectTab(1)
 
@@ -901,40 +859,76 @@ local function getPredictedPosition(targetPart, player)
 end
 
 -- ═══════════════════════════════════════════════════════
--- ✅ БЕЗОПАСНЫЙ HOOK (ТОЛЬКО от оружия!)
+-- ✅ НОВЫЙ AUTO SHOT (АВТОНОМНЫЙ)
 -- ═══════════════════════════════════════════════════════
-local function isFromWeapon(instance)
-    if not instance or typeof(instance) ~= "Instance" then return false end
-    
-    -- Проверка 1: сам instance это Tool
-    if instance:IsA("Tool") then return true end
-    
-    -- Проверка 2: parent это Tool
-    local p = instance.Parent
-    while p do
-        if p:IsA("Tool") then
-            -- Проверка 3: этот Tool в руках LocalPlayer
-            if p.Parent == LocalPlayer.Character then
-                return true
-            end
-            return false
+-- Логика:
+-- 1. Постоянно проверяем есть ли враг в Silent FOV
+-- 2. Если есть → проверяем Hitchance
+-- 3. Если Hitchance сработал → mouse1click()
+-- 4. Ждём SilentFireRate перед следующим выстрелом
+-- НЕ ТРЕБУЕТ НАЖАТИЯ МЫШИ!
+
+local lastAutoShotTime = 0
+
+task.spawn(function()
+    while task.wait(0.05) do  -- Проверка 20 раз в секунду
+        if not Config.SilentAim then continue end
+        if not Config.SilentAutoShot then continue end
+        
+        -- Кулдаун между выстрелами
+        local now = tick()
+        if now - lastAutoShotTime < Config.SilentFireRate then
+            continue
         end
-        p = p.Parent
+        
+        -- Проверяем что у нас есть оружие
+        local char = LocalPlayer.Character
+        if not char then continue end
+        local hasWeapon = false
+        for _, tool in pairs(char:GetChildren()) do
+            if tool:IsA("Tool") then hasWeapon = true break end
+        end
+        if not hasWeapon then continue end
+        
+        -- Ищем врага в Silent FOV
+        local target = getClosestPlayer(Config.SilentFOV, Config.SilentTeamCheck)
+        if not target then continue end
+        
+        -- Проверка Hitchance
+        local roll = math.random(1, 100)
+        if roll > Config.SilentHitchance then continue end
+        
+        -- ✅ АВТОМАТИЧЕСКИЙ ВЫСТРЕЛ!
+        lastAutoShotTime = now
+        
+        -- Наводим камеру на цель (мгновенно)
+        local part = getTargetPart(target.Character)
+        if part then
+            local predictedPos = getPredictedPosition(part, target)
+            local targetCFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
+            local originalCFrame = Camera.CFrame
+            
+            -- Наводимся
+            Camera.CFrame = targetCFrame
+            
+            -- Стреляем
+            task.spawn(function()
+                task.wait(0.016)
+                if mouse1click then
+                    pcall(function() mouse1click() end)
+                end
+                -- Возвращаем камеру
+                task.wait(0.032)
+                Camera.CFrame = originalCFrame
+            end)
+        end
     end
-    
-    return false
-end
+end)
 
-local function hasWeaponEquipped()
-    local char = LocalPlayer.Character
-    if not char then return false end
-    for _, tool in pairs(char:GetChildren()) do
-        if tool:IsA("Tool") then return true end
-    end
-    return false
-end
-
-local hookSuccess = pcall(function()
+-- ═══════════════════════════════════════════════════════
+-- RAGEBOT HOOK (в pcall)
+-- ═══════════════════════════════════════════════════════
+local rageHookSuccess = pcall(function()
     if type(hookmetamethod) ~= "function" then
         error("hookmetamethod not available")
     end
@@ -942,44 +936,52 @@ local hookSuccess = pcall(function()
     local oldNamecall
     oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
         local method = getnamecallmethod()
+        local args = {...}
         
-        -- ✅ ПРОВЕРКА: только если вызов от оружия!
-        if not isFromWeapon(self) then
+        if not Config.RagebotEnabled then
             return oldNamecall(self, ...)
         end
         
-        -- ✅ ПРОВЕРКА: только если у игрока есть оружие в руках
-        if not hasWeaponEquipped() then
+        local isFromWeapon = false
+        pcall(function()
+            if self and typeof(self) == "Instance" then
+                local current = self
+                while current do
+                    if current:IsA("Tool") then
+                        isFromWeapon = true
+                        break
+                    end
+                    current = current.Parent
+                end
+            end
+        end)
+        
+        if not isFromWeapon then
             return oldNamecall(self, ...)
         end
         
-        -- SILENT AIM
-        if Config.SilentAim and (method == "Raycast" or method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList") then
-            local args = {...}
-            local target = getClosestPlayer(Config.SilentFOV, Config.SilentTeamCheck)
+        if Config.DoubleTap and method == "FireServer" then
+            local result1 = oldNamecall(self, ...)
+            task.spawn(function()
+                oldNamecall(self, ...)
+            end)
+            return result1
+        end
+        
+        if (Config.SilentRage or Config.InstantHit) and (method == "Raycast" or method == "FindPartOnRay") then
+            local target = getClosestPlayer(Config.RageFOV, true)
             if target then
                 local part = getTargetPart(target.Character)
                 if part then
-                    local roll = math.random(1, 100)
-                    if roll <= Config.SilentHitchance then
-                        local targetPos = getPredictedPosition(part, target)
-                        
-                        if Config.SilentAutoShot then
-                            task.spawn(function()
-                                task.wait(0.016)
-                                if mouse1click then pcall(function() mouse1click() end) end
-                            end)
-                        end
-                        
-                        if method == "Raycast" and args[1] then
-                            local origin = args[1].Origin
-                            args[1] = Ray.new(origin, (targetPos - origin).Unit * 1000)
-                            return oldNamecall(self, unpack(args))
-                        elseif (method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList") and args[1] then
-                            local ray = args[1]
-                            args[1] = Ray.new(ray.Origin, (targetPos - ray.Origin).Unit * 1000)
-                            return oldNamecall(self, unpack(args))
-                        end
+                    local targetPos = getPredictedPosition(part, target)
+                    if method == "Raycast" and args[1] then
+                        local origin = args[1].Origin
+                        args[1] = Ray.new(origin, (targetPos - origin).Unit * 1000)
+                        return oldNamecall(self, unpack(args))
+                    elseif method == "FindPartOnRay" and args[1] then
+                        local ray = args[1]
+                        args[1] = Ray.new(ray.Origin, (targetPos - ray.Origin).Unit * 1000)
+                        return oldNamecall(self, unpack(args))
                     end
                 end
             end
@@ -989,10 +991,10 @@ local hookSuccess = pcall(function()
     end))
 end)
 
-if hookSuccess then
-    print("[TECHY v6.0] Silent Aim hook: OK")
+if rageHookSuccess then
+    print("[TECHY v5.4] Ragebot hook: OK")
 else
-    warn("[TECHY v6.0] Silent Aim hook not available")
+    warn("[TECHY v5.4] Ragebot hook not available")
 end
 
 -- FLY
@@ -1068,6 +1070,8 @@ task.spawn(function()
 end)
 
 -- MAIN LOOP
+local antiAimAngle = 0
+
 RunService.RenderStepped:Connect(function(dt)
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -1103,6 +1107,23 @@ RunService.RenderStepped:Connect(function(dt)
         end
     end
     
+    -- ANTI-AIM
+    if Config.RagebotEnabled and Config.AntiAim and hrp then
+        antiAimAngle = antiAimAngle + Config.AntiAimSpeed
+        if Config.AntiAimType == "Spin" then
+            local spinCFrame = CFrame.Angles(0, math.rad(antiAimAngle), 0)
+            hrp.CFrame = CFrame.new(hrp.Position) * spinCFrame
+        elseif Config.AntiAimType == "Jitter" then
+            local jitterX = math.random(-180, 180)
+            local jitterY = math.random(-180, 180)
+            local jitterCFrame = CFrame.Angles(math.rad(jitterX), math.rad(jitterY), 0)
+            hrp.CFrame = CFrame.new(hrp.Position) * jitterCFrame
+        elseif Config.AntiAimType == "Down" then
+            local downCFrame = CFrame.Angles(math.rad(90), 0, 0)
+            hrp.CFrame = CFrame.new(hrp.Position) * downCFrame
+        end
+    end
+    
     -- TRIGGERBOT
     if Config.Triggerbot then
         local target = getClosestPlayer()
@@ -1127,23 +1148,17 @@ RunService.RenderStepped:Connect(function(dt)
         hum.JumpPower = Config.JumpPower
     end
     
-    -- ✅ FLY С СЕНСОРНЫМИ КНОПКАМИ
+    -- FLY
     if Config.FlyEnabled and hrp then
         if not flyBodyVelocity then startFly() end
-        
-        -- ✅ Используем сенсорные кнопки вместо клавиатуры!
         local moveDir = Vector3.new(0, 0, 0)
-        if flyKeys.W then moveDir = moveDir + Camera.CFrame.LookVector end
-        if flyKeys.S then moveDir = moveDir - Camera.CFrame.LookVector end
-        if flyKeys.A then moveDir = moveDir - Camera.CFrame.RightVector end
-        if flyKeys.D then moveDir = moveDir + Camera.CFrame.RightVector end
-        if flyKeys.E then moveDir = moveDir + Vector3.new(0, 1, 0) end  -- Вверх
-        if flyKeys.Q then moveDir = moveDir - Vector3.new(0, 1, 0) end  -- Вниз
-        
-        if moveDir.Magnitude > 0 then
-            moveDir = moveDir.Unit
-        end
-        
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - Camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - Camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + Camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.E) then moveDir = moveDir + Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Q) then moveDir = moveDir - Vector3.new(0, 1, 0) end
+        if moveDir.Magnitude > 0 then moveDir = moveDir.Unit end
         flyBodyVelocity.Velocity = moveDir * Config.FlySpeed
         flyBodyGyro.CFrame = Camera.CFrame
     else
@@ -1266,8 +1281,8 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 print("╔══════════════════════════════════════════╗")
-print("║  TECHY ULTIMATE v6.0 - DELTA FIXED       ║")
-print("║  ✅ Silent Aim: только от оружия         ║")
-print("║  ✅ Fly: сенсорные кнопки W/A/S/D/E/Q    ║")
-print("║  ✅ Ragebot удалён (стабильно)           ║")
+print("║  TECHY ULTIMATE v5.4 - AUTO SHOT FIXED   ║")
+print("║  ✅ Auto Shot: САМ ищет врагов в FOV     ║")
+print("║  ✅ Auto Shot: САМ стреляет              ║")
+print("║  ✅ Fire Rate: настройка скорости        ║")
 print("╚══════════════════════════════════════════╝")
