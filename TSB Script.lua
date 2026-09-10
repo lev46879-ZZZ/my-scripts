@@ -1,8 +1,7 @@
 -- ==========================================================
---  JJS ULTIMATE v2.0 (Mobile)
+--  JJS ULTIMATE v2.1 (WallCheck + Fixed ESP + Left Tabs)
 --  Aimbot + AutoBlock + AutoCounter + Aura + Wings + ESP
 -- ==========================================================
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -15,16 +14,17 @@ local Camera = workspace.CurrentCamera
 local Config = {
     -- Aimbot
     AimbotEnabled = false,
-    FOV = 200,                -- 10..600
-    Smoothness = 0.01,        -- 0.01 (мгновенно) .. 1.0 (плавно)
-    TargetMode = "FOV",       -- FOV | LowestHP | HighestHP | Distance | Name
+    FOV = 200,
+    Smoothness = 0.01,
+    TargetMode = "FOV",
     TargetPart = "Head",
-
+    WallCheck = true,
+    
     -- Auto
     AutoBlock = false,
     AutoCounter = false,
     AutoBlockDistance = 15,
-
+    
     -- Визуалы
     AuraEnabled = true,
     WingsEnabled = true,
@@ -33,7 +33,7 @@ local Config = {
     WingsTransparency = 0.2,
     AuraSize = 6,
     AuraRate = 35,
-
+    
     -- ESP
     EspPlayers = false,
     EspCharms = false,
@@ -48,7 +48,7 @@ local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Root = Character:WaitForChild("HumanoidRootPart")
 
 -- ==========================================================
---  АУРА ДЗЮДО (обновляется вручную, без Weld)
+--  АУРА ДЗЮДО
 -- ==========================================================
 local AuraRing = Instance.new("Part")
 AuraRing.Shape = Enum.PartType.Cylinder
@@ -86,9 +86,9 @@ AuraParticles.Rotation = NumberRange.new(0, 360)
 AuraParticles.VelocityInheritance = 0
 
 -- ==========================================================
---  КРЫЛЬЯ ЧЁРНОЙ ЭНЕРГИИ (тоже без Weld)
+--  КРЫЛЬЯ ЧЁРНОЙ ЭНЕРГИИ
 -- ==========================================================
-local WingParts = {}   -- {Part, BaseOffset = CFrame}
+local WingParts = {}
 local WingBeams = {}
 
 local function CreateWing(side)
@@ -104,20 +104,18 @@ local function CreateWing(side)
         Seg.Material = Enum.Material.Neon
         Seg.Transparency = Config.WingsTransparency
         Seg.Parent = workspace
-
+        
         local offsetX = (i - 1) * 0.9 * side
         local offsetY = 1.5 + i * 0.3
-        local baseOffset = CFrame.new(offsetX, offsetY, 0.8)
-            * CFrame.Angles(0, math.rad(-30 * side), math.rad(20 * side))
-
+        local baseOffset = CFrame.new(offsetX, offsetY, 0.8) * CFrame.Angles(0, math.rad(-30 * side), math.rad(20 * side))
+        
         table.insert(WingParts, { Part = Seg, BaseOffset = baseOffset })
         table.insert(segments, Seg)
     end
-
+    
     for i = 1, #segments - 1 do
         local A0 = Instance.new("Attachment", segments[i])
         local A1 = Instance.new("Attachment", segments[i + 1])
-
         local Beam = Instance.new("Beam")
         Beam.Attachment0 = A0
         Beam.Attachment1 = A1
@@ -130,8 +128,7 @@ local function CreateWing(side)
         Beam.Parent = segments[i]
         table.insert(WingBeams, Beam)
     end
-
-    -- Частицы на кончике
+    
     local Att = Instance.new("Attachment", segments[#segments])
     local P = Instance.new("ParticleEmitter")
     P.Parent = Att
@@ -149,7 +146,6 @@ end
 CreateWing(1)
 CreateWing(-1)
 
--- Обновление позиций ауры и крыльев каждый кадр
 RunService.Heartbeat:Connect(function()
     if not Root or not Root.Parent then return end
     if Config.AuraEnabled then
@@ -183,7 +179,7 @@ end)
 -- ==========================================================
 --  ESP ИГРОКОВ
 -- ==========================================================
-local EspTable = {}   -- [Player] = {Box, Name, Hp}
+local EspTable = {}
 
 local function GetEspDraw(player)
     if not EspTable[player] then
@@ -223,16 +219,13 @@ RunService.RenderStepped:Connect(function()
                         local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
                         local scale = 1200 / dist
                         local boxSize = Vector2.new(scale * 1.5, scale * 2.5)
-
                         draw.Box.Size = boxSize
                         draw.Box.Position = Vector2.new(pos.X - boxSize.X / 2, pos.Y - boxSize.Y / 2)
                         draw.Box.Color = Config.EspColor
                         draw.Box.Visible = true
-
                         draw.Name.Text = player.Name
                         draw.Name.Position = Vector2.new(pos.X, pos.Y - boxSize.Y / 2 - 20)
                         draw.Name.Visible = true
-
                         draw.Hp.Text = math.floor(hum.Health) .. " HP"
                         draw.Hp.Position = Vector2.new(pos.X, pos.Y + boxSize.Y / 2 + 3)
                         draw.Hp.Visible = true
@@ -242,6 +235,12 @@ RunService.RenderStepped:Connect(function()
                             draw.Name.Visible = false
                             draw.Hp.Visible = false
                         end
+                    end
+                else
+                    if draw then
+                        draw.Box.Visible = false
+                        draw.Name.Visible = false
+                        draw.Hp.Visible = false
                     end
                 end
             else
@@ -271,9 +270,9 @@ Players.PlayerRemoving:Connect(function(p)
 end)
 
 -- ==========================================================
---  ESP CHARMS (объекты с "Charm" в имени по всей карте)
+--  ESP CHARMS
 -- ==========================================================
-local CharmTable = {}   -- [Model] = {Box, Name}
+local CharmTable = {}
 
 local function GetCharmDraw(model)
     if not CharmTable[model] then
@@ -300,10 +299,9 @@ RunService.RenderStepped:Connect(function()
         end
         return
     end
-
+    
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if (obj:IsA("Model") or obj:IsA("BasePart"))
-            and obj.Name:lower():find("charm") then
+        if (obj:IsA("Model") or obj:IsA("BasePart")) and obj.Name:lower():find("charm") then
             local part = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or obj
             if part then
                 local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
@@ -313,11 +311,9 @@ RunService.RenderStepped:Connect(function()
                     local dist = (Camera.CFrame.Position - part.Position).Magnitude
                     local scale = 1200 / dist
                     local boxSize = Vector2.new(scale * 1.2, scale * 1.2)
-
                     draw.Box.Size = boxSize
                     draw.Box.Position = Vector2.new(pos.X - boxSize.X / 2, pos.Y - boxSize.Y / 2)
                     draw.Box.Visible = true
-
                     draw.Name.Text = obj.Name
                     draw.Name.Position = Vector2.new(pos.X, pos.Y - boxSize.Y / 2 - 14)
                     draw.Name.Visible = true
@@ -333,7 +329,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ==========================================================
---  AIMBOT (правильная плавность + выбор цели)
+--  AIMBOT С WALLCHECK
 -- ==========================================================
 local function GetAlivePlayers()
     local list = {}
@@ -349,36 +345,62 @@ local function GetAlivePlayers()
     return list
 end
 
+local function IsVisible(targetPart)
+    if not Config.WallCheck then return true end
+    
+    local origin = Camera.CFrame.Position
+    local direction = targetPart.Position - origin
+    local distance = direction.Magnitude
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    raycastParams.IgnoreWater = true
+    
+    local result = workspace:Raycast(origin, direction.Unit * distance, raycastParams)
+    
+    if result then
+        if result.Instance:IsDescendantOf(targetPart.Parent) then
+            return true
+        end
+        return false
+    end
+    return true
+end
+
 local function PickTarget()
     local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     local best, bestScore = nil, nil
-
+    
     for _, info in ipairs(GetAlivePlayers()) do
         local part = info.Player.Character:FindFirstChild(Config.TargetPart) or info.Player.Character:FindFirstChild("Head")
         if part then
-            local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-            if onScreen then
-                local fovDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-                if fovDist <= Config.FOV then
-                    local score
-                    if Config.TargetMode == "FOV" then
-                        score = fovDist
-                    elseif Config.TargetMode == "LowestHP" then
-                        score = info.Hum.Health
-                    elseif Config.TargetMode == "HighestHP" then
-                        score = -info.Hum.Health
-                    elseif Config.TargetMode == "Distance" then
-                        score = (Camera.CFrame.Position - part.Position).Magnitude
-                    elseif Config.TargetMode == "Name" then
-                        score = info.Player.Name
-                    end
-                    if bestScore == nil then
-                        best, bestScore = { part = part, score = score }, score
-                    else
-                        if type(score) == "string" then
-                            if score < bestScore then best, bestScore = { part = part, score = score }, score end
+            if IsVisible(part) then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local fovDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                    if fovDist <= Config.FOV then
+                        local score
+                        if Config.TargetMode == "FOV" then
+                            score = fovDist
+                        elseif Config.TargetMode == "LowestHP" then
+                            score = info.Hum.Health
+                        elseif Config.TargetMode == "HighestHP" then
+                            score = -info.Hum.Health
+                        elseif Config.TargetMode == "Distance" then
+                            score = (Camera.CFrame.Position - part.Position).Magnitude
+                        elseif Config.TargetMode == "Name" then
+                            score = info.Player.Name
+                        end
+                        
+                        if bestScore == nil then
+                            best, bestScore = { part = part, score = score }, score
                         else
-                            if score < bestScore then best, bestScore = { part = part, score = score }, score end
+                            if type(score) == "string" then
+                                if score < bestScore then best, bestScore = { part = part, score = score }, score end
+                            else
+                                if score < bestScore then best, bestScore = { part = part, score = score }, score end
+                            end
                         end
                     end
                 end
@@ -388,34 +410,28 @@ local function PickTarget()
     return best and best.part
 end
 
--- Основной цикл аимбота
 RunService.RenderStepped:Connect(function(dt)
     if not Config.AimbotEnabled then return end
     local target = PickTarget()
     if target then
         local camPos = Camera.CFrame.Position
         local targetCF = CFrame.lookAt(camPos, target.Position)
-        -- Smoothness: 0.01 -> alpha = 0.99 (мгновенно)
-        --             1.00 -> alpha = 0.01 (плавно, но не застревает)
         local alpha = math.clamp(1 - Config.Smoothness, 0.01, 1)
-        -- Приведение к fps-независимости
         local smoothAlpha = 1 - (1 - alpha) ^ (dt * 60)
         Camera.CFrame = Camera.CFrame:Lerp(targetCF, smoothAlpha)
     end
 end)
 
 -- ==========================================================
---  AUTO BLOCK / AUTO COUNTER (заготовка)
+--  AUTO BLOCK / AUTO COUNTER
 -- ==========================================================
 RunService.Heartbeat:Connect(function()
     if Config.AutoBlock then
         for _, info in ipairs(GetAlivePlayers()) do
             local dist = (info.Root.Position - Root.Position).Magnitude
             if dist < Config.AutoBlockDistance then
-                -- ВСТАВЬ СВОЙ RemoteEvent:
-                -- game:GetService("ReplicatedStorage").Remotes.Block:FireServer()
-                -- ИЛИ активируй инструмент:
-                -- local t = Character:FindFirstChildOfClass("Tool"); if t then t:Activate() end
+                local tool = Character:FindFirstChildOfClass("Tool")
+                if tool then tool:Activate() end
             end
         end
     end
@@ -428,11 +444,10 @@ end)
 --  UI: ПЛАВАЮЩАЯ КНОПКА + ГЛАВНОЕ МЕНЮ
 -- ==========================================================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "JJSv2"
+ScreenGui.Name = "JJSv2.1"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- ---------- Плавающая кнопка ----------
 local FloatBtn = Instance.new("TextButton")
 FloatBtn.Size = UDim2.new(0, 55, 0, 55)
 FloatBtn.Position = UDim2.new(0, 20, 0, 200)
@@ -445,12 +460,10 @@ FloatBtn.Active = true
 FloatBtn.Draggable = true
 FloatBtn.Parent = ScreenGui
 Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(1, 0)
-
 local FloatStroke = Instance.new("UIStroke", FloatBtn)
 FloatStroke.Color = Color3.fromRGB(150, 0, 255)
 FloatStroke.Thickness = 2
 
--- ---------- Главное меню ----------
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 310, 0, 480)
 MainFrame.Position = UDim2.new(0.5, -155, 0.5, -240)
@@ -462,7 +475,6 @@ MainFrame.Draggable = true
 MainFrame.Visible = false
 MainFrame.Parent = ScreenGui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
-
 local MainStroke = Instance.new("UIStroke", MainFrame)
 MainStroke.Color = Color3.fromRGB(120, 0, 200)
 MainStroke.Thickness = 2
@@ -470,13 +482,12 @@ MainStroke.Thickness = 2
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 32)
 Title.BackgroundTransparency = 1
-Title.Text = "⚡ JJS ULTIMATE v2 ⚡"
+Title.Text = "⚡ JJS ULTIMATE v2.1 ⚡"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 15
 Title.Parent = MainFrame
 
--- Закрыть
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 26, 0, 26)
 CloseBtn.Position = UDim2.new(1, -32, 0, 4)
@@ -487,7 +498,6 @@ CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 18
 CloseBtn.Parent = MainFrame
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
-
 CloseBtn.MouseButton1Click:Connect(function()
     MainFrame.Visible = false
 end)
@@ -496,21 +506,21 @@ FloatBtn.MouseButton1Click:Connect(function()
     MainFrame.Visible = not MainFrame.Visible
 end)
 
--- ---------- Вкладки ----------
+-- ВКЛАДКИ СЛЕВА
 local TabBar = Instance.new("Frame")
-TabBar.Size = UDim2.new(1, -10, 0, 30)
-TabBar.Position = UDim2.new(0, 5, 0, 36)
+TabBar.Size = UDim2.new(0, 80, 1, -75)
+TabBar.Position = UDim2.new(0, 5, 0, 70)
 TabBar.BackgroundTransparency = 1
 TabBar.Parent = MainFrame
 
 local Tabs = {}
 local Pages = {}
-local tabNames = { "Aimbot", "Visuals", "ESP" }
+local tabNames = { "Aimbot", "Visuals", "ESP", "Misc" }
 
 for i, name in ipairs(tabNames) do
     local TabBtn = Instance.new("TextButton")
-    TabBtn.Size = UDim2.new(1/#tabNames, -4, 1, 0)
-    TabBtn.Position = UDim2.new((i-1)/#tabNames, 2, 0, 0)
+    TabBtn.Size = UDim2.new(1, 0, 0, 35)
+    TabBtn.Position = UDim2.new(0, 0, 0, (i-1) * 40)
     TabBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
     TabBtn.Text = name
     TabBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -519,17 +529,20 @@ for i, name in ipairs(tabNames) do
     TabBtn.Parent = TabBar
     Instance.new("UICorner", TabBtn).CornerRadius = UDim.new(0, 6)
     Tabs[name] = TabBtn
-
-    local Page = Instance.new("Frame")
-    Page.Size = UDim2.new(1, -10, 1, -75)
-    Page.Position = UDim2.new(0, 5, 0, 70)
+    
+    local Page = Instance.new("ScrollingFrame")
+    Page.Size = UDim2.new(1, -95, 1, -75)
+    Page.Position = UDim2.new(0, 90, 0, 70)
     Page.BackgroundTransparency = 1
+    Page.ScrollBarThickness = 4
     Page.Visible = false
+    Page.CanvasSize = UDim2.new(0, 0, 0, 1000)
     Page.Parent = MainFrame
     Pages[name] = Page
 end
 
 Pages["Aimbot"].Visible = true
+Tabs["Aimbot"].BackgroundColor3 = Color3.fromRGB(100, 30, 180)
 
 for name, btn in pairs(Tabs) do
     btn.MouseButton1Click:Connect(function()
@@ -542,7 +555,7 @@ for name, btn in pairs(Tabs) do
 end
 
 -- ==========================================================
---  УТИЛИТЫ UI: Кнопка, Заголовок, Слайдер, Выбор
+--  УТИЛИТЫ UI
 -- ==========================================================
 local function CreateButton(parent, text, y, color, callback)
     local B = Instance.new("TextButton")
@@ -573,14 +586,13 @@ local function CreateLabel(parent, text, y, size)
     return L
 end
 
--- ---------- Слайдер под палец ----------
 local function CreateSlider(parent, text, y, min, max, default, isFloat, callback)
     local Container = Instance.new("Frame")
     Container.Size = UDim2.new(1, -10, 0, 40)
     Container.Position = UDim2.new(0, 5, 0, y)
     Container.BackgroundTransparency = 1
     Container.Parent = parent
-
+    
     local Label = Instance.new("TextLabel")
     Label.Size = UDim2.new(1, 0, 0, 16)
     Label.BackgroundTransparency = 1
@@ -590,7 +602,7 @@ local function CreateSlider(parent, text, y, min, max, default, isFloat, callbac
     Label.TextSize = 11
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Container
-
+    
     local Track = Instance.new("Frame")
     Track.Size = UDim2.new(1, -10, 0, 8)
     Track.Position = UDim2.new(0, 5, 0, 24)
@@ -598,14 +610,14 @@ local function CreateSlider(parent, text, y, min, max, default, isFloat, callbac
     Track.BorderSizePixel = 0
     Track.Parent = Container
     Instance.new("UICorner", Track).CornerRadius = UDim.new(1, 0)
-
+    
     local Fill = Instance.new("Frame")
     Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
     Fill.BackgroundColor3 = Color3.fromRGB(130, 30, 220)
     Fill.BorderSizePixel = 0
     Fill.Parent = Track
     Instance.new("UICorner", Fill).CornerRadius = UDim.new(1, 0)
-
+    
     local Knob = Instance.new("Frame")
     Knob.Size = UDim2.new(0, 18, 0, 18)
     Knob.Position = UDim2.new((default - min) / (max - min), -9, 0.5, -9)
@@ -613,7 +625,7 @@ local function CreateSlider(parent, text, y, min, max, default, isFloat, callbac
     Knob.BorderSizePixel = 0
     Knob.Parent = Track
     Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
-
+    
     local function Update(inputX)
         local rel = math.clamp((inputX - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
         local val = min + (max - min) * rel
@@ -623,7 +635,7 @@ local function CreateSlider(parent, text, y, min, max, default, isFloat, callbac
         Label.Text = text .. ": " .. (isFloat and string.format("%.2f", val) or tostring(val))
         callback(val)
     end
-
+    
     local dragging = false
     Track.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -641,15 +653,13 @@ local function CreateSlider(parent, text, y, min, max, default, isFloat, callbac
             dragging = false
         end
     end)
-
+    
     return { Update = Update, Container = Container }
 end
 
--- ---------- Выбор режима цели ----------
 local function CreateSelector(parent, text, y, options, default, callback)
     local L = CreateLabel(parent, text, y, 16)
     local current = default
-
     local Btn = Instance.new("TextButton")
     Btn.Size = UDim2.new(1, -10, 0, 30)
     Btn.Position = UDim2.new(0, 5, 0, y + 18)
@@ -660,7 +670,6 @@ local function CreateSelector(parent, text, y, options, default, callback)
     Btn.TextSize = 12
     Btn.Parent = parent
     Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
-
     Btn.MouseButton1Click:Connect(function()
         local idx = 1
         for i, v in ipairs(options) do if v == current then idx = i break end end
@@ -677,12 +686,19 @@ end
 --  СТРАНИЦА AIMBOT
 -- ==========================================================
 local AimbotPage = Pages["Aimbot"]
-local y = 0
+local y = 10
 
 local AimBtn = CreateButton(AimbotPage, "Aimbot: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function()
     Config.AimbotEnabled = not Config.AimbotEnabled
     AimBtn.Text = "Aimbot: " .. (Config.AimbotEnabled and "ВКЛ" or "ВЫКЛ")
     AimBtn.BackgroundColor3 = Config.AimbotEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
+end)
+y = y + 38
+
+local WallBtn = CreateButton(AimbotPage, "WallCheck: ВКЛ", y, Color3.fromRGB(0, 130, 0), function()
+    Config.WallCheck = not Config.WallCheck
+    WallBtn.Text = "WallCheck: " .. (Config.WallCheck and "ВКЛ" or "ВЫКЛ")
+    WallBtn.BackgroundColor3 = Config.WallCheck and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)
 end)
 y = y + 38
 
@@ -711,7 +727,7 @@ CreateSelector(AimbotPage, "Часть тела", y,
 --  СТРАНИЦА VISUALS
 -- ==========================================================
 local VisPage = Pages["Visuals"]
-y = 0
+y = 10
 
 local AuraBtn = CreateButton(VisPage, "Аура: ВКЛ", y, Color3.fromRGB(0, 130, 0), function()
     Config.AuraEnabled = not Config.AuraEnabled
@@ -761,7 +777,6 @@ y = y + 50
 CreateLabel(VisPage, "Цвет ауры и крыльев (RGB)", y)
 y = y + 20
 
--- Палитра: 3 горизонтальных слайдера-«ползунка» R/G/B через CreateSlider
 CreateSlider(VisPage, "R", y, 0, 255, math.floor(Config.AuraColor.R * 255), false, function(v)
     Config.AuraColor = Color3.fromRGB(v, Config.AuraColor.G * 255, Config.AuraColor.B * 255)
     Config.WingsColor = Color3.fromRGB(v * 0.6, Config.AuraColor.G * 255 * 0.6, Config.AuraColor.B * 255 * 0.6)
@@ -795,7 +810,7 @@ end)
 --  СТРАНИЦА ESP
 -- ==========================================================
 local EspPage = Pages["ESP"]
-y = 0
+y = 10
 
 local EspPBtn = CreateButton(EspPage, "ESP Игроков: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function()
     Config.EspPlayers = not Config.EspPlayers
@@ -815,10 +830,12 @@ CreateSlider(EspPage, "R игроков", y, 0, 255, Config.EspColor.R * 255, fa
     Config.EspColor = Color3.fromRGB(v, Config.EspColor.G * 255, Config.EspColor.B * 255)
 end)
 y = y + 42
+
 CreateSlider(EspPage, "G игроков", y, 0, 255, Config.EspColor.G * 255, false, function(v)
     Config.EspColor = Color3.fromRGB(Config.EspColor.R * 255, v, Config.EspColor.B * 255)
 end)
 y = y + 42
+
 CreateSlider(EspPage, "B игроков", y, 0, 255, Config.EspColor.B * 255, false, function(v)
     Config.EspColor = Color3.fromRGB(Config.EspColor.R * 255, Config.EspColor.G * 255, v)
 end)
@@ -828,15 +845,38 @@ CreateSlider(EspPage, "R charms", y, 0, 255, Config.CharmColor.R * 255, false, f
     Config.CharmColor = Color3.fromRGB(v, Config.CharmColor.G * 255, Config.CharmColor.B * 255)
 end)
 y = y + 42
+
 CreateSlider(EspPage, "G charms", y, 0, 255, Config.CharmColor.G * 255, false, function(v)
     Config.CharmColor = Color3.fromRGB(Config.CharmColor.R * 255, v, Config.CharmColor.B * 255)
 end)
 y = y + 42
+
 CreateSlider(EspPage, "B charms", y, 0, 255, Config.CharmColor.B * 255, false, function(v)
     Config.CharmColor = Color3.fromRGB(Config.CharmColor.R * 255, Config.CharmColor.G * 255, v)
 end)
 
 -- ==========================================================
---  КОНЕЦ
+--  СТРАНИЦА MISC
 -- ==========================================================
-print("[JJS Ultimate v2] Загружено! Кнопка ⚡ слева открывает меню.")
+local MiscPage = Pages["Misc"]
+y = 10
+
+local BlockBtn = CreateButton(MiscPage, "Auto Block: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function()
+    Config.AutoBlock = not Config.AutoBlock
+    BlockBtn.Text = "Auto Block: " .. (Config.AutoBlock and "ВКЛ" or "ВЫКЛ")
+    BlockBtn.BackgroundColor3 = Config.AutoBlock and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
+end)
+y = y + 38
+
+local CounterBtn = CreateButton(MiscPage, "Auto Counter: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function()
+    Config.AutoCounter = not Config.AutoCounter
+    CounterBtn.Text = "Auto Counter: " .. (Config.AutoCounter and "ВКЛ" or "ВЫКЛ")
+    CounterBtn.BackgroundColor3 = Config.AutoCounter and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
+end)
+y = y + 38
+
+CreateSlider(MiscPage, "Дистанция блока", y, 5, 50, Config.AutoBlockDistance, false, function(v)
+    Config.AutoBlockDistance = v
+end)
+
+print("[JJS Ultimate v2.1] Загружено! WallCheck + Fixed ESP + Left Tabs")
