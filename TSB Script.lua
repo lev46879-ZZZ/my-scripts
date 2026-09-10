@@ -1,842 +1,461 @@
--- ==========================================================
---  JJS ULTIMATE v2.0 (Mobile)
---  Aimbot + AutoBlock + AutoCounter + Aura + Wings + ESP
--- ==========================================================
-
+-- ============================================
+-- 🎨 КРАСИВОЕ GUI МЕНЮ С ПЛАВНЫМИ АНИМАЦИЯМИ
+-- ============================================
+local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 
--- ==========================================================
---  КОНФИГ
--- ==========================================================
-local Config = {
-    -- Aimbot
-    AimbotEnabled = false,
-    FOV = 200,                -- 10..600
-    Smoothness = 0.01,        -- 0.01 (мгновенно) .. 1.0 (плавно)
-    TargetMode = "FOV",       -- FOV | LowestHP | HighestHP | Distance | Name
-    TargetPart = "Head",
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
-    -- Auto
-    AutoBlock = false,
-    AutoCounter = false,
-    AutoBlockDistance = 15,
+-- Настройки анимаций
+local TWEEN_INFO_SMOOTH = TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local TWEEN_INFO_FAST   = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local TWEEN_INFO_BOUNCE = TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local TWEEN_INFO_OPEN   = TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
-    -- Визуалы
-    AuraEnabled = true,
-    WingsEnabled = true,
-    AuraColor = Color3.fromRGB(150, 0, 255),
-    WingsColor = Color3.fromRGB(80, 0, 120),
-    WingsTransparency = 0.2,
-    AuraSize = 6,
-    AuraRate = 35,
+-- ============================================
+-- 🖼️ СОЗДАНИЕ SCREEN GUI
+-- ============================================
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "BeautifulMenuGui"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = playerGui
 
-    -- ESP
-    EspPlayers = false,
-    EspCharms = false,
-    EspColor = Color3.fromRGB(255, 50, 50),
-    CharmColor = Color3.fromRGB(255, 215, 0),
-}
+-- ============================================
+-- 🎯 КНОПКА ОТКРЫТИЯ МЕНЮ
+-- ============================================
+local openButton = Instance.new("TextButton")
+openButton.Name = "OpenButton"
+openButton.Size = UDim2.new(0, 70, 0, 70)
+openButton.Position = UDim2.new(0, 30, 0.5, -35)
+openButton.AnchorPoint = Vector2.new(0, 0.5)
+openButton.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+openButton.BorderSizePixel = 0
+openButton.Text = ""
+openButton.AutoButtonColor = false
+openButton.Parent = screenGui
 
--- ==========================================================
---  ЖДЁМ ПЕРСОНАЖА
--- ==========================================================
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local Root = Character:WaitForChild("HumanoidRootPart")
+local openCorner = Instance.new("UICorner", openButton)
+openCorner.CornerRadius = UDim.new(0, 18)
 
--- ==========================================================
---  АУРА ДЗЮДО (обновляется вручную, без Weld)
--- ==========================================================
-local AuraRing = Instance.new("Part")
-AuraRing.Shape = Enum.PartType.Cylinder
-AuraRing.Size = Vector3.new(0.15, Config.AuraSize, Config.AuraSize)
-AuraRing.Anchored = true
-AuraRing.CanCollide = false
-AuraRing.CanQuery = false
-AuraRing.Massless = true
-AuraRing.Color = Config.AuraColor
-AuraRing.Material = Enum.Material.Neon
-AuraRing.Transparency = 0.3
-AuraRing.Parent = workspace
+local openStroke = Instance.new("UIStroke", openButton)
+openStroke.Thickness = 2
+openStroke.Color = Color3.fromRGB(138, 92, 246)
+openStroke.Transparency = 0.3
 
-local AuraAttachment = Instance.new("Attachment")
-AuraAttachment.Parent = Root
-
-local AuraParticles = Instance.new("ParticleEmitter")
-AuraParticles.Parent = AuraAttachment
-AuraParticles.Texture = "rbxassetid://243098098"
-AuraParticles.Rate = Config.AuraRate
-AuraParticles.Lifetime = NumberRange.new(0.8, 1.5)
-AuraParticles.Speed = NumberRange.new(2, 5)
-AuraParticles.SpreadAngle = Vector2.new(15, 15)
-AuraParticles.Color = ColorSequence.new(Config.AuraColor)
-AuraParticles.Size = NumberSequence.new({
-    NumberSequenceKeypoint.new(0, 0.5),
-    NumberSequenceKeypoint.new(1, 0)
+local openGradient = Instance.new("UIGradient", openButton)
+openGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(99, 102, 241)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(168, 85, 247))
 })
-AuraParticles.Transparency = NumberSequence.new({
-    NumberSequenceKeypoint.new(0, 0.3),
-    NumberSequenceKeypoint.new(1, 1)
+openGradient.Rotation = 45
+
+local openIcon = Instance.new("TextLabel", openButton)
+openIcon.Size = UDim2.new(1, 0, 1, 0)
+openIcon.BackgroundTransparency = 1
+openIcon.Text = "☰"
+openIcon.TextSize = 34
+openIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
+openIcon.Font = Enum.Font.GothamBold
+
+-- Тень под кнопкой
+local openShadow = Instance.new("ImageLabel", openButton)
+openShadow.Name = "Shadow"
+openShadow.Size = UDim2.new(1.4, 0, 1.4, 0)
+openShadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+openShadow.AnchorPoint = Vector2.new(0.5, 0.5)
+openShadow.BackgroundTransparency = 1
+openShadow.Image = "rbxassetid://5554236805"
+openShadow.ImageColor3 = Color3.fromRGB(99, 102, 241)
+openShadow.ImageTransparency = 0.5
+openShadow.ZIndex = -1
+
+-- Пульсация кнопки
+task.spawn(function()
+	while openButton.Parent do
+		TweenService:Create(openStroke, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+			Transparency = 0.7
+		}):Play()
+		task.wait(1.5)
+		TweenService:Create(openStroke, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+			Transparency = 0.2
+		}):Play()
+		task.wait(1.5)
+	end
+end)
+
+-- Hover эффект
+openButton.MouseEnter:Connect(function()
+	TweenService:Create(openButton, TWEEN_INFO_FAST, {Size = UDim2.new(0, 78, 0, 78)}):Play()
+	TweenService:Create(openStroke, TWEEN_INFO_FAST, {Thickness = 3, Transparency = 0}):Play()
+end)
+
+openButton.MouseLeave:Connect(function()
+	TweenService:Create(openButton, TWEEN_INFO_FAST, {Size = UDim2.new(0, 70, 0, 70)}):Play()
+	TweenService:Create(openStroke, TWEEN_INFO_FAST, {Thickness = 2, Transparency = 0.3}):Play()
+end)
+
+-- ============================================
+-- 🌫️ ЗАТЕМНЕНИЕ ФОНА (BLUR + OVERLAY)
+-- ============================================
+local blurEffect = Instance.new("BlurEffect")
+blurEffect.Name = "MenuBlur"
+blurEffect.Size = 0
+blurEffect.Parent = game.Workspace.CurrentCamera
+
+local overlay = Instance.new("Frame")
+overlay.Name = "Overlay"
+overlay.Size = UDim2.new(1, 0, 1, 0)
+overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+overlay.BackgroundTransparency = 1
+overlay.BorderSizePixel = 0
+overlay.ZIndex = 5
+overlay.Parent = screenGui
+
+-- ============================================
+-- 📦 ГЛАВНОЕ МЕНЮ
+-- ============================================
+local menuFrame = Instance.new("Frame")
+menuFrame.Name = "MenuFrame"
+menuFrame.Size = UDim2.new(0, 480, 0, 540)
+menuFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+menuFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+menuFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 35)
+menuFrame.BackgroundTransparency = 0.15
+menuFrame.BorderSizePixel = 0
+menuFrame.Visible = false
+menuFrame.ZIndex = 10
+menuFrame.Parent = screenGui
+
+local menuCorner = Instance.new("UICorner", menuFrame)
+menuCorner.CornerRadius = UDim.new(0, 24)
+
+local menuStroke = Instance.new("UIStroke", menuFrame)
+menuStroke.Thickness = 1.5
+menuStroke.Color = Color3.fromRGB(138, 92, 246)
+menuStroke.Transparency = 0.5
+
+-- Градиентная рамка
+local menuGradient = Instance.new("UIGradient", menuStroke)
+menuGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(99, 102, 241)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(168, 85, 247)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(236, 72, 153))
 })
-AuraParticles.LightEmission = 1
-AuraParticles.Rotation = NumberRange.new(0, 360)
-AuraParticles.VelocityInheritance = 0
 
--- ==========================================================
---  КРЫЛЬЯ ЧЁРНОЙ ЭНЕРГИИ (тоже без Weld)
--- ==========================================================
-local WingParts = {}   -- {Part, BaseOffset = CFrame}
-local WingBeams = {}
+-- Тень меню
+local menuShadow = Instance.new("ImageLabel", menuFrame)
+menuShadow.Name = "Shadow"
+menuShadow.Size = UDim2.new(1.2, 0, 1.2, 0)
+menuShadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+menuShadow.AnchorPoint = Vector2.new(0.5, 0.5)
+menuShadow.BackgroundTransparency = 1
+menuShadow.Image = "rbxassetid://5554236805"
+menuShadow.ImageColor3 = Color3.fromRGB(99, 102, 241)
+menuShadow.ImageTransparency = 0.4
+menuShadow.ZIndex = -1
 
-local function CreateWing(side)
-    local segments = {}
-    for i = 1, 3 do
-        local Seg = Instance.new("Part")
-        Seg.Size = Vector3.new(0.2, 3 - i * 0.5, 1.2)
-        Seg.Anchored = true
-        Seg.CanCollide = false
-        Seg.CanQuery = false
-        Seg.Massless = true
-        Seg.Color = Config.WingsColor
-        Seg.Material = Enum.Material.Neon
-        Seg.Transparency = Config.WingsTransparency
-        Seg.Parent = workspace
+-- ============================================
+-- 🎨 ШАПКА МЕНЮ
+-- ============================================
+local header = Instance.new("Frame", menuFrame)
+header.Name = "Header"
+header.Size = UDim2.new(1, 0, 0, 90)
+header.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+header.BorderSizePixel = 0
+header.ZIndex = 11
 
-        local offsetX = (i - 1) * 0.9 * side
-        local offsetY = 1.5 + i * 0.3
-        local baseOffset = CFrame.new(offsetX, offsetY, 0.8)
-            * CFrame.Angles(0, math.rad(-30 * side), math.rad(20 * side))
+local headerCorner = Instance.new("UICorner", header)
+headerCorner.CornerRadius = UDim.new(0, 24)
 
-        table.insert(WingParts, { Part = Seg, BaseOffset = baseOffset })
-        table.insert(segments, Seg)
-    end
+-- Градиент шапки
+local headerGradient = Instance.new("UIGradient", header)
+headerGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(99, 102, 241)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(168, 85, 247))
+})
+headerGradient.Rotation = 90
 
-    for i = 1, #segments - 1 do
-        local A0 = Instance.new("Attachment", segments[i])
-        local A1 = Instance.new("Attachment", segments[i + 1])
+-- Заголовок
+local title = Instance.new("TextLabel", header)
+title.Size = UDim2.new(1, -80, 1, 0)
+title.Position = UDim2.new(0, 30, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "✨ Главное Меню"
+title.TextSize = 28
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.ZIndex = 12
 
-        local Beam = Instance.new("Beam")
-        Beam.Attachment0 = A0
-        Beam.Attachment1 = A1
-        Beam.Width0 = 1.2
-        Beam.Width1 = 1.2
-        Beam.Color = ColorSequence.new(Config.WingsColor)
-        Beam.Transparency = NumberSequence.new(Config.WingsTransparency)
-        Beam.LightEmission = 1
-        Beam.FaceCamera = true
-        Beam.Parent = segments[i]
-        table.insert(WingBeams, Beam)
-    end
+-- Подзаголовок
+local subtitle = Instance.new("TextLabel", header)
+subtitle.Size = UDim2.new(1, -80, 0, 20)
+subtitle.Position = UDim2.new(0, 30, 1, -35)
+subtitle.BackgroundTransparency = 1
+subtitle.Text = "Добро пожаловать, " .. player.Name
+subtitle.TextSize = 14
+subtitle.TextColor3 = Color3.fromRGB(200, 200, 220)
+subtitle.Font = Enum.Font.Gotham
+subtitle.TextXAlignment = Enum.TextXAlignment.Left
+subtitle.ZIndex = 12
 
-    -- Частицы на кончике
-    local Att = Instance.new("Attachment", segments[#segments])
-    local P = Instance.new("ParticleEmitter")
-    P.Parent = Att
-    P.Texture = "rbxassetid://243098098"
-    P.Rate = 15
-    P.Lifetime = NumberRange.new(0.5, 1)
-    P.Speed = NumberRange.new(1, 3)
-    P.SpreadAngle = Vector2.new(30, 30)
-    P.Color = ColorSequence.new(Config.WingsColor)
-    P.Size = NumberSequence.new(0.4)
-    P.Transparency = NumberSequence.new(Config.WingsTransparency)
-    P.LightEmission = 1
+-- Кнопка закрытия (X)
+local closeButton = Instance.new("TextButton", header)
+closeButton.Name = "CloseButton"
+closeButton.Size = UDim2.new(0, 40, 0, 40)
+closeButton.Position = UDim2.new(1, -55, 0.5, -20)
+closeButton.BackgroundColor3 = Color3.fromRGB(239, 68, 68)
+closeButton.BackgroundTransparency = 0.2
+closeButton.BorderSizePixel = 0
+closeButton.Text = "✕"
+closeButton.TextSize = 20
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.Font = Enum.Font.GothamBold
+closeButton.AutoButtonColor = false
+closeButton.ZIndex = 12
+
+local closeCorner = Instance.new("UICorner", closeButton)
+closeCorner.CornerRadius = UDim.new(0, 12)
+
+closeButton.MouseEnter:Connect(function()
+	TweenService:Create(closeButton, TWEEN_INFO_FAST, {BackgroundTransparency = 0, Rotation = 90}):Play()
+end)
+closeButton.MouseLeave:Connect(function()
+	TweenService:Create(closeButton, TWEEN_INFO_FAST, {BackgroundTransparency = 0.2, Rotation = 0}):Play()
+end)
+
+-- ============================================
+-- 📋 КОНТЕНТ МЕНЮ (КНОПКИ)
+-- ============================================
+local content = Instance.new("ScrollingFrame", menuFrame)
+content.Name = "Content"
+content.Size = UDim2.new(1, -40, 1, -110)
+content.Position = UDim2.new(0, 20, 0, 100)
+content.BackgroundTransparency = 1
+content.BorderSizePixel = 0
+content.ScrollBarThickness = 4
+content.ScrollBarImageColor3 = Color3.fromRGB(138, 92, 246)
+content.CanvasSize = UDim2.new(0, 0, 0, 0)
+content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+content.ZIndex = 11
+
+local listLayout = Instance.new("UIListLayout", content)
+listLayout.Padding = UDim.new(0, 12)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Функция создания красивой кнопки меню
+local menuButtons = {}
+local function createMenuButton(text, icon, order, color1, color2)
+	local btn = Instance.new("TextButton")
+	btn.Name = text
+	btn.Size = UDim2.new(1, 0, 0, 60)
+	btn.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+	btn.BackgroundTransparency = 0.3
+	btn.BorderSizePixel = 0
+	btn.Text = ""
+	btn.AutoButtonColor = false
+	btn.LayoutOrder = order
+	btn.ZIndex = 11
+	btn.Parent = content
+
+	local corner = Instance.new("UICorner", btn)
+	corner.CornerRadius = UDim.new(0, 14)
+
+	local stroke = Instance.new("UIStroke", btn)
+	stroke.Thickness = 1.5
+	stroke.Color = color1
+	stroke.Transparency = 0.7
+
+	local gradient = Instance.new("UIGradient", btn)
+	gradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, color1),
+		ColorSequenceKeypoint.new(1, color2)
+	})
+	gradient.Rotation = 90
+	gradient.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.85),
+		NumberSequenceKeypoint.new(1, 0.95)
+	})
+
+	-- Иконка
+	local iconLabel = Instance.new("TextLabel", btn)
+	iconLabel.Size = UDim2.new(0, 50, 1, 0)
+	iconLabel.BackgroundTransparency = 1
+	iconLabel.Text = icon
+	iconLabel.TextSize = 26
+	iconLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	iconLabel.Font = Enum.Font.GothamBold
+	iconLabel.ZIndex = 12
+
+	-- Текст
+	local textLabel = Instance.new("TextLabel", btn)
+	textLabel.Size = UDim2.new(1, -70, 1, 0)
+	textLabel.Position = UDim2.new(0, 60, 0, 0)
+	textLabel.BackgroundTransparency = 1
+	textLabel.Text = text
+	textLabel.TextSize = 18
+	textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	textLabel.Font = Enum.Font.GothamSemibold
+	textLabel.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel.ZIndex = 12
+
+	-- Стрелка справа
+	local arrow = Instance.new("TextLabel", btn)
+	arrow.Size = UDim2.new(0, 30, 1, 0)
+	arrow.Position = UDim2.new(1, -40, 0, 0)
+	arrow.BackgroundTransparency = 1
+	arrow.Text = "›"
+	arrow.TextSize = 28
+	arrow.TextColor3 = Color3.fromRGB(200, 200, 220)
+	arrow.Font = Enum.Font.GothamBold
+	arrow.ZIndex = 12
+
+	-- Hover анимация
+	btn.MouseEnter:Connect(function()
+		TweenService:Create(btn, TWEEN_INFO_FAST, {BackgroundTransparency = 0.1}):Play()
+		TweenService:Create(stroke, TWEEN_INFO_FAST, {Transparency = 0.2, Thickness = 2}):Play()
+		TweenService:Create(arrow, TWEEN_INFO_FAST, {Position = UDim2.new(1, -30, 0, 0)}):Play()
+	end)
+
+	btn.MouseLeave:Connect(function()
+		TweenService:Create(btn, TWEEN_INFO_FAST, {BackgroundTransparency = 0.3}):Play()
+		TweenService:Create(stroke, TWEEN_INFO_FAST, {Transparency = 0.7, Thickness = 1.5}):Play()
+		TweenService:Create(arrow, TWEEN_INFO_FAST, {Position = UDim2.new(1, -40, 0, 0)}):Play()
+	end)
+
+	btn.MouseButton1Click:Connect(function()
+		-- Анимация нажатия
+		TweenService:Create(btn, TweenInfo.new(0.1), {Size = UDim2.new(1, -10, 0, 55)}):Play()
+		task.wait(0.1)
+		TweenService:Create(btn, TWEEN_INFO_FAST, {Size = UDim2.new(1, 0, 0, 60)}):Play()
+		print("🎯 Нажата кнопка: " .. text)
+	end)
+
+	table.insert(menuButtons, btn)
+	return btn
 end
 
-CreateWing(1)
-CreateWing(-1)
+-- Создаём красивые кнопки
+createMenuButton("Игрок",      "👤", 1, Color3.fromRGB(99, 102, 241),  Color3.fromRGB(139, 92, 246))
+createMenuButton("Настройки",  "⚙️", 2, Color3.fromRGB(168, 85, 247),  Color3.fromRGB(219, 39, 119))
+createMenuButton("Инвентарь",  "🎒", 3, Color3.fromRGB(236, 72, 153),  Color3.fromRGB(244, 114, 182))
+createMenuButton("Магазин",    "🛒", 4, Color3.fromRGB(34, 197, 94),   Color3.fromRGB(16, 185, 129))
+createMenuButton("Друзья",     "💬", 5, Color3.fromRGB(59, 130, 246),  Color3.fromRGB(37, 99, 235))
+createMenuButton("Достижения", "🏆", 6, Color3.fromRGB(245, 158, 11),  Color3.fromRGB(234, 88, 12))
 
--- Обновление позиций ауры и крыльев каждый кадр
-RunService.Heartbeat:Connect(function()
-    if not Root or not Root.Parent then return end
-    if Config.AuraEnabled then
-        AuraRing.CFrame = Root.CFrame * CFrame.new(0, -2.5, 0) * CFrame.Angles(0, 0, math.rad(90))
-    end
-    if Config.WingsEnabled then
-        for _, w in ipairs(WingParts) do
-            w.Part.CFrame = Root.CFrame * w.BaseOffset
-        end
-    end
-end)
+-- ============================================
+-- 🎬 АНИМАЦИЯ ОТКРЫТИЯ
+-- ============================================
+local isOpen = false
 
--- ==========================================================
---  FOV CIRCLE
--- ==========================================================
-local FovCircle = Drawing.new("Circle")
-FovCircle.Thickness = 1
-FovCircle.NumSides = 60
-FovCircle.Radius = Config.FOV
-FovCircle.Filled = false
-FovCircle.Color = Color3.fromRGB(255, 255, 255)
-FovCircle.Transparency = 1
-FovCircle.Visible = false
+local function openMenu()
+	if isOpen then return end
+	isOpen = true
 
-RunService.RenderStepped:Connect(function()
-    FovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    FovCircle.Radius = Config.FOV
-    FovCircle.Visible = Config.AimbotEnabled
-end)
+	menuFrame.Visible = true
+	menuFrame.Size = UDim2.new(0, 400, 0, 450)
+	menuFrame.Position = UDim2.new(0.5, 0, 0.5, 30)
+	menuFrame.BackgroundTransparency = 1
 
--- ==========================================================
---  ESP ИГРОКОВ
--- ==========================================================
-local EspTable = {}   -- [Player] = {Box, Name, Hp}
+	-- Сбрасываем прозрачность кнопок
+	for _, btn in ipairs(menuButtons) do
+		btn.BackgroundTransparency = 1
+		btn.Size = UDim2.new(0.8, 0, 0, 0)
+	end
 
-local function GetEspDraw(player)
-    if not EspTable[player] then
-        EspTable[player] = {
-            Box = Drawing.new("Square"),
-            Name = Drawing.new("Text"),
-            Hp = Drawing.new("Text"),
-        }
-        EspTable[player].Box.Thickness = 1
-        EspTable[player].Box.Filled = false
-        EspTable[player].Box.Color = Config.EspColor
-        EspTable[player].Name.Size = 13
-        EspTable[player].Name.Center = true
-        EspTable[player].Name.Outline = true
-        EspTable[player].Name.Color = Color3.fromRGB(255, 255, 255)
-        EspTable[player].Hp.Size = 11
-        EspTable[player].Hp.Center = true
-        EspTable[player].Hp.Outline = true
-        EspTable[player].Hp.Color = Color3.fromRGB(0, 255, 100)
-    end
-    return EspTable[player]
+	-- Плавное появление меню
+	TweenService:Create(menuFrame, TWEEN_INFO_OPEN, {
+		Size = UDim2.new(0, 480, 0, 540),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		BackgroundTransparency = 0.15
+	}):Play()
+
+	-- Blur
+	TweenService:Create(blurEffect, TWEEN_INFO_SMOOTH, {Size = 20}):Play()
+
+	-- Затемнение
+	TweenService:Create(overlay, TWEEN_INFO_SMOOTH, {BackgroundTransparency = 0.5}):Play()
+
+	-- Stagger анимация кнопок (появляются по очереди)
+	for i, btn in ipairs(menuButtons) do
+		task.delay(0.15 + (i - 1) * 0.07, function()
+			TweenService:Create(btn, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+				BackgroundTransparency = 0.3,
+				Size = UDim2.new(1, 0, 0, 60)
+			}):Play()
+		end)
+	end
 end
 
-RunService.RenderStepped:Connect(function()
-    for _, player in pairs(Players:GetPlayers()) do
-        local draw = EspTable[player]
-        if player ~= LocalPlayer and Config.EspPlayers then
-            local char = player.Character
-            if char then
-                local hrp = char:FindFirstChild("HumanoidRootPart")
-                local head = char:FindFirstChild("Head")
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                if hrp and head and hum then
-                    local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                    if onScreen then
-                        draw = GetEspDraw(player)
-                        local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
-                        local scale = 1200 / dist
-                        local boxSize = Vector2.new(scale * 1.5, scale * 2.5)
+-- ============================================
+-- 🎬 АНИМАЦИЯ ЗАКРЫТИЯ
+-- ============================================
+local function closeMenu()
+	if not isOpen then return end
+	isOpen = false
 
-                        draw.Box.Size = boxSize
-                        draw.Box.Position = Vector2.new(pos.X - boxSize.X / 2, pos.Y - boxSize.Y / 2)
-                        draw.Box.Color = Config.EspColor
-                        draw.Box.Visible = true
+	-- Обратный stagger кнопок
+	for i = #menuButtons, 1, -1 do
+		local btn = menuButtons[i]
+		task.delay((#menuButtons - i) * 0.04, function()
+			TweenService:Create(btn, TWEEN_INFO_FAST, {
+				BackgroundTransparency = 1,
+				Size = UDim2.new(0.8, 0, 0, 0)
+			}):Play()
+		end)
+	end
 
-                        draw.Name.Text = player.Name
-                        draw.Name.Position = Vector2.new(pos.X, pos.Y - boxSize.Y / 2 - 20)
-                        draw.Name.Visible = true
+	-- Закрытие меню
+	TweenService:Create(menuFrame, TWEEN_INFO_FAST, {
+		Size = UDim2.new(0, 400, 0, 450),
+		Position = UDim2.new(0.5, 0, 0.5, 30),
+		BackgroundTransparency = 1
+	}):Play()
 
-                        draw.Hp.Text = math.floor(hum.Health) .. " HP"
-                        draw.Hp.Position = Vector2.new(pos.X, pos.Y + boxSize.Y / 2 + 3)
-                        draw.Hp.Visible = true
-                    else
-                        if draw then
-                            draw.Box.Visible = false
-                            draw.Name.Visible = false
-                            draw.Hp.Visible = false
-                        end
-                    end
-                end
-            else
-                if draw then
-                    draw.Box.Visible = false
-                    draw.Name.Visible = false
-                    draw.Hp.Visible = false
-                end
-            end
-        else
-            if draw then
-                draw.Box.Visible = false
-                draw.Name.Visible = false
-                draw.Hp.Visible = false
-            end
-        end
-    end
-end)
+	TweenService:Create(blurEffect, TWEEN_INFO_FAST, {Size = 0}):Play()
+	TweenService:Create(overlay, TWEEN_INFO_FAST, {BackgroundTransparency = 1}):Play()
 
-Players.PlayerRemoving:Connect(function(p)
-    if EspTable[p] then
-        for _, d in pairs(EspTable[p]) do
-            if d.Remove then d:Remove() end
-        end
-        EspTable[p] = nil
-    end
-end)
-
--- ==========================================================
---  ESP CHARMS (объекты с "Charm" в имени по всей карте)
--- ==========================================================
-local CharmTable = {}   -- [Model] = {Box, Name}
-
-local function GetCharmDraw(model)
-    if not CharmTable[model] then
-        CharmTable[model] = {
-            Box = Drawing.new("Square"),
-            Name = Drawing.new("Text"),
-        }
-        CharmTable[model].Box.Thickness = 1
-        CharmTable[model].Box.Filled = false
-        CharmTable[model].Box.Color = Config.CharmColor
-        CharmTable[model].Name.Size = 12
-        CharmTable[model].Name.Center = true
-        CharmTable[model].Name.Outline = true
-        CharmTable[model].Name.Color = Config.CharmColor
-    end
-    return CharmTable[model]
+	task.delay(0.5, function()
+		menuFrame.Visible = false
+	end)
 end
 
-RunService.RenderStepped:Connect(function()
-    if not Config.EspCharms then
-        for m, d in pairs(CharmTable) do
-            d.Box.Visible = false
-            d.Name.Visible = false
-        end
-        return
-    end
+-- ============================================
+-- 🔘 ОБРАБОТЧИКИ СОБЫТИЙ
+-- ============================================
+openButton.MouseButton1Click:Connect(openMenu)
+closeButton.MouseButton1Click:Connect(closeMenu)
 
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if (obj:IsA("Model") or obj:IsA("BasePart"))
-            and obj.Name:lower():find("charm") then
-            local part = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or obj
-            if part then
-                local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                local draw = CharmTable[obj]
-                if onScreen then
-                    draw = GetCharmDraw(obj)
-                    local dist = (Camera.CFrame.Position - part.Position).Magnitude
-                    local scale = 1200 / dist
-                    local boxSize = Vector2.new(scale * 1.2, scale * 1.2)
-
-                    draw.Box.Size = boxSize
-                    draw.Box.Position = Vector2.new(pos.X - boxSize.X / 2, pos.Y - boxSize.Y / 2)
-                    draw.Box.Visible = true
-
-                    draw.Name.Text = obj.Name
-                    draw.Name.Position = Vector2.new(pos.X, pos.Y - boxSize.Y / 2 - 14)
-                    draw.Name.Visible = true
-                else
-                    if draw then
-                        draw.Box.Visible = false
-                        draw.Name.Visible = false
-                    end
-                end
-            end
-        end
-    end
+-- Закрытие по клику на оверлей
+overlay.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		closeMenu()
+	end
 end)
 
--- ==========================================================
---  AIMBOT (правильная плавность + выбор цели)
--- ==========================================================
-local function GetAlivePlayers()
-    local list = {}
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character then
-            local hum = p.Character:FindFirstChildOfClass("Humanoid")
-            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
-            if hum and hrp and hum.Health > 0 then
-                table.insert(list, { Player = p, Hum = hum, Root = hrp })
-            end
-        end
-    end
-    return list
-end
-
-local function PickTarget()
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    local best, bestScore = nil, nil
-
-    for _, info in ipairs(GetAlivePlayers()) do
-        local part = info.Player.Character:FindFirstChild(Config.TargetPart) or info.Player.Character:FindFirstChild("Head")
-        if part then
-            local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-            if onScreen then
-                local fovDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-                if fovDist <= Config.FOV then
-                    local score
-                    if Config.TargetMode == "FOV" then
-                        score = fovDist
-                    elseif Config.TargetMode == "LowestHP" then
-                        score = info.Hum.Health
-                    elseif Config.TargetMode == "HighestHP" then
-                        score = -info.Hum.Health
-                    elseif Config.TargetMode == "Distance" then
-                        score = (Camera.CFrame.Position - part.Position).Magnitude
-                    elseif Config.TargetMode == "Name" then
-                        score = info.Player.Name
-                    end
-                    if bestScore == nil then
-                        best, bestScore = { part = part, score = score }, score
-                    else
-                        if type(score) == "string" then
-                            if score < bestScore then best, bestScore = { part = part, score = score }, score end
-                        else
-                            if score < bestScore then best, bestScore = { part = part, score = score }, score end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return best and best.part
-end
-
--- Основной цикл аимбота
-RunService.RenderStepped:Connect(function(dt)
-    if not Config.AimbotEnabled then return end
-    local target = PickTarget()
-    if target then
-        local camPos = Camera.CFrame.Position
-        local targetCF = CFrame.lookAt(camPos, target.Position)
-        -- Smoothness: 0.01 -> alpha = 0.99 (мгновенно)
-        --             1.00 -> alpha = 0.01 (плавно, но не застревает)
-        local alpha = math.clamp(1 - Config.Smoothness, 0.01, 1)
-        -- Приведение к fps-независимости
-        local smoothAlpha = 1 - (1 - alpha) ^ (dt * 60)
-        Camera.CFrame = Camera.CFrame:Lerp(targetCF, smoothAlpha)
-    end
+-- Закрытие по клавише ESC или M
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.M then
+		if isOpen then closeMenu() else openMenu() end
+	end
 end)
 
--- ==========================================================
---  AUTO BLOCK / AUTO COUNTER (заготовка)
--- ==========================================================
-RunService.Heartbeat:Connect(function()
-    if Config.AutoBlock then
-        for _, info in ipairs(GetAlivePlayers()) do
-            local dist = (info.Root.Position - Root.Position).Magnitude
-            if dist < Config.AutoBlockDistance then
-                -- ВСТАВЬ СВОЙ RemoteEvent:
-                -- game:GetService("ReplicatedStorage").Remotes.Block:FireServer()
-                -- ИЛИ активируй инструмент:
-                -- local t = Character:FindFirstChildOfClass("Tool"); if t then t:Activate() end
-            end
-        end
-    end
-    if Config.AutoCounter then
-        -- ВСТАВЬ СВОЙ RemoteEvent контры
-    end
+-- ============================================
+-- ✨ АНИМАЦИЯ ПОЯВЛЕНИЯ КНОПКИ ПРИ СТАРТЕ
+-- ============================================
+task.spawn(function()
+	openButton.Size = UDim2.new(0, 0, 0, 0)
+	openButton.BackgroundTransparency = 1
+	task.wait(0.5)
+	TweenService:Create(openButton, TWEEN_INFO_BOUNCE, {
+		Size = UDim2.new(0, 70, 0, 70),
+		BackgroundTransparency = 0
+	}):Play()
 end)
 
--- ==========================================================
---  UI: ПЛАВАЮЩАЯ КНОПКА + ГЛАВНОЕ МЕНЮ
--- ==========================================================
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "JJSv2"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
--- ---------- Плавающая кнопка ----------
-local FloatBtn = Instance.new("TextButton")
-FloatBtn.Size = UDim2.new(0, 55, 0, 55)
-FloatBtn.Position = UDim2.new(0, 20, 0, 200)
-FloatBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-FloatBtn.Text = "⚡"
-FloatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-FloatBtn.Font = Enum.Font.GothamBold
-FloatBtn.TextSize = 26
-FloatBtn.Active = true
-FloatBtn.Draggable = true
-FloatBtn.Parent = ScreenGui
-Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(1, 0)
-
-local FloatStroke = Instance.new("UIStroke", FloatBtn)
-FloatStroke.Color = Color3.fromRGB(150, 0, 255)
-FloatStroke.Thickness = 2
-
--- ---------- Главное меню ----------
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 310, 0, 480)
-MainFrame.Position = UDim2.new(0.5, -155, 0.5, -240)
-MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
-MainFrame.BackgroundTransparency = 0.08
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Visible = false
-MainFrame.Parent = ScreenGui
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
-
-local MainStroke = Instance.new("UIStroke", MainFrame)
-MainStroke.Color = Color3.fromRGB(120, 0, 200)
-MainStroke.Thickness = 2
-
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 32)
-Title.BackgroundTransparency = 1
-Title.Text = "⚡ JJS ULTIMATE v2 ⚡"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 15
-Title.Parent = MainFrame
-
--- Закрыть
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 26, 0, 26)
-CloseBtn.Position = UDim2.new(1, -32, 0, 4)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
-CloseBtn.Text = "×"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 18
-CloseBtn.Parent = MainFrame
-Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
-
-CloseBtn.MouseButton1Click:Connect(function()
-    MainFrame.Visible = false
-end)
-
-FloatBtn.MouseButton1Click:Connect(function()
-    MainFrame.Visible = not MainFrame.Visible
-end)
-
--- ---------- Вкладки ----------
-local TabBar = Instance.new("Frame")
-TabBar.Size = UDim2.new(1, -10, 0, 30)
-TabBar.Position = UDim2.new(0, 5, 0, 36)
-TabBar.BackgroundTransparency = 1
-TabBar.Parent = MainFrame
-
-local Tabs = {}
-local Pages = {}
-local tabNames = { "Aimbot", "Visuals", "ESP" }
-
-for i, name in ipairs(tabNames) do
-    local TabBtn = Instance.new("TextButton")
-    TabBtn.Size = UDim2.new(1/#tabNames, -4, 1, 0)
-    TabBtn.Position = UDim2.new((i-1)/#tabNames, 2, 0, 0)
-    TabBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-    TabBtn.Text = name
-    TabBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    TabBtn.Font = Enum.Font.GothamBold
-    TabBtn.TextSize = 11
-    TabBtn.Parent = TabBar
-    Instance.new("UICorner", TabBtn).CornerRadius = UDim.new(0, 6)
-    Tabs[name] = TabBtn
-
-    local Page = Instance.new("Frame")
-    Page.Size = UDim2.new(1, -10, 1, -75)
-    Page.Position = UDim2.new(0, 5, 0, 70)
-    Page.BackgroundTransparency = 1
-    Page.Visible = false
-    Page.Parent = MainFrame
-    Pages[name] = Page
-end
-
-Pages["Aimbot"].Visible = true
-
-for name, btn in pairs(Tabs) do
-    btn.MouseButton1Click:Connect(function()
-        for n, p in pairs(Pages) do p.Visible = false end
-        Pages[name].Visible = true
-        for n, b in pairs(Tabs) do
-            b.BackgroundColor3 = (n == name) and Color3.fromRGB(100, 30, 180) or Color3.fromRGB(40, 40, 55)
-        end
-    end)
-end
-
--- ==========================================================
---  УТИЛИТЫ UI: Кнопка, Заголовок, Слайдер, Выбор
--- ==========================================================
-local function CreateButton(parent, text, y, color, callback)
-    local B = Instance.new("TextButton")
-    B.Size = UDim2.new(1, -10, 0, 32)
-    B.Position = UDim2.new(0, 5, 0, y)
-    B.BackgroundColor3 = color or Color3.fromRGB(60, 60, 75)
-    B.Text = text
-    B.TextColor3 = Color3.fromRGB(255, 255, 255)
-    B.Font = Enum.Font.GothamBold
-    B.TextSize = 12
-    B.Parent = parent
-    Instance.new("UICorner", B).CornerRadius = UDim.new(0, 6)
-    B.MouseButton1Click:Connect(callback)
-    return B
-end
-
-local function CreateLabel(parent, text, y, size)
-    local L = Instance.new("TextLabel")
-    L.Size = UDim2.new(1, -10, 0, size or 18)
-    L.Position = UDim2.new(0, 5, 0, y)
-    L.BackgroundTransparency = 1
-    L.Text = text
-    L.TextColor3 = Color3.fromRGB(200, 200, 220)
-    L.Font = Enum.Font.Gotham
-    L.TextSize = 11
-    L.TextXAlignment = Enum.TextXAlignment.Left
-    L.Parent = parent
-    return L
-end
-
--- ---------- Слайдер под палец ----------
-local function CreateSlider(parent, text, y, min, max, default, isFloat, callback)
-    local Container = Instance.new("Frame")
-    Container.Size = UDim2.new(1, -10, 0, 40)
-    Container.Position = UDim2.new(0, 5, 0, y)
-    Container.BackgroundTransparency = 1
-    Container.Parent = parent
-
-    local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, 0, 0, 16)
-    Label.BackgroundTransparency = 1
-    Label.Text = text .. ": " .. tostring(default)
-    Label.TextColor3 = Color3.fromRGB(200, 200, 220)
-    Label.Font = Enum.Font.Gotham
-    Label.TextSize = 11
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.Parent = Container
-
-    local Track = Instance.new("Frame")
-    Track.Size = UDim2.new(1, -10, 0, 8)
-    Track.Position = UDim2.new(0, 5, 0, 24)
-    Track.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
-    Track.BorderSizePixel = 0
-    Track.Parent = Container
-    Instance.new("UICorner", Track).CornerRadius = UDim.new(1, 0)
-
-    local Fill = Instance.new("Frame")
-    Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    Fill.BackgroundColor3 = Color3.fromRGB(130, 30, 220)
-    Fill.BorderSizePixel = 0
-    Fill.Parent = Track
-    Instance.new("UICorner", Fill).CornerRadius = UDim.new(1, 0)
-
-    local Knob = Instance.new("Frame")
-    Knob.Size = UDim2.new(0, 18, 0, 18)
-    Knob.Position = UDim2.new((default - min) / (max - min), -9, 0.5, -9)
-    Knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    Knob.BorderSizePixel = 0
-    Knob.Parent = Track
-    Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
-
-    local function Update(inputX)
-        local rel = math.clamp((inputX - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
-        local val = min + (max - min) * rel
-        if not isFloat then val = math.floor(val + 0.5) end
-        Fill.Size = UDim2.new(rel, 0, 1, 0)
-        Knob.Position = UDim2.new(rel, -9, 0.5, -9)
-        Label.Text = text .. ": " .. (isFloat and string.format("%.2f", val) or tostring(val))
-        callback(val)
-    end
-
-    local dragging = false
-    Track.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            Update(input.Position.X)
-        end
-    end)
-    Track.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
-            Update(input.Position.X)
-        end
-    end)
-    Track.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end)
-
-    return { Update = Update, Container = Container }
-end
-
--- ---------- Выбор режима цели ----------
-local function CreateSelector(parent, text, y, options, default, callback)
-    local L = CreateLabel(parent, text, y, 16)
-    local current = default
-
-    local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(1, -10, 0, 30)
-    Btn.Position = UDim2.new(0, 5, 0, y + 18)
-    Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-    Btn.Text = "▶ " .. current
-    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Btn.Font = Enum.Font.Gotham
-    Btn.TextSize = 12
-    Btn.Parent = parent
-    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
-
-    Btn.MouseButton1Click:Connect(function()
-        local idx = 1
-        for i, v in ipairs(options) do if v == current then idx = i break end end
-        idx = idx + 1
-        if idx > #options then idx = 1 end
-        current = options[idx]
-        Btn.Text = "▶ " .. current
-        callback(current)
-    end)
-    return Btn
-end
-
--- ==========================================================
---  СТРАНИЦА AIMBOT
--- ==========================================================
-local AimbotPage = Pages["Aimbot"]
-local y = 0
-
-local AimBtn = CreateButton(AimbotPage, "Aimbot: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function()
-    Config.AimbotEnabled = not Config.AimbotEnabled
-    AimBtn.Text = "Aimbot: " .. (Config.AimbotEnabled and "ВКЛ" or "ВЫКЛ")
-    AimBtn.BackgroundColor3 = Config.AimbotEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
-end)
-y = y + 38
-
-CreateSlider(AimbotPage, "FOV", y, 10, 600, Config.FOV, false, function(v)
-    Config.FOV = v
-end)
-y = y + 45
-
-CreateSlider(AimbotPage, "Плавность", y, 0.01, 1.0, Config.Smoothness, true, function(v)
-    Config.Smoothness = v
-end)
-y = y + 45
-
-CreateSelector(AimbotPage, "Режим выбора цели", y,
-    {"FOV", "LowestHP", "HighestHP", "Distance", "Name"},
-    Config.TargetMode,
-    function(v) Config.TargetMode = v end)
-y = y + 55
-
-CreateSelector(AimbotPage, "Часть тела", y,
-    {"Head", "HumanoidRootPart", "UpperTorso"},
-    Config.TargetPart,
-    function(v) Config.TargetPart = v end)
-
--- ==========================================================
---  СТРАНИЦА VISUALS
--- ==========================================================
-local VisPage = Pages["Visuals"]
-y = 0
-
-local AuraBtn = CreateButton(VisPage, "Аура: ВКЛ", y, Color3.fromRGB(0, 130, 0), function()
-    Config.AuraEnabled = not Config.AuraEnabled
-    AuraBtn.Text = "Аура: " .. (Config.AuraEnabled and "ВКЛ" or "ВЫКЛ")
-    AuraBtn.BackgroundColor3 = Config.AuraEnabled and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)
-    AuraRing.Transparency = Config.AuraEnabled and 0.3 or 1
-    AuraParticles.Enabled = Config.AuraEnabled
-end)
-y = y + 38
-
-local WingBtn = CreateButton(VisPage, "Крылья: ВКЛ", y, Color3.fromRGB(0, 130, 0), function()
-    Config.WingsEnabled = not Config.WingsEnabled
-    WingBtn.Text = "Крылья: " .. (Config.WingsEnabled and "ВКЛ" or "ВЫКЛ")
-    WingBtn.BackgroundColor3 = Config.WingsEnabled and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)
-    for _, w in ipairs(WingParts) do
-        w.Part.Transparency = Config.WingsEnabled and Config.WingsTransparency or 1
-    end
-    for _, b in ipairs(WingBeams) do
-        b.Transparency = NumberSequence.new(Config.WingsEnabled and Config.WingsTransparency or 1)
-    end
-end)
-y = y + 45
-
-CreateSlider(VisPage, "Размер ауры", y, 2, 15, Config.AuraSize, false, function(v)
-    Config.AuraSize = v
-    AuraRing.Size = Vector3.new(0.15, v, v)
-end)
-y = y + 45
-
-CreateSlider(VisPage, "Частиц ауры", y, 0, 100, Config.AuraRate, false, function(v)
-    Config.AuraRate = v
-    AuraParticles.Rate = v
-end)
-y = y + 45
-
-CreateSlider(VisPage, "Чёткость крыльев", y, 0, 1.0, Config.WingsTransparency, true, function(v)
-    Config.WingsTransparency = v
-    for _, w in ipairs(WingParts) do
-        if Config.WingsEnabled then w.Part.Transparency = v end
-    end
-    for _, b in ipairs(WingBeams) do
-        if Config.WingsEnabled then b.Transparency = NumberSequence.new(v) end
-    end
-end)
-y = y + 50
-
-CreateLabel(VisPage, "Цвет ауры и крыльев (RGB)", y)
-y = y + 20
-
--- Палитра: 3 горизонтальных слайдера-«ползунка» R/G/B через CreateSlider
-CreateSlider(VisPage, "R", y, 0, 255, math.floor(Config.AuraColor.R * 255), false, function(v)
-    Config.AuraColor = Color3.fromRGB(v, Config.AuraColor.G * 255, Config.AuraColor.B * 255)
-    Config.WingsColor = Color3.fromRGB(v * 0.6, Config.AuraColor.G * 255 * 0.6, Config.AuraColor.B * 255 * 0.6)
-    AuraRing.Color = Config.AuraColor
-    AuraParticles.Color = ColorSequence.new(Config.AuraColor)
-    for _, w in ipairs(WingParts) do w.Part.Color = Config.WingsColor end
-    for _, b in ipairs(WingBeams) do b.Color = ColorSequence.new(Config.WingsColor) end
-end)
-y = y + 42
-
-CreateSlider(VisPage, "G", y, 0, 255, math.floor(Config.AuraColor.G * 255), false, function(v)
-    Config.AuraColor = Color3.fromRGB(Config.AuraColor.R * 255, v, Config.AuraColor.B * 255)
-    Config.WingsColor = Color3.fromRGB(Config.AuraColor.R * 255 * 0.6, v * 0.6, Config.AuraColor.B * 255 * 0.6)
-    AuraRing.Color = Config.AuraColor
-    AuraParticles.Color = ColorSequence.new(Config.AuraColor)
-    for _, w in ipairs(WingParts) do w.Part.Color = Config.WingsColor end
-    for _, b in ipairs(WingBeams) do b.Color = ColorSequence.new(Config.WingsColor) end
-end)
-y = y + 42
-
-CreateSlider(VisPage, "B", y, 0, 255, math.floor(Config.AuraColor.B * 255), false, function(v)
-    Config.AuraColor = Color3.fromRGB(Config.AuraColor.R * 255, Config.AuraColor.G * 255, v)
-    Config.WingsColor = Color3.fromRGB(Config.AuraColor.R * 255 * 0.6, Config.AuraColor.G * 255 * 0.6, v * 0.6)
-    AuraRing.Color = Config.AuraColor
-    AuraParticles.Color = ColorSequence.new(Config.AuraColor)
-    for _, w in ipairs(WingParts) do w.Part.Color = Config.WingsColor end
-    for _, b in ipairs(WingBeams) do b.Color = ColorSequence.new(Config.WingsColor) end
-end)
-
--- ==========================================================
---  СТРАНИЦА ESP
--- ==========================================================
-local EspPage = Pages["ESP"]
-y = 0
-
-local EspPBtn = CreateButton(EspPage, "ESP Игроков: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function()
-    Config.EspPlayers = not Config.EspPlayers
-    EspPBtn.Text = "ESP Игроков: " .. (Config.EspPlayers and "ВКЛ" or "ВЫКЛ")
-    EspPBtn.BackgroundColor3 = Config.EspPlayers and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
-end)
-y = y + 38
-
-local EspCBtn = CreateButton(EspPage, "ESP Charms: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function()
-    Config.EspCharms = not Config.EspCharms
-    EspCBtn.Text = "ESP Charms: " .. (Config.EspCharms and "ВКЛ" or "ВЫКЛ")
-    EspCBtn.BackgroundColor3 = Config.EspCharms and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
-end)
-y = y + 45
-
-CreateSlider(EspPage, "R игроков", y, 0, 255, Config.EspColor.R * 255, false, function(v)
-    Config.EspColor = Color3.fromRGB(v, Config.EspColor.G * 255, Config.EspColor.B * 255)
-end)
-y = y + 42
-CreateSlider(EspPage, "G игроков", y, 0, 255, Config.EspColor.G * 255, false, function(v)
-    Config.EspColor = Color3.fromRGB(Config.EspColor.R * 255, v, Config.EspColor.B * 255)
-end)
-y = y + 42
-CreateSlider(EspPage, "B игроков", y, 0, 255, Config.EspColor.B * 255, false, function(v)
-    Config.EspColor = Color3.fromRGB(Config.EspColor.R * 255, Config.EspColor.G * 255, v)
-end)
-y = y + 50
-
-CreateSlider(EspPage, "R charms", y, 0, 255, Config.CharmColor.R * 255, false, function(v)
-    Config.CharmColor = Color3.fromRGB(v, Config.CharmColor.G * 255, Config.CharmColor.B * 255)
-end)
-y = y + 42
-CreateSlider(EspPage, "G charms", y, 0, 255, Config.CharmColor.G * 255, false, function(v)
-    Config.CharmColor = Color3.fromRGB(Config.CharmColor.R * 255, v, Config.CharmColor.B * 255)
-end)
-y = y + 42
-CreateSlider(EspPage, "B charms", y, 0, 255, Config.CharmColor.B * 255, false, function(v)
-    Config.CharmColor = Color3.fromRGB(Config.CharmColor.R * 255, Config.CharmColor.G * 255, v)
-end)
-
--- ==========================================================
---  КОНЕЦ
--- ==========================================================
-print("[JJS Ultimate v2] Загружено! Кнопка ⚡ слева открывает меню.")
+print("✅ Красивое GUI меню загружено! Нажми на кнопку слева или клавишу M")
