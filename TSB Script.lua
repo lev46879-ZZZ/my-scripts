@@ -1,10 +1,9 @@
 -- ============================================
--- 💜 ПУРПУРНОЕ GUI МЕНЮ С ДОЖДЁМ
+-- 💜 ПУРПУРНОЕ GUI МЕНЮ С ДОЖДЁМ (ИСПРАВЛЕНО)
 -- ============================================
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -33,7 +32,7 @@ screenGui.IgnoreGuiInset = true
 screenGui.Parent = playerGui
 
 -- ============================================
--- 🌧️ СИСТЕМА ДОЖДЯ
+-- 🌧️ СИСТЕМА ДОЖДЯ (ФОНОВЫЙ ЭФФЕКТ)
 -- ============================================
 local rainContainer = Instance.new("Frame")
 rainContainer.Name = "RainContainer"
@@ -41,6 +40,7 @@ rainContainer.Size = UDim2.new(1, 0, 1, 0)
 rainContainer.BackgroundTransparency = 1
 rainContainer.ClipsDescendants = true
 rainContainer.ZIndex = 1
+rainContainer.Active = false -- ❗ ВАЖНО: не блокирует клики!
 rainContainer.Parent = screenGui
 
 local rainDrops = {}
@@ -56,11 +56,20 @@ for i = 1, RAIN_COUNT do
 	drop.BorderSizePixel = 0
 	drop.Rotation = math.random(-5, 5)
 	drop.ZIndex = 2
+	drop.Active = false -- ❗ Не блокирует клики
 	
 	local corner = Instance.new("UICorner", drop)
 	corner.CornerRadius = UDim.new(1, 0)
 	
 	drop.Parent = rainContainer
+	
+	-- Случайная начальная позиция
+	drop.Position = UDim2.new(
+		math.random(0, 100) / 100,
+		0,
+		math.random(-100, 100) / 100,
+		0
+	)
 	
 	table.insert(rainDrops, {
 		frame = drop,
@@ -103,7 +112,7 @@ task.spawn(function()
 end)
 
 -- ============================================
--- 🎯 КНОПКА ОТКРЫТИЯ/ЗАКРЫТИЯ МЕНЮ
+-- 🎯 КНОПКА ОТКРЫТИЯ/ЗАКРЫТИЯ МЕНЮ (ПЛАВАЮЩАЯ)
 -- ============================================
 local toggleButton = Instance.new("TextButton")
 toggleButton.Name = "ToggleButton"
@@ -114,6 +123,7 @@ toggleButton.BackgroundColor3 = PURPLE_DARK
 toggleButton.BorderSizePixel = 0
 toggleButton.Text = ""
 toggleButton.AutoButtonColor = false
+toggleButton.ZIndex = 100 -- ❗ ВЫШЕ дождя!
 toggleButton.Parent = screenGui
 
 local toggleCorner = Instance.new("UICorner", toggleButton)
@@ -123,6 +133,7 @@ local toggleStroke = Instance.new("UIStroke", toggleButton)
 toggleStroke.Thickness = 2
 toggleStroke.Color = PURPLE_MAIN
 toggleStroke.Transparency = 0.3
+toggleStroke.ZIndex = 101
 
 local toggleGradient = Instance.new("UIGradient", toggleButton)
 toggleGradient.Color = ColorSequence.new({
@@ -138,6 +149,8 @@ toggleIcon.Text = "☰"
 toggleIcon.TextSize = 34
 toggleIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleIcon.Font = Enum.Font.GothamBold
+toggleIcon.ZIndex = 102
+toggleIcon.Active = false -- ❗ Не блокирует клики родителя
 
 -- Тень под кнопкой
 local toggleShadow = Instance.new("ImageLabel", toggleButton)
@@ -149,7 +162,8 @@ toggleShadow.BackgroundTransparency = 1
 toggleShadow.Image = "rbxassetid://5554236805"
 toggleShadow.ImageColor3 = PURPLE_MAIN
 toggleShadow.ImageTransparency = 0.5
-toggleShadow.ZIndex = -1
+toggleShadow.ZIndex = 99
+toggleShadow.Active = false
 
 -- Пульсация кнопки
 task.spawn(function()
@@ -190,22 +204,22 @@ overlay.Size = UDim2.new(1, 0, 1, 0)
 overlay.BackgroundColor3 = PURPLE_DARK
 overlay.BackgroundTransparency = 1
 overlay.BorderSizePixel = 0
-overlay.ZIndex = 5
+overlay.ZIndex = 50
 overlay.Parent = screenGui
 
 -- ============================================
--- 📦 ГЛАВНОЕ МЕНЮ (ШИРЕ, МЕНЬШЕ ВЫСОТА)
+-- 📦 ГЛАВНОЕ МЕНЮ
 -- ============================================
 local menuFrame = Instance.new("Frame")
 menuFrame.Name = "MenuFrame"
-menuFrame.Size = UDim2.new(0, 540, 0, 480)  -- Шире (540), меньше высота (480)
+menuFrame.Size = UDim2.new(0, 540, 0, 480)
 menuFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 menuFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 menuFrame.BackgroundColor3 = PURPLE_DARK
 menuFrame.BackgroundTransparency = 0.15
 menuFrame.BorderSizePixel = 0
 menuFrame.Visible = false
-menuFrame.ZIndex = 10
+menuFrame.ZIndex = 60
 menuFrame.Parent = screenGui
 
 local menuCorner = Instance.new("UICorner", menuFrame)
@@ -215,6 +229,7 @@ local menuStroke = Instance.new("UIStroke", menuFrame)
 menuStroke.Thickness = 1.5
 menuStroke.Color = PURPLE_MAIN
 menuStroke.Transparency = 0.5
+menuStroke.ZIndex = 61
 
 -- Градиентная рамка
 local menuGradient = Instance.new("UIGradient", menuStroke)
@@ -234,7 +249,8 @@ menuShadow.BackgroundTransparency = 1
 menuShadow.Image = "rbxassetid://5554236805"
 menuShadow.ImageColor3 = PURPLE_MAIN
 menuShadow.ImageTransparency = 0.4
-menuShadow.ZIndex = -1
+menuShadow.ZIndex = 59
+menuShadow.Active = false
 
 -- ============================================
 -- 🎨 ШАПКА МЕНЮ
@@ -244,7 +260,7 @@ header.Name = "Header"
 header.Size = UDim2.new(1, 0, 0, 90)
 header.BackgroundColor3 = PURPLE_DARK
 header.BorderSizePixel = 0
-header.ZIndex = 11
+header.ZIndex = 61
 
 local headerCorner = Instance.new("UICorner", header)
 headerCorner.CornerRadius = UDim.new(0, 24)
@@ -267,7 +283,8 @@ title.TextSize = 28
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
-title.ZIndex = 12
+title.ZIndex = 62
+title.Active = false
 
 -- Подзаголовок
 local subtitle = Instance.new("TextLabel", header)
@@ -279,7 +296,8 @@ subtitle.TextSize = 14
 subtitle.TextColor3 = PURPLE_LIGHT
 subtitle.Font = Enum.Font.Gotham
 subtitle.TextXAlignment = Enum.TextXAlignment.Left
-subtitle.ZIndex = 12
+subtitle.ZIndex = 62
+subtitle.Active = false
 
 -- ============================================
 -- 📋 КОНТЕНТ МЕНЮ
@@ -294,7 +312,7 @@ content.ScrollBarThickness = 4
 content.ScrollBarImageColor3 = PURPLE_MAIN
 content.CanvasSize = UDim2.new(0, 0, 0, 0)
 content.AutomaticCanvasSize = Enum.AutomaticSize.Y
-content.ZIndex = 11
+content.ZIndex = 61
 
 local listLayout = Instance.new("UIListLayout", content)
 listLayout.Padding = UDim.new(0, 12)
@@ -312,7 +330,7 @@ local function createMenuButton(text, icon, order, color1, color2)
 	btn.Text = ""
 	btn.AutoButtonColor = false
 	btn.LayoutOrder = order
-	btn.ZIndex = 11
+	btn.ZIndex = 62
 	btn.Parent = content
 
 	local corner = Instance.new("UICorner", btn)
@@ -322,6 +340,7 @@ local function createMenuButton(text, icon, order, color1, color2)
 	stroke.Thickness = 1.5
 	stroke.Color = color1
 	stroke.Transparency = 0.7
+	stroke.ZIndex = 63
 
 	local gradient = Instance.new("UIGradient", btn)
 	gradient.Color = ColorSequence.new({
@@ -342,7 +361,8 @@ local function createMenuButton(text, icon, order, color1, color2)
 	iconLabel.TextSize = 26
 	iconLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 	iconLabel.Font = Enum.Font.GothamBold
-	iconLabel.ZIndex = 12
+	iconLabel.ZIndex = 63
+	iconLabel.Active = false
 
 	-- Текст
 	local textLabel = Instance.new("TextLabel", btn)
@@ -354,7 +374,8 @@ local function createMenuButton(text, icon, order, color1, color2)
 	textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 	textLabel.Font = Enum.Font.GothamSemibold
 	textLabel.TextXAlignment = Enum.TextXAlignment.Left
-	textLabel.ZIndex = 12
+	textLabel.ZIndex = 63
+	textLabel.Active = false
 
 	-- Стрелка справа
 	local arrow = Instance.new("TextLabel", btn)
@@ -365,7 +386,8 @@ local function createMenuButton(text, icon, order, color1, color2)
 	arrow.TextSize = 28
 	arrow.TextColor3 = PURPLE_LIGHT
 	arrow.Font = Enum.Font.GothamBold
-	arrow.ZIndex = 12
+	arrow.ZIndex = 63
+	arrow.Active = false
 
 	-- Hover анимация
 	btn.MouseEnter:Connect(function()
@@ -400,11 +422,12 @@ createMenuButton("Друзья",     "💬", 5, Color3.fromRGB(80, 40, 120),   P
 createMenuButton("Достижения", "🏆", 6, Color3.fromRGB(120, 60, 180),  PURPLE_GLOW)
 
 -- ============================================
--- 🎬 TOGGLE ЛОГИКА (ОТКРЫТИЕ/ЗАКРЫТИЕ)
+-- 🎬 TOGGLE ЛОГИКА
 -- ============================================
 local isOpen = false
 
 local function toggleMenu()
+	print("🔄 Toggle вызван! isOpen:", isOpen)
 	if isOpen then
 		closeMenu()
 	else
@@ -415,6 +438,7 @@ end
 local function openMenu()
 	if isOpen then return end
 	isOpen = true
+	print("📂 Меню открывается!")
 
 	menuFrame.Visible = true
 	menuFrame.Size = UDim2.new(0, 460, 0, 400)
@@ -448,6 +472,7 @@ end
 local function closeMenu()
 	if not isOpen then return end
 	isOpen = false
+	print("📁 Меню закрывается!")
 
 	for i = #menuButtons, 1, -1 do
 		local btn = menuButtons[i]
@@ -476,7 +501,10 @@ end
 -- ============================================
 -- 🔘 ОБРАБОТЧИКИ СОБЫТИЙ
 -- ============================================
-toggleButton.MouseButton1Click:Connect(toggleMenu)
+toggleButton.MouseButton1Click:Connect(function()
+	print("🖱️ Кнопка нажата!")
+	toggleMenu()
+end)
 
 overlay.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -504,4 +532,5 @@ task.spawn(function()
 	}):Play()
 end)
 
-print("💜 Пурпурное меню с дождём загружено! Нажми на кнопку слева или клавишу M")
+print("💜 Пурпурное меню с дождём загружено!")
+print("📍 Кнопка слева | 🖱️ Клик для открытия | ⌨️ M или ESC")
