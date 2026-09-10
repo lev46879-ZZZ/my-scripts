@@ -1,7 +1,6 @@
 -- ==========================================================
---  JJS ULTIMATE v3.1 (Battle Grounds Edition)
+--  JJS ULTIMATE v3.2 (ИСПРАВЛЕНО ПОЯВЛЕНИЕ МЕНЮ)
 --  Aimbot (WallCheck) + AutoBlock + AutoCounter + Aura + Wings + ESP + Invis + NoCD
---  БЕЗ Silent Aim и Prediction (только кулаки и способности)
 -- ==========================================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -14,21 +13,18 @@ local Camera = workspace.CurrentCamera
 --  КОНФИГ
 -- ==========================================================
 local Config = {
-    -- Aimbot
     AimbotEnabled = false,
     FOV = 200,
     ShowFOV = true,
     Smoothness = 0.15,
-    TargetMode = "FOV",       -- FOV | LowestHP | HighestHP | Distance
+    TargetMode = "FOV",
     TargetPart = "Head",
     WallCheck = true,
     
-    -- Auto
     AutoBlock = false,
     AutoCounter = false,
     AutoBlockDistance = 15,
     
-    -- Визуалы
     AuraEnabled = true,
     WingsEnabled = true,
     AuraColor = Color3.fromRGB(150, 0, 255),
@@ -37,13 +33,11 @@ local Config = {
     AuraSize = 6,
     AuraRate = 35,
     
-    -- ESP
     EspPlayers = false,
     EspCharms = false,
     EspColor = Color3.fromRGB(255, 50, 50),
     CharmColor = Color3.fromRGB(255, 215, 0),
     
-    -- Misc
     Invisibility = false,
     NoCooldown = false,
 }
@@ -55,7 +49,7 @@ local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Root = Character:WaitForChild("HumanoidRootPart")
 
 -- ==========================================================
---  АУРА ДЗЮДО
+--  АУРА И КРЫЛЬЯ
 -- ==========================================================
 local AuraRing = Instance.new("Part")
 AuraRing.Shape = Enum.PartType.Cylinder
@@ -84,11 +78,7 @@ AuraParticles.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.5), Num
 AuraParticles.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1)})
 AuraParticles.LightEmission = 1
 AuraParticles.Rotation = NumberRange.new(0, 360)
-AuraParticles.VelocityInheritance = 0
 
--- ==========================================================
---  КРЫЛЬЯ ЧЁРНОЙ ЭНЕРГИИ
--- ==========================================================
 local WingParts = {}
 local WingBeams = {}
 
@@ -287,7 +277,7 @@ Players.PlayerRemoving:Connect(function(p)
 end)
 
 -- ==========================================================
---  ESP CHARMS (ФИКС ЛАГОВ: КЭШИРОВАНИЕ)
+--  ESP CHARMS (С КЭШИРОВАНИЕМ ДЛЯ ВЫСОКОГО FPS)
 -- ==========================================================
 local CharmTable = {}
 local CachedCharms = {}
@@ -342,7 +332,6 @@ local function GetCharmDraw(model)
 end
 
 RunService.RenderStepped:Connect(function()
-    -- Обновляем кэш раз в 1 секунду вместо каждого кадра (это убирает лаги до 20 FPS)
     if tick() - LastCharmUpdate > 1 then
         UpdateCharmCache()
         LastCharmUpdate = tick()
@@ -387,7 +376,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ==========================================================
---  AIMBOT С WALLCHECK (БЕЗ SILENT AIM И PREDICTION)
+--  AIMBOT С WALLCHECK
 -- ==========================================================
 local function GetAlivePlayers()
     local list = {}
@@ -433,7 +422,6 @@ local function PickTarget()
     for _, info in ipairs(GetAlivePlayers()) do
         local part = info.Player.Character:FindFirstChild(Config.TargetPart) or info.Player.Character:FindFirstChild("Head")
         if part then
-            -- Сначала проверяем видимость (WallCheck)
             if IsVisible(part) then
                 local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
                 if onScreen then
@@ -491,14 +479,14 @@ RunService.Heartbeat:Connect(function()
                 if tool then tool:Activate() end
             end
             if Config.AutoCounter then
-                -- Логика контры (если есть конкретный RemoteEvent, вставь его сюда)
+                -- Логика контры
             end
         end
     end
 end)
 
 -- ==========================================================
---  НЕВИДИМОСТЬ
+--  НЕВИДИМОСТЬ И NO COOLDOWN
 -- ==========================================================
 local function SetInvisibility(state)
     if not Character then return end
@@ -516,9 +504,6 @@ Character.DescendantAdded:Connect(function(desc)
     end
 end)
 
--- ==========================================================
---  NO COOLDOWN
--- ==========================================================
 local function ApplyNoCooldown()
     if not Character then return end
     for _, desc in ipairs(Character:GetDescendants()) do
@@ -549,15 +534,14 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==========================================================
---  UI v3.1: АНИМИРОВАННОЕ МЕНЮ С ВКЛАДКАМИ СЛЕВА
+--  UI v3.2: ИСПРАВЛЕННОЕ ПОЯВЛЕНИЕ МЕНЮ
 -- ==========================================================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "JJSv3.1"
+ScreenGui.Name = "JJSv3.2"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Плавающая кнопка
 local FloatBtn = Instance.new("TextButton")
 FloatBtn.Size = UDim2.new(0, 60, 0, 60)
 FloatBtn.Position = UDim2.new(0, 20, 0, 200)
@@ -574,7 +558,6 @@ local FloatStroke = Instance.new("UIStroke", FloatBtn)
 FloatStroke.Color = Color3.fromRGB(150, 0, 255)
 FloatStroke.Thickness = 2.5
 
--- Анимация пульсации кнопки
 task.spawn(function()
     while FloatBtn.Parent do
         local tweenIn = TweenService:Create(FloatStroke, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Thickness = 4})
@@ -593,7 +576,6 @@ FloatBtn.MouseLeave:Connect(function()
     TweenService:Create(FloatBtn, TweenInfo.new(0.2), {Size = UDim2.new(0, 60, 0, 60)}):Play()
 end)
 
--- Главное меню
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 360, 0, 480)
 MainFrame.Position = UDim2.new(0.5, -180, 0.5, -240)
@@ -613,7 +595,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -40, 0, 35)
 Title.Position = UDim2.new(0, 15, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "⚡ JJS ULTIMATE v3.1 ⚡"
+Title.Text = "⚡ JJS ULTIMATE v3.2 ⚡"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 16
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -638,21 +620,19 @@ CloseBtn.MouseLeave:Connect(function()
     TweenService:Create(CloseBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(200, 40, 60)}):Play()
 end)
 
-CloseBtn.MouseButton1Click:Connect(function()
-    local tween = TweenService:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-        Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1
-    })
-    tween:Play()
-    tween.Completed:Connect(function()
-        MainFrame.Visible = false
-        MainFrame.Size = UDim2.new(0, 360, 0, 480)
-        MainFrame.BackgroundTransparency = 0.05
-    end)
-end)
-
-FloatBtn.MouseButton1Click:Connect(function()
+-- ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ ОТКРЫТИЯ/ЗАКРЫТИЯ (без ошибок)
+local function ToggleMenu()
     if MainFrame.Visible then
-        CloseBtn:Fire()
+        local tween = TweenService:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+            Size = UDim2.new(0, 0, 0, 0), 
+            BackgroundTransparency = 1
+        })
+        tween:Play()
+        tween.Completed:Connect(function()
+            MainFrame.Visible = false
+            MainFrame.Size = UDim2.new(0, 360, 0, 480)
+            MainFrame.BackgroundTransparency = 0.05
+        end)
     else
         MainFrame.Visible = true
         MainFrame.Size = UDim2.new(0, 0, 0, 0)
@@ -661,7 +641,10 @@ FloatBtn.MouseButton1Click:Connect(function()
         })
         tween:Play()
     end
-end)
+end
+
+CloseBtn.MouseButton1Click:Connect(ToggleMenu)
+FloatBtn.MouseButton1Click:Connect(ToggleMenu)
 
 -- ВКЛАДКИ СЛЕВА
 local TabBar = Instance.new("Frame")
@@ -907,211 +890,124 @@ local function CreateSelector(parent, text, y, options, default, callback)
 end
 
 -- ==========================================================
---  СТРАНИЦА AIMBOT
+--  СТРАНИЦЫ МЕНЮ
 -- ==========================================================
 local AimbotPage = Pages["Aimbot"]
 local y = 10
-
-CreateSectionLabel(AimbotPage, "⚔ ОСНОВНЫЕ", y)
-y = y + 25
-
+CreateSectionLabel(AimbotPage, "⚔ ОСНОВНЫЕ", y); y = y + 25
 local AimBtn = CreateButton(AimbotPage, "Aimbot: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
     Config.AimbotEnabled = not Config.AimbotEnabled
     self.Text = "Aimbot: " .. (Config.AimbotEnabled and "ВКЛ ✓" or "ВЫКЛ")
     TweenService:Create(self, TweenInfo.new(0.2), {BackgroundColor3 = Config.AimbotEnabled and Color3.fromRGB(0, 160, 60) or Color3.fromRGB(140, 40, 40)}):Play()
-end)
-y = y + 40
-
+end); y = y + 40
 local WallBtn = CreateButton(AimbotPage, "WallCheck: ВКЛ", y, Color3.fromRGB(0, 130, 0), function(self)
     Config.WallCheck = not Config.WallCheck
     self.Text = "WallCheck: " .. (Config.WallCheck and "ВКЛ ✓" or "ВЫКЛ")
     TweenService:Create(self, TweenInfo.new(0.2), {BackgroundColor3 = Config.WallCheck and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)}):Play()
-end)
-y = y + 40
-
+end); y = y + 40
 local FovBtn = CreateButton(AimbotPage, "Показать FOV: ВКЛ", y, Color3.fromRGB(0, 130, 0), function(self)
     Config.ShowFOV = not Config.ShowFOV
     self.Text = "Показать FOV: " .. (Config.ShowFOV and "ВКЛ ✓" or "ВЫКЛ")
     TweenService:Create(self, TweenInfo.new(0.2), {BackgroundColor3 = Config.ShowFOV and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)}):Play()
-end)
-y = y + 45
-
-CreateSectionLabel(AimbotPage, "⚙ НАСТРОЙКИ", y)
-y = y + 25
-
-CreateSlider(AimbotPage, "FOV", y, 10, 800, Config.FOV, false, function(v) Config.FOV = v end)
-y = y + 50
-
-CreateSlider(AimbotPage, "Плавность", y, 0.01, 1.0, Config.Smoothness, true, function(v) Config.Smoothness = v end)
-y = y + 50
-
-CreateSelector(AimbotPage, "Режим цели", y, {"FOV", "LowestHP", "HighestHP", "Distance"}, Config.TargetMode, function(v) Config.TargetMode = v end)
-y = y + 55
-
+end); y = y + 45
+CreateSectionLabel(AimbotPage, "⚙ НАСТРОЙКИ", y); y = y + 25
+CreateSlider(AimbotPage, "FOV", y, 10, 800, Config.FOV, false, function(v) Config.FOV = v end); y = y + 50
+CreateSlider(AimbotPage, "Плавность", y, 0.01, 1.0, Config.Smoothness, true, function(v) Config.Smoothness = v end); y = y + 50
+CreateSelector(AimbotPage, "Режим цели", y, {"FOV", "LowestHP", "HighestHP", "Distance"}, Config.TargetMode, function(v) Config.TargetMode = v end); y = y + 55
 CreateSelector(AimbotPage, "Часть тела", y, {"Head", "HumanoidRootPart", "UpperTorso"}, Config.TargetPart, function(v) Config.TargetPart = v end)
 
--- ==========================================================
---  СТРАНИЦА VISUALS
--- ==========================================================
-local VisPage = Pages["Visuals"]
-y = 10
-
-CreateSectionLabel(VisPage, "✨ АУРА И КРЫЛЬЯ", y)
-y = y + 25
-
+local VisPage = Pages["Visuals"]; y = 10
+CreateSectionLabel(VisPage, "✨ АУРА И КРЫЛЬЯ", y); y = y + 25
 local AuraBtn = CreateButton(VisPage, "Аура: ВКЛ", y, Color3.fromRGB(0, 130, 0), function(self)
     Config.AuraEnabled = not Config.AuraEnabled
     self.Text = "Аура: " .. (Config.AuraEnabled and "ВКЛ ✓" or "ВЫКЛ")
     TweenService:Create(self, TweenInfo.new(0.2), {BackgroundColor3 = Config.AuraEnabled and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)}):Play()
     AuraRing.Transparency = Config.AuraEnabled and 0.3 or 1
     AuraParticles.Enabled = Config.AuraEnabled
-end)
-y = y + 40
-
+end); y = y + 40
 local WingBtn = CreateButton(VisPage, "Крылья: ВКЛ", y, Color3.fromRGB(0, 130, 0), function(self)
     Config.WingsEnabled = not Config.WingsEnabled
     self.Text = "Крылья: " .. (Config.WingsEnabled and "ВКЛ ✓" or "ВЫКЛ")
     TweenService:Create(self, TweenInfo.new(0.2), {BackgroundColor3 = Config.WingsEnabled and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)}):Play()
     for _, w in ipairs(WingParts) do w.Part.Transparency = Config.WingsEnabled and Config.WingsTransparency or 1 end
     for _, b in ipairs(WingBeams) do b.Transparency = NumberSequence.new(Config.WingsEnabled and Config.WingsTransparency or 1) end
-end)
-y = y + 45
-
-CreateSectionLabel(VisPage, "⚙ ПАРАМЕТРЫ", y)
-y = y + 25
-
-CreateSlider(VisPage, "Размер ауры", y, 2, 15, Config.AuraSize, false, function(v) Config.AuraSize = v; AuraRing.Size = Vector3.new(0.15, v, v) end)
-y = y + 50
-
-CreateSlider(VisPage, "Частиц ауры", y, 0, 100, Config.AuraRate, false, function(v) Config.AuraRate = v; AuraParticles.Rate = v end)
-y = y + 50
-
+end); y = y + 45
+CreateSectionLabel(VisPage, "⚙ ПАРАМЕТРЫ", y); y = y + 25
+CreateSlider(VisPage, "Размер ауры", y, 2, 15, Config.AuraSize, false, function(v) Config.AuraSize = v; AuraRing.Size = Vector3.new(0.15, v, v) end); y = y + 50
+CreateSlider(VisPage, "Частиц ауры", y, 0, 100, Config.AuraRate, false, function(v) Config.AuraRate = v; AuraParticles.Rate = v end); y = y + 50
 CreateSlider(VisPage, "Чёткость крыльев", y, 0, 1.0, Config.WingsTransparency, true, function(v)
     Config.WingsTransparency = v
     for _, w in ipairs(WingParts) do if Config.WingsEnabled then w.Part.Transparency = v end end
     for _, b in ipairs(WingBeams) do if Config.WingsEnabled then b.Transparency = NumberSequence.new(v) end end
-end)
-y = y + 55
-
-CreateSectionLabel(VisPage, "🎨 ЦВЕТ", y)
-y = y + 25
-
+end); y = y + 55
+CreateSectionLabel(VisPage, "🎨 ЦВЕТ", y); y = y + 25
 CreateSlider(VisPage, "R", y, 0, 255, math.floor(Config.AuraColor.R * 255), false, function(v)
     Config.AuraColor = Color3.fromRGB(v, Config.AuraColor.G * 255, Config.AuraColor.B * 255)
     Config.WingsColor = Color3.fromRGB(v * 0.6, Config.AuraColor.G * 255 * 0.6, Config.AuraColor.B * 255 * 0.6)
-    AuraRing.Color = Config.AuraColor
-    AuraParticles.Color = ColorSequence.new(Config.AuraColor)
+    AuraRing.Color = Config.AuraColor; AuraParticles.Color = ColorSequence.new(Config.AuraColor)
     for _, w in ipairs(WingParts) do w.Part.Color = Config.WingsColor end
     for _, b in ipairs(WingBeams) do b.Color = ColorSequence.new(Config.WingsColor) end
-end)
-y = y + 47
-
+end); y = y + 47
 CreateSlider(VisPage, "G", y, 0, 255, math.floor(Config.AuraColor.G * 255), false, function(v)
     Config.AuraColor = Color3.fromRGB(Config.AuraColor.R * 255, v, Config.AuraColor.B * 255)
     Config.WingsColor = Color3.fromRGB(Config.AuraColor.R * 255 * 0.6, v * 0.6, Config.AuraColor.B * 255 * 0.6)
-    AuraRing.Color = Config.AuraColor
-    AuraParticles.Color = ColorSequence.new(Config.AuraColor)
+    AuraRing.Color = Config.AuraColor; AuraParticles.Color = ColorSequence.new(Config.AuraColor)
     for _, w in ipairs(WingParts) do w.Part.Color = Config.WingsColor end
     for _, b in ipairs(WingBeams) do b.Color = ColorSequence.new(Config.WingsColor) end
-end)
-y = y + 47
-
+end); y = y + 47
 CreateSlider(VisPage, "B", y, 0, 255, math.floor(Config.AuraColor.B * 255), false, function(v)
     Config.AuraColor = Color3.fromRGB(Config.AuraColor.R * 255, Config.AuraColor.G * 255, v)
     Config.WingsColor = Color3.fromRGB(Config.AuraColor.R * 255 * 0.6, Config.AuraColor.G * 255 * 0.6, v * 0.6)
-    AuraRing.Color = Config.AuraColor
-    AuraParticles.Color = ColorSequence.new(Config.AuraColor)
+    AuraRing.Color = Config.AuraColor; AuraParticles.Color = ColorSequence.new(Config.AuraColor)
     for _, w in ipairs(WingParts) do w.Part.Color = Config.WingsColor end
     for _, b in ipairs(WingBeams) do b.Color = ColorSequence.new(Config.WingsColor) end
 end)
 
--- ==========================================================
---  СТРАНИЦА ESP
--- ==========================================================
-local EspPage = Pages["ESP"]
-y = 10
-
-CreateSectionLabel(EspPage, "👁 ВИДЫ ESP", y)
-y = y + 25
-
+local EspPage = Pages["ESP"]; y = 10
+CreateSectionLabel(EspPage, "👁 ВИДЫ ESP", y); y = y + 25
 local EspPBtn = CreateButton(EspPage, "ESP Игроков: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
     Config.EspPlayers = not Config.EspPlayers
     self.Text = "ESP Игроков: " .. (Config.EspPlayers and "ВКЛ ✓" or "ВЫКЛ")
     TweenService:Create(self, TweenInfo.new(0.2), {BackgroundColor3 = Config.EspPlayers and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)}):Play()
-end)
-y = y + 40
-
+end); y = y + 40
 local EspCBtn = CreateButton(EspPage, "ESP Charms: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
     Config.EspCharms = not Config.EspCharms
     self.Text = "ESP Charms: " .. (Config.EspCharms and "ВКЛ ✓" or "ВЫКЛ")
     TweenService:Create(self, TweenInfo.new(0.2), {BackgroundColor3 = Config.EspCharms and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)}):Play()
-end)
-y = y + 45
-
-CreateSectionLabel(EspPage, "🎨 ЦВЕТ ИГРОКОВ", y)
-y = y + 25
-
-CreateSlider(EspPage, "R", y, 0, 255, Config.EspColor.R * 255, false, function(v) Config.EspColor = Color3.fromRGB(v, Config.EspColor.G * 255, Config.EspColor.B * 255) end)
-y = y + 47
-
-CreateSlider(EspPage, "G", y, 0, 255, Config.EspColor.G * 255, false, function(v) Config.EspColor = Color3.fromRGB(Config.EspColor.R * 255, v, Config.EspColor.B * 255) end)
-y = y + 47
-
-CreateSlider(EspPage, "B", y, 0, 255, Config.EspColor.B * 255, false, function(v) Config.EspColor = Color3.fromRGB(Config.EspColor.R * 255, Config.EspColor.G * 255, v) end)
-y = y + 55
-
-CreateSectionLabel(EspPage, "🎨 ЦВЕТ CHARMS", y)
-y = y + 25
-
-CreateSlider(EspPage, "R", y, 0, 255, Config.CharmColor.R * 255, false, function(v) Config.CharmColor = Color3.fromRGB(v, Config.CharmColor.G * 255, Config.CharmColor.B * 255) end)
-y = y + 47
-
-CreateSlider(EspPage, "G", y, 0, 255, Config.CharmColor.G * 255, false, function(v) Config.CharmColor = Color3.fromRGB(Config.CharmColor.R * 255, v, Config.CharmColor.B * 255) end)
-y = y + 47
-
+end); y = y + 45
+CreateSectionLabel(EspPage, "🎨 ЦВЕТ ИГРОКОВ", y); y = y + 25
+CreateSlider(EspPage, "R", y, 0, 255, Config.EspColor.R * 255, false, function(v) Config.EspColor = Color3.fromRGB(v, Config.EspColor.G * 255, Config.EspColor.B * 255) end); y = y + 47
+CreateSlider(EspPage, "G", y, 0, 255, Config.EspColor.G * 255, false, function(v) Config.EspColor = Color3.fromRGB(Config.EspColor.R * 255, v, Config.EspColor.B * 255) end); y = y + 47
+CreateSlider(EspPage, "B", y, 0, 255, Config.EspColor.B * 255, false, function(v) Config.EspColor = Color3.fromRGB(Config.EspColor.R * 255, Config.EspColor.G * 255, v) end); y = y + 55
+CreateSectionLabel(EspPage, "🎨 ЦВЕТ CHARMS", y); y = y + 25
+CreateSlider(EspPage, "R", y, 0, 255, Config.CharmColor.R * 255, false, function(v) Config.CharmColor = Color3.fromRGB(v, Config.CharmColor.G * 255, Config.CharmColor.B * 255) end); y = y + 47
+CreateSlider(EspPage, "G", y, 0, 255, Config.CharmColor.G * 255, false, function(v) Config.CharmColor = Color3.fromRGB(Config.CharmColor.R * 255, v, Config.CharmColor.B * 255) end); y = y + 47
 CreateSlider(EspPage, "B", y, 0, 255, Config.CharmColor.B * 255, false, function(v) Config.CharmColor = Color3.fromRGB(Config.CharmColor.R * 255, Config.CharmColor.G * 255, v) end)
 
--- ==========================================================
---  СТРАНИЦА MISC
--- ==========================================================
-local MiscPage = Pages["Misc"]
-y = 10
-
-CreateSectionLabel(MiscPage, "⚙ AUTO", y)
-y = y + 25
-
+local MiscPage = Pages["Misc"]; y = 10
+CreateSectionLabel(MiscPage, "⚙ AUTO", y); y = y + 25
 local BlockBtn = CreateButton(MiscPage, "Auto Block: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
     Config.AutoBlock = not Config.AutoBlock
     self.Text = "Auto Block: " .. (Config.AutoBlock and "ВКЛ ✓" or "ВЫКЛ")
     TweenService:Create(self, TweenInfo.new(0.2), {BackgroundColor3 = Config.AutoBlock and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)}):Play()
-end)
-y = y + 40
-
+end); y = y + 40
 local CounterBtn = CreateButton(MiscPage, "Auto Counter: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
     Config.AutoCounter = not Config.AutoCounter
     self.Text = "Auto Counter: " .. (Config.AutoCounter and "ВКЛ ✓" or "ВЫКЛ")
     TweenService:Create(self, TweenInfo.new(0.2), {BackgroundColor3 = Config.AutoCounter and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)}):Play()
-end)
-y = y + 40
-
-CreateSlider(MiscPage, "Дистанция блока", y, 5, 50, Config.AutoBlockDistance, false, function(v) Config.AutoBlockDistance = v end)
-y = y + 55
-
-CreateSectionLabel(MiscPage, "👻 СПЕЦИАЛЬНЫЕ", y)
-y = y + 25
-
+end); y = y + 40
+CreateSlider(MiscPage, "Дистанция блока", y, 5, 50, Config.AutoBlockDistance, false, function(v) Config.AutoBlockDistance = v end); y = y + 55
+CreateSectionLabel(MiscPage, "👻 СПЕЦИАЛЬНЫЕ", y); y = y + 25
 local InvisBtn = CreateButton(MiscPage, "Невидимость: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
     Config.Invisibility = not Config.Invisibility
     self.Text = "Невидимость: " .. (Config.Invisibility and "ВКЛ ✓" or "ВЫКЛ")
     TweenService:Create(self, TweenInfo.new(0.2), {BackgroundColor3 = Config.Invisibility and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)}):Play()
     SetInvisibility(Config.Invisibility)
-end)
-y = y + 40
-
+end); y = y + 40
 local NoCDBtn = CreateButton(MiscPage, "No Cooldown: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
     Config.NoCooldown = not Config.NoCooldown
     self.Text = "No Cooldown: " .. (Config.NoCooldown and "ВКЛ ✓" or "ВЫКЛ")
     TweenService:Create(self, TweenInfo.new(0.2), {BackgroundColor3 = Config.NoCooldown and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)}):Play()
 end)
 
-print("[JJS Ultimate v3.1] Загружено! (Без Silent Aim/Prediction, с WallCheck, фиксом ESP и анимациями)")
+print("[JJS Ultimate v3.2] Загружено! Меню теперь появляется без ошибок.")
