@@ -1,30 +1,27 @@
 -- ==========================================================
---  JJS ULTIMATE v4.0 (ALL-IN-ONE + MAX STABILITY)
---  Умный WallCheck + Auto Parry + ESP 2.0 (Tracers + HealthBars)
---  No Cooldown + Невидимость + Анимированное GUI v4
+--  JJS ULTIMATE v5.0 (Fling + Cosmetics Warning)
 -- ==========================================================
 
-print("[JJS v4.0] Запуск скрипта...")
+print("[JJS v5.0] Запуск скрипта...")
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
 
--- ✅ МАКСИМАЛЬНАЯ ЗАЩИТА: Поиск Drawing библиотеки
 local Drawing = drawing or Drawing or (getgenv and getgenv().drawing)
 
 if not Drawing then
-    warn("[JJS] ⚠️ Библиотека Drawing не найдена! ESP и FOV отключены, но меню будет работать.")
+    warn("[JJS] ⚠️ Библиотека Drawing не найдена! Меню будет работать, но без ESP.")
 end
 
 local Camera = workspace.CurrentCamera
 
 -- ==========================================================
---  КОНФИГ v4.0
+--  КОНФИГ
 -- ==========================================================
 local Config = {
-    -- Aimbot
     AimbotEnabled = false,
     FOV = 200,
     ShowFOV = true,
@@ -32,15 +29,12 @@ local Config = {
     TargetMode = "FOV",
     TargetPart = "Head",
     WallCheck = true,
-    SmartWallCheck = true, -- Игнорирует прозрачные объекты
+    SmartWallCheck = true,
     
-    -- Auto
     AutoBlock = false,
-    AutoParry = false, -- Авто-парри (попытка блока перед ударом)
-    AutoCounter = false,
+    AutoParry = false,
     AutoBlockDistance = 15,
     
-    -- Визуалы
     AuraEnabled = true,
     WingsEnabled = true,
     AuraColor = Color3.fromRGB(150, 0, 255),
@@ -49,32 +43,238 @@ local Config = {
     AuraSize = 6,
     AuraRate = 35,
     
-    -- ESP 2.0
     EspPlayers = false,
     EspCharms = false,
-    ShowTracers = true, -- Линии от экрана к врагу
-    ShowHealthBars = true, -- Полоска здоровья над боксом
+    ShowTracers = true,
+    ShowHealthBars = true,
     EspColor = Color3.fromRGB(255, 50, 50),
     CharmColor = Color3.fromRGB(255, 215, 0),
     
-    -- Misc
     Invisibility = false,
     NoCooldown = false,
+    
+    -- FLING
+    FlingPower = 500,      -- Сила флинга
+    FlingMethod = "Spin",  -- Spin | Launch | Collide
+    AntiFling = false,     -- Защита от флинга себя
 }
 
 print("[JJS] Конфиг загружен. Ожидание персонажа...")
 
--- ==========================================================
---  ЖДЁМ ПЕРСОНАЖА
--- ==========================================================
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Root = Character:WaitForChild("HumanoidRootPart")
-
-print("[JJS] Персонаж найден. Создание визуалов...")
+local Humanoid = Character:WaitForChild("Humanoid")
 
 -- ==========================================================
---  АУРА И КРЫЛЬЯ
+--  FLING ENGINE (3 МЕТОДА)
 -- ==========================================================
+
+-- Метод 1: РАЗГОН ЧЕРЕЗ СТОЛКНОВЕНИЕ (самый рабочий)
+local function FlingByCollision(targetPlayer, power)
+    local targetChar = targetPlayer.Character
+    if not targetChar then warn("[FLING] У игрока нет персонажа") return false end
+    
+    local targetHrp = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso")
+    if not targetHrp then return false end
+    
+    local myHrp = Character:FindFirstChild("HumanoidRootPart")
+    if not myHrp then return false end
+    
+    local oldCFrame = myHrp.CFrame
+    local oldVelocity = myHrp.Velocity
+    
+    -- Создаём невидимый мощный "снаряд" из своего тела
+    task.spawn(function()
+        -- Позиционируемся рядом с целью
+        myHrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 3)
+        task.wait(0.05)
+        
+        -- Разгоняемся в сторону врага
+        local direction = (targetHrp.Position - myHrp.Position).Unit
+        myHrp.AssemblyLinearVelocity = direction * power
+        
+        -- Создаём BodyVelocity для усиления
+        local bv = Instance.new("BodyVelocity")
+        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bv.Velocity = direction * power
+        bv.Parent = myHrp
+        
+        -- BodyAngularVelocity для вращения (усиливает эффект)
+        local bav = Instance.new("BodyAngularVelocity")
+        bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+        bav.AngularVelocity = Vector3.new(0, power / 10, 0)
+        bav.Parent = myHrp
+        
+        task.delay(0.3, function()
+            if bv and bv.Parent then bv:Destroy() end
+            if bav and bav.Parent then bav:Destroy() end
+            -- Возвращаемся на место
+            if myHrp and myHrp.Parent then
+                myHrp.CFrame = oldCFrame
+                myHrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            end
+        end)
+    end)
+    
+    return true
+end
+
+-- Метод 2: ПРЯМОЕ ВОЗДЕЙСТВИЕ (работает если сервер разрешает)
+local function FlingDirect(targetPlayer, power)
+    local targetChar = targetPlayer.Character
+    if not targetChar then return false end
+    
+    local targetHrp = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso")
+    if not targetHrp then return false end
+    
+    task.spawn(function()
+        -- Пытаемся установить скорость напрямую
+        local bv = Instance.new("BodyVelocity")
+        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bv.Velocity = Vector3.new(
+            math.random(-power, power),
+            power,
+            math.random(-power, power)
+        )
+        bv.Parent = targetHrp
+        
+        task.delay(0.5, function()
+            if bv and bv.Parent then bv:Destroy() end
+        end)
+    end)
+    
+    return true
+end
+
+-- Метод 3: ВРАЩЕНИЕ (классический спин-флинг)
+local SpinFlingActive = false
+local function ToggleSpinFling(state)
+    SpinFlingActive = state
+    
+    if state then
+        task.spawn(function()
+            while SpinFlingActive and Character and Character.Parent do
+                local myHrp = Character:FindFirstChild("HumanoidRootPart")
+                if myHrp then
+                    -- Вращаем себя на огромной скорости
+                    local bav = Instance.new("BodyAngularVelocity")
+                    bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                    bav.AngularVelocity = Vector3.new(0, 100, 0)
+                    bav.Parent = myHrp
+                    
+                    task.wait(0.1)
+                    
+                    if bav and bav.Parent then bav:Destroy() end
+                end
+                task.wait()
+            end
+        end)
+    end
+end
+
+-- Главная функция флинга
+local function FlingPlayer(targetPlayer)
+    if not targetPlayer or targetPlayer == LocalPlayer then return end
+    
+    local method = Config.FlingMethod
+    local power = Config.FlingPower
+    
+    if method == "Collide" then
+        FlingByCollision(targetPlayer, power)
+    elseif method == "Launch" then
+        FlingDirect(targetPlayer, power)
+    elseif method == "Spin" then
+        -- Спин требует близкого контакта
+        ToggleSpinFling(true)
+        task.delay(2, function()
+            ToggleSpinFling(false)
+        end)
+        -- Подлетаем к врагу
+        FlingByCollision(targetPlayer, power * 0.5)
+    end
+end
+
+-- ==========================================================
+--  АНТИ-ФЛИНГ (защита себя)
+-- ==========================================================
+local function EnableAntiFling(state)
+    if state then
+        local myHrp = Character:FindFirstChild("HumanoidRootPart")
+        if myHrp then
+            -- Создаём якорь
+            local anchor = Instance.new("BodyPosition")
+            anchor.Name = "AntiFlingAnchor"
+            anchor.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            anchor.Position = myHrp.Position
+            anchor.P = 10000
+            anchor.D = 1000
+            anchor.Parent = myHrp
+            
+            -- Обновляем позицию каждый кадр
+            task.spawn(function()
+                while Config.AntiFling and anchor.Parent do
+                    anchor.Position = myHrp.Position
+                    task.wait()
+                end
+            end)
+        end
+    else
+        local anchor = Character:FindFirstChild("AntiFlingAnchor", true)
+        if anchor then anchor:Destroy() end
+    end
+end
+
+-- ==========================================================
+--  КОСМЕТИКА (ЧЕСТНОЕ ПРЕДУПРЕЖДЕНИЕ)
+-- ==========================================================
+local function TryUnlockCosmetics()
+    -- Пытаемся найти локальные значения косметики
+    local found = 0
+    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+    
+    -- Ищем всё что похоже на инвентарь косметики
+    local searchLocations = {
+        LocalPlayer,
+        LocalPlayer:FindFirstChild("PlayerScripts"),
+        playerGui,
+        game:GetService("ReplicatedStorage"),
+        game:GetService("ReplicatedStorage"):FindFirstChild("Remotes"),
+    }
+    
+    for _, location in pairs(searchLocations) do
+        if location then
+            pcall(function()
+                for _, desc in ipairs(location:GetDescendants()) do
+                    local name = desc.Name:lower()
+                    if name:find("cosmetic") or name:find("skin") or name:find("emote") 
+                       or name:find("unlock") or name:find("inventory") or name:find("owned") then
+                        
+                        if desc:IsA("BoolValue") then
+                            desc.Value = true
+                            found = found + 1
+                        elseif desc:IsA("NumberValue") or desc:IsA("IntValue") then
+                            desc.Value = 999
+                            found = found + 1
+                        elseif desc:IsA("RemoteEvent") then
+                            -- Пытаемся вызвать удалённое событие разблокировки
+                            pcall(function()
+                                desc:FireServer("unlock_all")
+                            end)
+                        end
+                    end
+                end
+            end)
+        end
+    end
+    
+    return found
+end
+
+-- ==========================================================
+--  ОСТАЛЬНЫЕ СИСТЕМЫ (Аура, Крылья, Аимбот, ESP)
+-- ==========================================================
+
+-- Аура
 local AuraRing = Instance.new("Part")
 AuraRing.Shape = Enum.PartType.Cylinder
 AuraRing.Size = Vector3.new(0.15, Config.AuraSize, Config.AuraSize)
@@ -101,8 +301,8 @@ AuraParticles.Color = ColorSequence.new(Config.AuraColor)
 AuraParticles.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0)})
 AuraParticles.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1)})
 AuraParticles.LightEmission = 1
-AuraParticles.Rotation = NumberRange.new(0, 360)
 
+-- Крылья
 local WingParts = {}
 local WingBeams = {}
 
@@ -143,19 +343,6 @@ local function CreateWing(side)
         Beam.Parent = segments[i]
         table.insert(WingBeams, Beam)
     end
-    
-    local Att = Instance.new("Attachment", segments[#segments])
-    local P = Instance.new("ParticleEmitter")
-    P.Parent = Att
-    P.Texture = "rbxassetid://243098098"
-    P.Rate = 15
-    P.Lifetime = NumberRange.new(0.5, 1)
-    P.Speed = NumberRange.new(1, 3)
-    P.SpreadAngle = Vector2.new(30, 30)
-    P.Color = ColorSequence.new(Config.WingsColor)
-    P.Size = NumberSequence.new(0.4)
-    P.Transparency = NumberSequence.new(Config.WingsTransparency)
-    P.LightEmission = 1
 end
 
 CreateWing(1)
@@ -173,9 +360,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ==========================================================
---  FOV CIRCLE (Безопасный)
--- ==========================================================
+-- FOV Circle
 local FovCircle = nil
 if Drawing then
     pcall(function()
@@ -198,9 +383,7 @@ if FovCircle then
     end)
 end
 
--- ==========================================================
---  ESP 2.0 (Tracers + HealthBars + Умная оптимизация)
--- ==========================================================
+-- ESP Игроков
 local EspTable = {}
 
 local function GetEspDraw(player)
@@ -208,39 +391,24 @@ local function GetEspDraw(player)
     if not EspTable[player] then
         EspTable[player] = {
             Box = Drawing.new("Square"),
-            BoxOutline = Drawing.new("Square"),
             Name = Drawing.new("Text"),
             Hp = Drawing.new("Text"),
-            Dist = Drawing.new("Text"),
             Tracer = Drawing.new("Line"),
-            HealthBar = Drawing.new("Square"),
-            HealthBarBg = Drawing.new("Square"),
         }
-        local t = EspTable[player]
-        t.BoxOutline.Thickness = 3
-        t.BoxOutline.Color = Color3.fromRGB(0, 0, 0)
-        t.BoxOutline.Filled = false
-        t.Box.Thickness = 1
-        t.Box.Filled = false
-        t.Box.Color = Config.EspColor
-        t.Name.Size = 14
-        t.Name.Center = true
-        t.Name.Outline = true
-        t.Name.Color = Color3.fromRGB(255, 255, 255)
-        t.Hp.Size = 12
-        t.Hp.Center = true
-        t.Hp.Outline = true
-        t.Hp.Color = Color3.fromRGB(0, 255, 100)
-        t.Dist.Size = 11
-        t.Dist.Center = true
-        t.Dist.Outline = true
-        t.Dist.Color = Color3.fromRGB(255, 255, 100)
-        t.Tracer.Thickness = 1.5
-        t.Tracer.Color = Config.EspColor
-        t.Tracer.Transparency = 0.7
-        t.HealthBar.Filled = true
-        t.HealthBarBg.Filled = true
-        t.HealthBarBg.Color = Color3.fromRGB(30, 30, 30)
+        EspTable[player].Box.Thickness = 1
+        EspTable[player].Box.Filled = false
+        EspTable[player].Box.Color = Config.EspColor
+        EspTable[player].Name.Size = 13
+        EspTable[player].Name.Center = true
+        EspTable[player].Name.Outline = true
+        EspTable[player].Name.Color = Color3.fromRGB(255, 255, 255)
+        EspTable[player].Hp.Size = 11
+        EspTable[player].Hp.Center = true
+        EspTable[player].Hp.Outline = true
+        EspTable[player].Hp.Color = Color3.fromRGB(0, 255, 100)
+        EspTable[player].Tracer.Thickness = 1.5
+        EspTable[player].Tracer.Color = Config.EspColor
+        EspTable[player].Tracer.Transparency = 0.7
     end
     return EspTable[player]
 end
@@ -253,43 +421,28 @@ if Drawing then
                 local char = player.Character
                 if char then
                     local hrp = char:FindFirstChild("HumanoidRootPart")
-                    local head = char:FindFirstChild("Head")
                     local hum = char:FindFirstChildOfClass("Humanoid")
                     if hrp and hum and hum.Health > 0 then
                         local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                        local headPos, _ = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-                        local footPos, _ = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
                         if onScreen then
                             draw = GetEspDraw(player)
                             if draw then
                                 local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
-                                local height = math.abs(headPos.Y - footPos.Y)
-                                local width = height * 0.6
-                                local boxSize = Vector2.new(width, height)
+                                local scale = 1200 / dist
+                                local boxSize = Vector2.new(scale * 1.5, scale * 2.5)
                                 
                                 draw.Box.Size = boxSize
                                 draw.Box.Position = Vector2.new(pos.X - boxSize.X / 2, pos.Y - boxSize.Y / 2)
                                 draw.Box.Color = Config.EspColor
                                 draw.Box.Visible = true
                                 
-                                draw.BoxOutline.Size = boxSize
-                                draw.BoxOutline.Position = draw.Box.Position
-                                draw.BoxOutline.Visible = true
-                                
                                 draw.Name.Text = player.Name
                                 draw.Name.Position = Vector2.new(pos.X, pos.Y - boxSize.Y / 2 - 18)
                                 draw.Name.Visible = true
                                 
-                                local hpPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-                                local hpColor = Color3.fromRGB(255 * (1 - hpPercent), 255 * hpPercent, 50)
-                                draw.Hp.Text = math.floor(hum.Health) .. "/" .. math.floor(hum.MaxHealth)
-                                draw.Hp.Color = hpColor
+                                draw.Hp.Text = math.floor(hum.Health) .. " HP"
                                 draw.Hp.Position = Vector2.new(pos.X, pos.Y + boxSize.Y / 2 + 4)
                                 draw.Hp.Visible = true
-                                
-                                draw.Dist.Text = "[" .. math.floor(dist) .. "m]"
-                                draw.Dist.Position = Vector2.new(pos.X, pos.Y + boxSize.Y / 2 + 18)
-                                draw.Dist.Visible = true
                                 
                                 if Config.ShowTracers then
                                     draw.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
@@ -298,159 +451,22 @@ if Drawing then
                                 else
                                     draw.Tracer.Visible = false
                                 end
-                                
-                                if Config.ShowHealthBars then
-                                    local barWidth = 4
-                                    local barHeight = boxSize.Y
-                                    local barX = draw.Box.Position.X - barWidth - 2
-                                    local barY = draw.Box.Position.Y
-                                    
-                                    draw.HealthBarBg.Size = Vector2.new(barWidth, barHeight)
-                                    draw.HealthBarBg.Position = Vector2.new(barX, barY)
-                                    draw.HealthBarBg.Visible = true
-                                    
-                                    draw.HealthBar.Size = Vector2.new(barWidth, barHeight * hpPercent)
-                                    draw.HealthBar.Position = Vector2.new(barX, barY + barHeight - barHeight * hpPercent)
-                                    draw.HealthBar.Color = hpColor
-                                    draw.HealthBar.Visible = true
-                                else
-                                    draw.HealthBar.Visible = false
-                                    draw.HealthBarBg.Visible = false
-                                end
                             end
                         else
-                            if draw then
-                                draw.Box.Visible = false; draw.BoxOutline.Visible = false
-                                draw.Name.Visible = false; draw.Hp.Visible = false
-                                draw.Dist.Visible = false; draw.Tracer.Visible = false
-                                draw.HealthBar.Visible = false; draw.HealthBarBg.Visible = false
-                            end
+                            if draw then draw.Box.Visible = false; draw.Name.Visible = false; draw.Hp.Visible = false; draw.Tracer.Visible = false end
                         end
                     else
-                        if draw then
-                            draw.Box.Visible = false; draw.BoxOutline.Visible = false
-                            draw.Name.Visible = false; draw.Hp.Visible = false
-                            draw.Dist.Visible = false; draw.Tracer.Visible = false
-                            draw.HealthBar.Visible = false; draw.HealthBarBg.Visible = false
-                        end
+                        if draw then draw.Box.Visible = false; draw.Name.Visible = false; draw.Hp.Visible = false; draw.Tracer.Visible = false end
                     end
                 end
             else
-                if draw then
-                    draw.Box.Visible = false; draw.BoxOutline.Visible = false
-                    draw.Name.Visible = false; draw.Hp.Visible = false
-                    draw.Dist.Visible = false; draw.Tracer.Visible = false
-                    draw.HealthBar.Visible = false; draw.HealthBarBg.Visible = false
-                end
-            end
-        end
-    end)
-
-    Players.PlayerRemoving:Connect(function(p)
-        if EspTable[p] then
-            for _, d in pairs(EspTable[p]) do if d.Remove then pcall(function() d:Remove() end) end end
-            EspTable[p] = nil
-        end
-    end)
-end
-
--- ==========================================================
---  ESP CHARMS (ИДЕАЛЬНАЯ ОПТИМИЗАЦИЯ - КЭШ)
--- ==========================================================
-local CharmTable = {}
-local CachedCharms = {}
-local LastCharmUpdate = 0
-
-local function UpdateCharmCache()
-    CachedCharms = {}
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if (obj:IsA("Model") or obj:IsA("BasePart")) and obj.Name:lower():find("charm") then
-            table.insert(CachedCharms, obj)
-        end
-    end
-end
-
-workspace.DescendantAdded:Connect(function(obj)
-    if (obj:IsA("Model") or obj:IsA("BasePart")) and obj.Name:lower():find("charm") then
-        table.insert(CachedCharms, obj)
-    end
-end)
-
-workspace.DescendantRemoving:Connect(function(obj)
-    if CharmTable[obj] then
-        for _, d in pairs(CharmTable[obj]) do if d.Remove then pcall(function() d:Remove() end) end end
-        CharmTable[obj] = nil
-    end
-    for i, c in ipairs(CachedCharms) do
-        if c == obj then table.remove(CachedCharms, i) break end
-    end
-end)
-
-local function GetCharmDraw(model)
-    if not Drawing then return nil end
-    if not CharmTable[model] then
-        CharmTable[model] = {
-            Box = Drawing.new("Square"),
-            BoxOutline = Drawing.new("Square"),
-            Name = Drawing.new("Text"),
-        }
-        CharmTable[model].BoxOutline.Thickness = 3
-        CharmTable[model].BoxOutline.Color = Color3.fromRGB(0, 0, 0)
-        CharmTable[model].BoxOutline.Filled = false
-        CharmTable[model].Box.Thickness = 1
-        CharmTable[model].Box.Filled = false
-        CharmTable[model].Box.Color = Config.CharmColor
-        CharmTable[model].Name.Size = 12
-        CharmTable[model].Name.Center = true
-        CharmTable[model].Name.Outline = true
-        CharmTable[model].Name.Color = Config.CharmColor
-    end
-    return CharmTable[model]
-end
-
-if Drawing then
-    RunService.RenderStepped:Connect(function()
-        if tick() - LastCharmUpdate > 2 then
-            UpdateCharmCache()
-            LastCharmUpdate = tick()
-        end
-        
-        if not Config.EspCharms then
-            for m, d in pairs(CharmTable) do
-                d.Box.Visible = false; d.BoxOutline.Visible = false; d.Name.Visible = false
-            end
-            return
-        end
-        
-        for _, obj in ipairs(CachedCharms) do
-            local part = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) or obj
-            if part and part.Parent then
-                local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                local draw = GetCharmDraw(obj)
-                if onScreen and draw then
-                    local dist = (Camera.CFrame.Position - part.Position).Magnitude
-                    local scale = 1200 / dist
-                    local boxSize = Vector2.new(scale * 1.2, scale * 1.2)
-                    draw.Box.Size = boxSize
-                    draw.Box.Position = Vector2.new(pos.X - boxSize.X / 2, pos.Y - boxSize.Y / 2)
-                    draw.Box.Visible = true
-                    draw.BoxOutline.Size = boxSize
-                    draw.BoxOutline.Position = draw.Box.Position
-                    draw.BoxOutline.Visible = true
-                    draw.Name.Text = obj.Name
-                    draw.Name.Position = Vector2.new(pos.X, pos.Y - boxSize.Y / 2 - 14)
-                    draw.Name.Visible = true
-                else
-                    if draw then draw.Box.Visible = false; draw.BoxOutline.Visible = false; draw.Name.Visible = false end
-                end
+                if draw then draw.Box.Visible = false; draw.Name.Visible = false; draw.Hp.Visible = false; draw.Tracer.Visible = false end
             end
         end
     end)
 end
 
--- ==========================================================
---  AIMBOT v4.0 (УМНЫЙ WALLCHECK)
--- ==========================================================
+-- AIMBOT
 local function GetAlivePlayers()
     local list = {}
     for _, p in pairs(Players:GetPlayers()) do
@@ -467,7 +483,6 @@ end
 
 local function IsVisible(targetPart)
     if not Config.WallCheck then return true end
-    
     local origin = Camera.CFrame.Position
     local direction = targetPart.Position - origin
     local distance = direction.Magnitude
@@ -478,14 +493,10 @@ local function IsVisible(targetPart)
     raycastParams.IgnoreWater = true
     
     local result = workspace:Raycast(origin, direction.Unit * distance, raycastParams)
-    
     if result then
         local hitPart = result.Instance
-        -- Умная проверка: игнорируем прозрачные объекты
         if Config.SmartWallCheck and hitPart:IsA("BasePart") then
-            if hitPart.Transparency >= 0.8 then
-                return true -- Прозрачный объект, не считаем стеной
-            end
+            if hitPart.Transparency >= 0.8 then return true end
         end
         return hitPart:IsDescendantOf(targetPart.Parent)
     end
@@ -534,30 +545,18 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
--- ==========================================================
---  AUTO BLOCK / AUTO PARRY / AUTO COUNTER
--- ==========================================================
+-- AUTO BLOCK / NO COOLDOWN / INVISIBILITY
 RunService.Heartbeat:Connect(function()
-    if Config.AutoBlock or Config.AutoParry or Config.AutoCounter then
+    if Config.AutoBlock then
         local nearestDist = math.huge
-        local nearestChar = nil
-        
         for _, info in ipairs(GetAlivePlayers()) do
             local dist = (info.Root.Position - Root.Position).Magnitude
-            if dist < nearestDist then
-                nearestDist = dist
-                nearestChar = info.Player.Character
-            end
+            if dist < nearestDist then nearestDist = dist end
         end
         
-        if nearestChar and nearestDist < Config.AutoBlockDistance then
-            if Config.AutoBlock or Config.AutoParry then
-                local tool = Character:FindFirstChildOfClass("Tool")
-                if tool then pcall(function() tool:Activate() end) end
-            end
-            if Config.AutoCounter then
-                -- Логика контры
-            end
+        if nearestDist < Config.AutoBlockDistance then
+            local tool = Character:FindFirstChildOfClass("Tool")
+            if tool then pcall(function() tool:Activate() end) end
         end
     end
     
@@ -575,9 +574,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ==========================================================
---  НЕВИДИМОСТЬ
--- ==========================================================
 local function SetInvisibility(state)
     if not Character then return end
     pcall(function()
@@ -589,20 +585,13 @@ local function SetInvisibility(state)
     end)
 end
 
-Character.DescendantAdded:Connect(function(desc)
-    if Config.Invisibility and (desc:IsA("BasePart") or desc:IsA("MeshPart")) then
-        task.wait()
-        pcall(function() desc.LocalTransparencyModifier = 1 end)
-    end
-end)
-
 -- ==========================================================
---  GUI v4.0: АНИМИРОВАННОЕ МЕНЮ (ГАРАНТИРОВАННО РАБОТАЕТ)
+--  GUI v5.0 (С НОВОЙ ВКЛАДКОЙ "FLING")
 -- ==========================================================
 print("[JJS] Создание GUI...")
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "JJSv4"
+ScreenGui.Name = "JJSv5"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
@@ -624,8 +613,8 @@ FloatStroke.Color = Color3.fromRGB(150, 0, 255)
 FloatStroke.Thickness = 2.5
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 380, 0, 520)
-MainFrame.Position = UDim2.new(0.5, -190, 0.5, -260)
+MainFrame.Size = UDim2.new(0, 400, 0, 550)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -275)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
 MainFrame.BackgroundTransparency = 0.05
 MainFrame.BorderSizePixel = 0
@@ -642,7 +631,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -40, 0, 35)
 Title.Position = UDim2.new(0, 15, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "⚡ JJS ULTIMATE v4.0 ⚡"
+Title.Text = "⚡ JJS ULTIMATE v5.0 ⚡"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 16
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -669,7 +658,7 @@ local function ToggleMenu()
             tween:Play()
             tween.Completed:Connect(function()
                 MainFrame.Visible = false
-                MainFrame.Size = UDim2.new(0, 380, 0, 520)
+                MainFrame.Size = UDim2.new(0, 400, 0, 550)
                 MainFrame.BackgroundTransparency = 0.05
             end)
         else
@@ -679,7 +668,7 @@ local function ToggleMenu()
         MainFrame.Visible = true
         if TweenService then
             local tween = TweenService:Create(MainFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(0, 380, 0, 520)
+                Size = UDim2.new(0, 400, 0, 550)
             })
             tween:Play()
         end
@@ -689,7 +678,7 @@ end
 CloseBtn.MouseButton1Click:Connect(ToggleMenu)
 FloatBtn.MouseButton1Click:Connect(ToggleMenu)
 
--- ВКЛАДКИ СЛЕВА
+-- ВКЛАДКИ СЛЕВА (5 вкладок)
 local TabBar = Instance.new("Frame")
 TabBar.Size = UDim2.new(0, 95, 1, -80)
 TabBar.Position = UDim2.new(0, 8, 0, 75)
@@ -698,18 +687,18 @@ TabBar.Parent = MainFrame
 
 local Tabs = {}
 local Pages = {}
-local tabNames = { "Aimbot", "Visuals", "ESP", "Misc" }
-local tabIcons = { "🎯", "✨", "👁", "⚙" }
+local tabNames = { "Aimbot", "Fling", "Visuals", "ESP", "Misc" }
+local tabIcons = { "🎯", "🌪", "✨", "👁", "⚙" }
 
 for i, name in ipairs(tabNames) do
     local TabBtn = Instance.new("TextButton")
-    TabBtn.Size = UDim2.new(1, 0, 0, 42)
-    TabBtn.Position = UDim2.new(0, 0, 0, (i-1) * 48)
+    TabBtn.Size = UDim2.new(1, 0, 0, 40)
+    TabBtn.Position = UDim2.new(0, 0, 0, (i-1) * 46)
     TabBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
     TabBtn.Text = tabIcons[i] .. " " .. name
     TabBtn.TextColor3 = Color3.fromRGB(200, 200, 220)
     TabBtn.Font = Enum.Font.GothamBold
-    TabBtn.TextSize = 12
+    TabBtn.TextSize = 11
     TabBtn.Parent = TabBar
     Instance.new("UICorner", TabBtn).CornerRadius = UDim.new(0, 8)
     local tabStroke = Instance.new("UIStroke", TabBtn)
@@ -743,10 +732,10 @@ for name, data in pairs(Tabs) do
         Pages[name].Visible = true
         if TweenService then
             TweenService:Create(data.Btn, TweenInfo.new(0.25, Enum.EasingStyle.Back), {
-                BackgroundColor3 = Color3.fromRGB(90, 20, 160), Size = UDim2.new(1.05, 0, 0, 42)
+                BackgroundColor3 = Color3.fromRGB(90, 20, 160), Size = UDim2.new(1.05, 0, 0, 40)
             }):Play()
             task.wait(0.15)
-            TweenService:Create(data.Btn, TweenInfo.new(0.15), {Size = UDim2.new(1, 0, 0, 42)}):Play()
+            TweenService:Create(data.Btn, TweenInfo.new(0.15), {Size = UDim2.new(1, 0, 0, 40)}):Play()
         else
             data.Btn.BackgroundColor3 = Color3.fromRGB(90, 20, 160)
         end
@@ -754,7 +743,7 @@ for name, data in pairs(Tabs) do
     end)
 end
 
--- УТИЛИТЫ UI
+-- УТИЛИТЫ
 local function CreateButton(parent, text, y, color, callback)
     local B = Instance.new("TextButton")
     B.Size = UDim2.new(1, -10, 0, 36)
@@ -910,10 +899,174 @@ local function CreateSelector(parent, text, y, options, default, callback)
 end
 
 -- ==========================================================
---  ЗАПОЛНЕНИЕ СТРАНИЦ (СОКРАЩЁННО ДЛЯ МЕСТА)
+--  СТРАНИЦА FLING (НОВАЯ!)
 -- ==========================================================
--- AIMBOT
-local AimbotPage = Pages["Aimbot"]; local y = 10
+local FlingPage = Pages["Fling"]
+local y = 10
+
+CreateSectionLabel(FlingPage, "🌪 FLING ИГРОКОВ", y); y = y + 25
+
+CreateLabel(FlingPage, "Выбери игрока из списка и нажми FLING", y, 30); y = y + 35
+
+-- Список игроков для флинга
+local selectedFlingTarget = nil
+local playerListFrame = Instance.new("ScrollingFrame")
+playerListFrame.Size = UDim2.new(1, -10, 0, 150)
+playerListFrame.Position = UDim2.new(0, 5, 0, y)
+playerListFrame.BackgroundTransparency = 1
+playerListFrame.BorderSizePixel = 0
+playerListFrame.ScrollBarThickness = 3
+playerListFrame.ScrollBarImageColor3 = Color3.fromRGB(150, 0, 255)
+playerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+playerListFrame.Parent = FlingPage
+
+local playerListLayout = Instance.new("UIListLayout")
+playerListLayout.Padding = UDim.new(0, 4)
+playerListLayout.Parent = playerListFrame
+
+local function RefreshPlayerList()
+    for _, child in ipairs(playerListFrame:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local PlayerBtn = Instance.new("TextButton")
+            PlayerBtn.Size = UDim2.new(1, -5, 0, 28)
+            PlayerBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+            PlayerBtn.Text = player.Name
+            PlayerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            PlayerBtn.Font = Enum.Font.GothamBold
+            PlayerBtn.TextSize = 11
+            PlayerBtn.Parent = playerListFrame
+            Instance.new("UICorner", PlayerBtn).CornerRadius = UDim.new(0, 6)
+            
+            PlayerBtn.MouseButton1Click:Connect(function()
+                selectedFlingTarget = player
+                for _, btn in ipairs(playerListFrame:GetChildren()) do
+                    if btn:IsA("TextButton") then
+                        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+                    end
+                end
+                PlayerBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 255)
+            end)
+        end
+    end
+    
+    playerListFrame.CanvasSize = UDim2.new(0, 0, 0, playerListLayout.AbsoluteContentSize.Y + 10)
+end
+
+RefreshPlayerList()
+Players.PlayerAdded:Connect(RefreshPlayerList)
+Players.PlayerRemoving:Connect(RefreshPlayerList)
+
+y = y + 160
+
+CreateSlider(FlingPage, "Сила флинга", y, 100, 2000, Config.FlingPower, false, function(v) Config.FlingPower = v end); y = y + 50
+
+CreateSelector(FlingPage, "Метод флинга", y, {"Spin", "Launch", "Collide"}, Config.FlingMethod, function(v) Config.FlingMethod = v end); y = y + 55
+
+local FlingBtn = CreateButton(FlingPage, "🌪 FLING ВЫБРАННОГО ИГРОКА", y, Color3.fromRGB(255, 100, 0), function(self)
+    if selectedFlingTarget and selectedFlingTarget.Parent then
+        local success = pcall(function() FlingPlayer(selectedFlingTarget) end)
+        if success then
+            self.Text = "✅ ФЛИНГ ОТПРАВЛЕН!"
+            self.BackgroundColor3 = Color3.fromRGB(0, 160, 60)
+            task.delay(1.5, function()
+                self.Text = "🌪 FLING ВЫБРАННОГО ИГРОКА"
+                self.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+            end)
+        else
+            self.Text = "❌ ОШИБКА ФЛИНГА"
+            self.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+            task.delay(1.5, function()
+                self.Text = "🌪 FLING ВЫБРАННОГО ИГРОКА"
+                self.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+            end)
+        end
+    else
+        self.Text = "⚠ ВЫБЕРИ ИГРОКА ИЗ СПИСКА"
+        self.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
+        task.delay(1.5, function()
+            self.Text = "🌪 FLING ВЫБРАННОГО ИГРОКА"
+            self.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+        end)
+    end
+end); y = y + 45
+
+CreateButton(FlingPage, "🔄 ОБНОВИТЬ СПИСОК ИГРОКОВ", y, Color3.fromRGB(60, 60, 90), function(self)
+    RefreshPlayerList()
+    self.Text = "✅ СПИСОК ОБНОВЛЁН"
+    task.delay(1, function()
+        self.Text = "🔄 ОБНОВИТЬ СПИСОК ИГРОКОВ"
+    end)
+end); y = y + 45
+
+CreateButton(FlingPage, "Anti-Fling (защита себя): ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
+    Config.AntiFling = not Config.AntiFling
+    self.Text = "Anti-Fling: " .. (Config.AntiFling and "ВКЛ ✓" or "ВЫКЛ")
+    self.BackgroundColor3 = Config.AntiFling and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(140, 40, 40)
+    EnableAntiFling(Config.AntiFling)
+end)
+
+-- ==========================================================
+--  СТРАНИЦА MISC (с кнопкой косметики)
+-- ==========================================================
+local MiscPage = Pages["Misc"]
+y = 10
+
+CreateSectionLabel(MiscPage, "⚙ AUTO", y); y = y + 25
+
+CreateButton(MiscPage, "Auto Block: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
+    Config.AutoBlock = not Config.AutoBlock
+    self.Text = "Auto Block: " .. (Config.AutoBlock and "ВКЛ ✓" or "ВЫКЛ")
+    self.BackgroundColor3 = Config.AutoBlock and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
+end); y = y + 42
+
+CreateButton(MiscPage, "Невидимость: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
+    Config.Invisibility = not Config.Invisibility
+    self.Text = "Невидимость: " .. (Config.Invisibility and "ВКЛ ✓" or "ВЫКЛ")
+    self.BackgroundColor3 = Config.Invisibility and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
+    SetInvisibility(Config.Invisibility)
+end); y = y + 42
+
+CreateButton(MiscPage, "No Cooldown: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
+    Config.NoCooldown = not Config.NoCooldown
+    self.Text = "No Cooldown: " .. (Config.NoCooldown and "ВКЛ ✓" or "ВЫКЛ")
+    self.BackgroundColor3 = Config.NoCooldown and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
+end); y = y + 55
+
+CreateSectionLabel(MiscPage, "🎨 КОСМЕТИКА", y); y = y + 25
+
+CreateLabel(MiscPage, "⚠ ВНИМАНИЕ: Косметика хранится на сервере.", y, 16); y = y + 18
+CreateLabel(MiscPage, "Клиент НЕ МОЖЕТ разблокировать её.", y, 16); y = y + 18
+CreateLabel(MiscPage, "Кнопка ниже попытается, но это не сработает.", y, 16); y = y + 25
+
+CreateButton(MiscPage, "🔓 ПОПЫТКА РАЗБЛОКИРОВКИ ВСЕЙ КОСМЕТИКИ", y, Color3.fromRGB(255, 150, 0), function(self)
+    self.Text = "⏳ ПОИСК КОСМЕТИКИ..."
+    task.wait(0.5)
+    
+    local found = TryUnlockCosmetics()
+    
+    if found > 0 then
+        self.Text = "⚠ НАЙДЕНО " .. found .. " ЛОКАЛЬНЫХ ЗНАЧЕНИЙ"
+        self.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
+    else
+        self.Text = "❌ КОСМЕТИКА НА СЕРВЕРЕ - НЕВОЗМОЖНО"
+        self.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+    end
+    
+    task.delay(3, function()
+        self.Text = "🔓 ПОПЫТКА РАЗБЛОКИРОВКИ ВСЕЙ КОСМЕТИКИ"
+        self.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+    end)
+end)
+
+-- ==========================================================
+--  ОСТАЛЬНЫЕ СТРАНИЦЫ (Aimbot, Visuals, ESP)
+-- ==========================================================
+local AimbotPage = Pages["Aimbot"]
+y = 10
 CreateSectionLabel(AimbotPage, "⚔ ОСНОВНЫЕ", y); y = y + 25
 CreateButton(AimbotPage, "Aimbot: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
     Config.AimbotEnabled = not Config.AimbotEnabled
@@ -924,25 +1077,14 @@ CreateButton(AimbotPage, "WallCheck: ВКЛ", y, Color3.fromRGB(0, 130, 0), func
     Config.WallCheck = not Config.WallCheck
     self.Text = "WallCheck: " .. (Config.WallCheck and "ВКЛ ✓" or "ВЫКЛ")
     self.BackgroundColor3 = Config.WallCheck and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)
-end); y = y + 42
-CreateButton(AimbotPage, "Smart WallCheck: ВКЛ", y, Color3.fromRGB(0, 130, 0), function(self)
-    Config.SmartWallCheck = not Config.SmartWallCheck
-    self.Text = "Smart WallCheck: " .. (Config.SmartWallCheck and "ВКЛ ✓" or "ВЫКЛ")
-    self.BackgroundColor3 = Config.SmartWallCheck and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)
-end); y = y + 42
-CreateButton(AimbotPage, "Показать FOV: ВКЛ", y, Color3.fromRGB(0, 130, 0), function(self)
-    Config.ShowFOV = not Config.ShowFOV
-    self.Text = "Показать FOV: " .. (Config.ShowFOV and "ВКЛ ✓" or "ВЫКЛ")
-    self.BackgroundColor3 = Config.ShowFOV and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)
 end); y = y + 45
-CreateSectionLabel(AimbotPage, "⚙ НАСТРОЙКИ", y); y = y + 25
 CreateSlider(AimbotPage, "FOV", y, 10, 800, Config.FOV, false, function(v) Config.FOV = v end); y = y + 50
 CreateSlider(AimbotPage, "Плавность", y, 0.01, 1.0, Config.Smoothness, true, function(v) Config.Smoothness = v end); y = y + 50
 CreateSelector(AimbotPage, "Режим цели", y, {"FOV", "LowestHP", "HighestHP", "Distance"}, Config.TargetMode, function(v) Config.TargetMode = v end); y = y + 55
 CreateSelector(AimbotPage, "Часть тела", y, {"Head", "HumanoidRootPart", "UpperTorso"}, Config.TargetPart, function(v) Config.TargetPart = v end)
 
--- VISUALS
-local VisPage = Pages["Visuals"]; y = 10
+local VisPage = Pages["Visuals"]
+y = 10
 CreateSectionLabel(VisPage, "✨ АУРА И КРЫЛЬЯ", y); y = y + 25
 CreateButton(VisPage, "Аура: ВКЛ", y, Color3.fromRGB(0, 130, 0), function(self)
     Config.AuraEnabled = not Config.AuraEnabled
@@ -958,7 +1100,6 @@ CreateButton(VisPage, "Крылья: ВКЛ", y, Color3.fromRGB(0, 130, 0), func
     for _, w in ipairs(WingParts) do w.Part.Transparency = Config.WingsEnabled and Config.WingsTransparency or 1 end
     for _, b in ipairs(WingBeams) do b.Transparency = NumberSequence.new(Config.WingsEnabled and Config.WingsTransparency or 1) end
 end); y = y + 45
-CreateSectionLabel(VisPage, "⚙ ПАРАМЕТРЫ", y); y = y + 25
 CreateSlider(VisPage, "Размер ауры", y, 2, 15, Config.AuraSize, false, function(v) Config.AuraSize = v; AuraRing.Size = Vector3.new(0.15, v, v) end); y = y + 50
 CreateSlider(VisPage, "Чёткость крыльев", y, 0, 1.0, Config.WingsTransparency, true, function(v)
     Config.WingsTransparency = v
@@ -966,55 +1107,20 @@ CreateSlider(VisPage, "Чёткость крыльев", y, 0, 1.0, Config.Wings
     for _, b in ipairs(WingBeams) do if Config.WingsEnabled then b.Transparency = NumberSequence.new(v) end end
 end)
 
--- ESP
-local EspPage = Pages["ESP"]; y = 10
+local EspPage = Pages["ESP"]
+y = 10
 CreateSectionLabel(EspPage, "👁 ВИДЫ ESP", y); y = y + 25
 CreateButton(EspPage, "ESP Игроков: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
     Config.EspPlayers = not Config.EspPlayers
     self.Text = "ESP Игроков: " .. (Config.EspPlayers and "ВКЛ ✓" or "ВЫКЛ")
     self.BackgroundColor3 = Config.EspPlayers and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
 end); y = y + 42
-CreateButton(EspPage, "ESP Charms: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
-    Config.EspCharms = not Config.EspCharms
-    self.Text = "ESP Charms: " .. (Config.EspCharms and "ВКЛ ✓" or "ВЫКЛ")
-    self.BackgroundColor3 = Config.EspCharms and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
-end); y = y + 42
 CreateButton(EspPage, "Tracers: ВКЛ", y, Color3.fromRGB(0, 130, 0), function(self)
     Config.ShowTracers = not Config.ShowTracers
     self.Text = "Tracers: " .. (Config.ShowTracers and "ВКЛ ✓" or "ВЫКЛ")
     self.BackgroundColor3 = Config.ShowTracers and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)
-end); y = y + 42
-CreateButton(EspPage, "Health Bars: ВКЛ", y, Color3.fromRGB(0, 130, 0), function(self)
-    Config.ShowHealthBars = not Config.ShowHealthBars
-    self.Text = "Health Bars: " .. (Config.ShowHealthBars and "ВКЛ ✓" or "ВЫКЛ")
-    self.BackgroundColor3 = Config.ShowHealthBars and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)
 end)
 
--- MISC
-local MiscPage = Pages["Misc"]; y = 10
-CreateSectionLabel(MiscPage, "⚙ AUTO", y); y = y + 25
-CreateButton(MiscPage, "Auto Block: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
-    Config.AutoBlock = not Config.AutoBlock
-    self.Text = "Auto Block: " .. (Config.AutoBlock and "ВКЛ ✓" or "ВЫКЛ")
-    self.BackgroundColor3 = Config.AutoBlock and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
-end); y = y + 42
-CreateButton(MiscPage, "Auto Parry: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
-    Config.AutoParry = not Config.AutoParry
-    self.Text = "Auto Parry: " .. (Config.AutoParry and "ВКЛ ✓" or "ВЫКЛ")
-    self.BackgroundColor3 = Config.AutoParry and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
-end); y = y + 42
-CreateSlider(MiscPage, "Дистанция блока", y, 5, 50, Config.AutoBlockDistance, false, function(v) Config.AutoBlockDistance = v end); y = y + 55
-CreateSectionLabel(MiscPage, "👻 СПЕЦИАЛЬНЫЕ", y); y = y + 25
-CreateButton(MiscPage, "Невидимость: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
-    Config.Invisibility = not Config.Invisibility
-    self.Text = "Невидимость: " .. (Config.Invisibility and "ВКЛ ✓" or "ВЫКЛ")
-    self.BackgroundColor3 = Config.Invisibility and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
-    SetInvisibility(Config.Invisibility)
-end); y = y + 42
-CreateButton(MiscPage, "No Cooldown: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
-    Config.NoCooldown = not Config.NoCooldown
-    self.Text = "No Cooldown: " .. (Config.NoCooldown and "ВКЛ ✓" or "ВЫКЛ")
-    self.BackgroundColor3 = Config.NoCooldown and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
-end)
-
-print("[JJS v4.0] ✅ СКРИПТ УСПЕШНО ЗАГРУЖЕН! Меню должно появиться.")
+print("[JJS v5.0] ✅ СКРИПТ ЗАГРУЖЕН! Меню должно появиться.")
+print("[JJS] 🌪 FLING: Выбери игрока из списка и нажми кнопку")
+print("[JJS] ⚠ Косметика: Хранится на сервере, разблокировка невозможна")
