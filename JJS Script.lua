@@ -1,20 +1,17 @@
 -- ==========================================================
---  JJS ULTIMATE v5.0 (Fling + Cosmetics Warning)
+--  APEX HUB v6.0 | JJS ULTIMATE
+--  Fling (Cosmos) + True Invisibility + Premium GUI
 -- ==========================================================
 
-print("[JJS v5.0] Запуск скрипта...")
+print("[APEX] Запуск...")
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local VirtualUser = game:GetService("VirtualUser")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
 local Drawing = drawing or Drawing or (getgenv and getgenv().drawing)
-
-if not Drawing then
-    warn("[JJS] ⚠️ Библиотека Drawing не найдена! Меню будет работать, но без ESP.")
-end
 
 local Camera = workspace.CurrentCamera
 
@@ -32,7 +29,6 @@ local Config = {
     SmartWallCheck = true,
     
     AutoBlock = false,
-    AutoParry = false,
     AutoBlockDistance = 15,
     
     AuraEnabled = true,
@@ -53,26 +49,26 @@ local Config = {
     Invisibility = false,
     NoCooldown = false,
     
-    -- FLING
-    FlingPower = 500,      -- Сила флинга
-    FlingMethod = "Spin",  -- Spin | Launch | Collide
-    AntiFling = false,     -- Защита от флинга себя
+    FlingPower = 3000,
+    FlingHeight = 5000,
 }
-
-print("[JJS] Конфиг загружен. Ожидание персонажа...")
 
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Root = Character:WaitForChild("HumanoidRootPart")
 local Humanoid = Character:WaitForChild("Humanoid")
 
--- ==========================================================
---  FLING ENGINE (3 МЕТОДА)
--- ==========================================================
+-- Сохраняем позицию для возврата
+local SavedPosition = Root.CFrame
+local IsInvisible = false
 
--- Метод 1: РАЗГОН ЧЕРЕЗ СТОЛКНОВЕНИЕ (самый рабочий)
-local function FlingByCollision(targetPlayer, power)
+-- ==========================================================
+--  FLING В КОСМОС (ОДИН МОЩНЫЙ МЕТОД)
+-- ==========================================================
+local function FlingToCosmos(targetPlayer)
+    if not targetPlayer or targetPlayer == LocalPlayer then return false end
+    
     local targetChar = targetPlayer.Character
-    if not targetChar then warn("[FLING] У игрока нет персонажа") return false end
+    if not targetChar then return false end
     
     local targetHrp = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso")
     if not targetHrp then return false end
@@ -80,38 +76,63 @@ local function FlingByCollision(targetPlayer, power)
     local myHrp = Character:FindFirstChild("HumanoidRootPart")
     if not myHrp then return false end
     
-    local oldCFrame = myHrp.CFrame
-    local oldVelocity = myHrp.Velocity
+    -- Сохраняем свою позицию
+    local myOldCFrame = myHrp.CFrame
     
-    -- Создаём невидимый мощный "снаряд" из своего тела
     task.spawn(function()
-        -- Позиционируемся рядом с целью
-        myHrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 3)
+        -- Подлетаем к врагу
+        local direction = (targetHrp.Position - myHrp.Position).Unit
+        myHrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 2)
         task.wait(0.05)
         
-        -- Разгоняемся в сторону врага
-        local direction = (targetHrp.Position - myHrp.Position).Unit
-        myHrp.AssemblyLinearVelocity = direction * power
+        -- Создаём мощнейший импульс
+        local flingVelocity = Vector3.new(
+            math.random(-Config.FlingPower, Config.FlingPower),
+            Config.FlingHeight,
+            math.random(-Config.FlingPower, Config.FlingPower)
+        )
         
-        -- Создаём BodyVelocity для усиления
+        -- Разгоняем себя в сторону врага
+        myHrp.AssemblyLinearVelocity = direction * Config.FlingPower
+        
+        -- BodyVelocity для максимальной силы
         local bv = Instance.new("BodyVelocity")
         bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        bv.Velocity = direction * power
+        bv.Velocity = direction * Config.FlingPower
         bv.Parent = myHrp
         
         -- BodyAngularVelocity для вращения (усиливает эффект)
         local bav = Instance.new("BodyAngularVelocity")
         bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-        bav.AngularVelocity = Vector3.new(0, power / 10, 0)
+        bav.AngularVelocity = Vector3.new(100, 100, 100)
         bav.Parent = myHrp
         
-        task.delay(0.3, function()
+        -- Пытаемся напрямую воздействовать на врага
+        pcall(function()
+            local enemyBv = Instance.new("BodyVelocity")
+            enemyBv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            enemyBv.Velocity = flingVelocity
+            enemyBv.Parent = targetHrp
+            
+            local enemyBav = Instance.new("BodyAngularVelocity")
+            enemyBav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+            enemyBav.AngularVelocity = Vector3.new(200, 200, 200)
+            enemyBav.Parent = targetHrp
+            
+            task.delay(1, function()
+                if enemyBv and enemyBv.Parent then enemyBv:Destroy() end
+                if enemyBav and enemyBav.Parent then enemyBav:Destroy() end
+            end)
+        end)
+        
+        -- Возвращаемся на место
+        task.delay(0.4, function()
             if bv and bv.Parent then bv:Destroy() end
             if bav and bav.Parent then bav:Destroy() end
-            -- Возвращаемся на место
             if myHrp and myHrp.Parent then
-                myHrp.CFrame = oldCFrame
+                myHrp.CFrame = myOldCFrame
                 myHrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                myHrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
             end
         end)
     end)
@@ -119,162 +140,63 @@ local function FlingByCollision(targetPlayer, power)
     return true
 end
 
--- Метод 2: ПРЯМОЕ ВОЗДЕЙСТВИЕ (работает если сервер разрешает)
-local function FlingDirect(targetPlayer, power)
-    local targetChar = targetPlayer.Character
-    if not targetChar then return false end
+-- ==========================================================
+--  НАСТОЯЩАЯ НЕВИДИМОСТЬ (ДЛЯ ВСЕХ)
+-- ==========================================================
+local function SetTrueInvisibility(state)
+    if not Character or not Root then return end
     
-    local targetHrp = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso")
-    if not targetHrp then return false end
+    local myHrp = Character:FindFirstChild("HumanoidRootPart")
+    if not myHrp then return end
     
-    task.spawn(function()
-        -- Пытаемся установить скорость напрямую
-        local bv = Instance.new("BodyVelocity")
-        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        bv.Velocity = Vector3.new(
-            math.random(-power, power),
-            power,
-            math.random(-power, power)
-        )
-        bv.Parent = targetHrp
+    if state then
+        -- Сохраняем текущую позицию
+        SavedPosition = myHrp.CFrame
         
-        task.delay(0.5, function()
-            if bv and bv.Parent then bv:Destroy() end
-        end)
-    end)
-    
-    return true
-end
-
--- Метод 3: ВРАЩЕНИЕ (классический спин-флинг)
-local SpinFlingActive = false
-local function ToggleSpinFling(state)
-    SpinFlingActive = state
-    
-    if state then
-        task.spawn(function()
-            while SpinFlingActive and Character and Character.Parent do
-                local myHrp = Character:FindFirstChild("HumanoidRootPart")
-                if myHrp then
-                    -- Вращаем себя на огромной скорости
-                    local bav = Instance.new("BodyAngularVelocity")
-                    bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-                    bav.AngularVelocity = Vector3.new(0, 100, 0)
-                    bav.Parent = myHrp
-                    
-                    task.wait(0.1)
-                    
-                    if bav and bav.Parent then bav:Destroy() end
+        -- Делаем себя прозрачным локально (чтобы видеть себя)
+        pcall(function()
+            for _, part in ipairs(Character:GetDescendants()) do
+                if part:IsA("BasePart") or part:IsA("MeshPart") then
+                    part.LocalTransparencyModifier = 0.7
                 end
-                task.wait()
             end
         end)
-    end
-end
-
--- Главная функция флинга
-local function FlingPlayer(targetPlayer)
-    if not targetPlayer or targetPlayer == LocalPlayer then return end
-    
-    local method = Config.FlingMethod
-    local power = Config.FlingPower
-    
-    if method == "Collide" then
-        FlingByCollision(targetPlayer, power)
-    elseif method == "Launch" then
-        FlingDirect(targetPlayer, power)
-    elseif method == "Spin" then
-        -- Спин требует близкого контакта
-        ToggleSpinFling(true)
-        task.delay(2, function()
-            ToggleSpinFling(false)
-        end)
-        -- Подлетаем к врагу
-        FlingByCollision(targetPlayer, power * 0.5)
-    end
-end
-
--- ==========================================================
---  АНТИ-ФЛИНГ (защита себя)
--- ==========================================================
-local function EnableAntiFling(state)
-    if state then
-        local myHrp = Character:FindFirstChild("HumanoidRootPart")
-        if myHrp then
-            -- Создаём якорь
-            local anchor = Instance.new("BodyPosition")
-            anchor.Name = "AntiFlingAnchor"
-            anchor.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            anchor.Position = myHrp.Position
-            anchor.P = 10000
-            anchor.D = 1000
-            anchor.Parent = myHrp
-            
-            -- Обновляем позицию каждый кадр
-            task.spawn(function()
-                while Config.AntiFling and anchor.Parent do
-                    anchor.Position = myHrp.Position
-                    task.wait()
-                end
-            end)
-        end
+        
+        -- Телепортируем персонажа далеко под карту (другие нас не увидят)
+        task.wait(0.1)
+        myHrp.CFrame = CFrame.new(0, -5000, 0)
+        
+        IsInvisible = true
+        print("[APEX] Невидимость включена! Персонаж телепортирован далеко.")
     else
-        local anchor = Character:FindFirstChild("AntiFlingAnchor", true)
-        if anchor then anchor:Destroy() end
-    end
-end
-
--- ==========================================================
---  КОСМЕТИКА (ЧЕСТНОЕ ПРЕДУПРЕЖДЕНИЕ)
--- ==========================================================
-local function TryUnlockCosmetics()
-    -- Пытаемся найти локальные значения косметики
-    local found = 0
-    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-    
-    -- Ищем всё что похоже на инвентарь косметики
-    local searchLocations = {
-        LocalPlayer,
-        LocalPlayer:FindFirstChild("PlayerScripts"),
-        playerGui,
-        game:GetService("ReplicatedStorage"),
-        game:GetService("ReplicatedStorage"):FindFirstChild("Remotes"),
-    }
-    
-    for _, location in pairs(searchLocations) do
-        if location then
-            pcall(function()
-                for _, desc in ipairs(location:GetDescendants()) do
-                    local name = desc.Name:lower()
-                    if name:find("cosmetic") or name:find("skin") or name:find("emote") 
-                       or name:find("unlock") or name:find("inventory") or name:find("owned") then
-                        
-                        if desc:IsA("BoolValue") then
-                            desc.Value = true
-                            found = found + 1
-                        elseif desc:IsA("NumberValue") or desc:IsA("IntValue") then
-                            desc.Value = 999
-                            found = found + 1
-                        elseif desc:IsA("RemoteEvent") then
-                            -- Пытаемся вызвать удалённое событие разблокировки
-                            pcall(function()
-                                desc:FireServer("unlock_all")
-                            end)
-                        end
-                    end
+        -- Возвращаемся на сохранённую позицию
+        myHrp.CFrame = SavedPosition
+        
+        -- Убираем прозрачность
+        pcall(function()
+            for _, part in ipairs(Character:GetDescendants()) do
+                if part:IsA("BasePart") or part:IsA("MeshPart") then
+                    part.LocalTransparencyModifier = 0
                 end
-            end)
-        end
+            end
+        end)
+        
+        IsInvisible = false
+        print("[APEX] Невидимость выключена! Персонаж возвращён.")
     end
-    
-    return found
 end
 
--- ==========================================================
---  ОСТАЛЬНЫЕ СИСТЕМЫ (Аура, Крылья, Аимбот, ESP)
--- ==========================================================
+-- Следим за новыми частями персонажа
+Character.DescendantAdded:Connect(function(desc)
+    if IsInvisible and (desc:IsA("BasePart") or desc:IsA("MeshPart")) then
+        task.wait()
+        pcall(function() desc.LocalTransparencyModifier = 0.7 end)
+    end
+end)
 
--- Аура
+-- ==========================================================
+--  АУРА И КРЫЛЬЯ
+-- ==========================================================
 local AuraRing = Instance.new("Part")
 AuraRing.Shape = Enum.PartType.Cylinder
 AuraRing.Size = Vector3.new(0.15, Config.AuraSize, Config.AuraSize)
@@ -302,7 +224,6 @@ AuraParticles.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.5), Num
 AuraParticles.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1)})
 AuraParticles.LightEmission = 1
 
--- Крылья
 local WingParts = {}
 local WingBeams = {}
 
@@ -350,27 +271,29 @@ CreateWing(-1)
 
 RunService.Heartbeat:Connect(function()
     if not Root or not Root.Parent then return end
-    if Config.AuraEnabled then
+    if Config.AuraEnabled and not IsInvisible then
         AuraRing.CFrame = Root.CFrame * CFrame.new(0, -2.5, 0) * CFrame.Angles(0, 0, math.rad(90))
     end
-    if Config.WingsEnabled then
+    if Config.WingsEnabled and not IsInvisible then
         for _, w in ipairs(WingParts) do
             w.Part.CFrame = Root.CFrame * w.BaseOffset
         end
     end
 end)
 
--- FOV Circle
+-- ==========================================================
+--  FOV + ESP + AIMBOT (как раньше)
+-- ==========================================================
 local FovCircle = nil
 if Drawing then
     pcall(function()
         FovCircle = Drawing.new("Circle")
-        FovCircle.Thickness = 1.5
-        FovCircle.NumSides = 80
+        FovCircle.Thickness = 2
+        FovCircle.NumSides = 100
         FovCircle.Radius = Config.FOV
         FovCircle.Filled = false
-        FovCircle.Color = Color3.fromRGB(180, 50, 255)
-        FovCircle.Transparency = 0.6
+        FovCircle.Color = Color3.fromRGB(0, 255, 200)
+        FovCircle.Transparency = 0.7
         FovCircle.Visible = false
     end)
 end
@@ -383,7 +306,7 @@ if FovCircle then
     end)
 end
 
--- ESP Игроков
+-- ESP
 local EspTable = {}
 
 local function GetEspDraw(player)
@@ -395,20 +318,20 @@ local function GetEspDraw(player)
             Hp = Drawing.new("Text"),
             Tracer = Drawing.new("Line"),
         }
-        EspTable[player].Box.Thickness = 1
+        EspTable[player].Box.Thickness = 1.5
         EspTable[player].Box.Filled = false
         EspTable[player].Box.Color = Config.EspColor
-        EspTable[player].Name.Size = 13
+        EspTable[player].Name.Size = 14
         EspTable[player].Name.Center = true
         EspTable[player].Name.Outline = true
         EspTable[player].Name.Color = Color3.fromRGB(255, 255, 255)
-        EspTable[player].Hp.Size = 11
+        EspTable[player].Hp.Size = 12
         EspTable[player].Hp.Center = true
         EspTable[player].Hp.Outline = true
         EspTable[player].Hp.Color = Color3.fromRGB(0, 255, 100)
-        EspTable[player].Tracer.Thickness = 1.5
+        EspTable[player].Tracer.Thickness = 2
         EspTable[player].Tracer.Color = Config.EspColor
-        EspTable[player].Tracer.Transparency = 0.7
+        EspTable[player].Tracer.Transparency = 0.8
     end
     return EspTable[player]
 end
@@ -437,11 +360,11 @@ if Drawing then
                                 draw.Box.Visible = true
                                 
                                 draw.Name.Text = player.Name
-                                draw.Name.Position = Vector2.new(pos.X, pos.Y - boxSize.Y / 2 - 18)
+                                draw.Name.Position = Vector2.new(pos.X, pos.Y - boxSize.Y / 2 - 20)
                                 draw.Name.Visible = true
                                 
                                 draw.Hp.Text = math.floor(hum.Health) .. " HP"
-                                draw.Hp.Position = Vector2.new(pos.X, pos.Y + boxSize.Y / 2 + 4)
+                                draw.Hp.Position = Vector2.new(pos.X, pos.Y + boxSize.Y / 2 + 5)
                                 draw.Hp.Visible = true
                                 
                                 if Config.ShowTracers then
@@ -545,9 +468,9 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
--- AUTO BLOCK / NO COOLDOWN / INVISIBILITY
+-- AUTO BLOCK / NO COOLDOWN
 RunService.Heartbeat:Connect(function()
-    if Config.AutoBlock then
+    if Config.AutoBlock and not IsInvisible then
         local nearestDist = math.huge
         for _, info in ipairs(GetAlivePlayers()) do
             local dist = (info.Root.Position - Root.Position).Magnitude
@@ -574,114 +497,208 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-local function SetInvisibility(state)
-    if not Character then return end
-    pcall(function()
-        for _, part in ipairs(Character:GetDescendants()) do
-            if part:IsA("BasePart") or part:IsA("MeshPart") then
-                part.LocalTransparencyModifier = state and 1 or 0
-            end
-        end
-    end)
-end
-
 -- ==========================================================
---  GUI v5.0 (С НОВОЙ ВКЛАДКОЙ "FLING")
+--  ПРЕМИУМ GUI "APEX"
 -- ==========================================================
-print("[JJS] Создание GUI...")
+print("[APEX] Создание премиум GUI...")
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "JJSv5"
+ScreenGui.Name = "ApexHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
+-- ========== КНОПКА APEX (ФОРМА РОМБА) ==========
+local FloatBtnContainer = Instance.new("Frame")
+FloatBtnContainer.Size = UDim2.new(0, 80, 0, 80)
+FloatBtnContainer.Position = UDim2.new(0, 15, 0.5, -40)
+FloatBtnContainer.BackgroundTransparency = 1
+FloatBtnContainer.Active = true
+FloatBtnContainer.Draggable = true
+FloatBtnContainer.Parent = ScreenGui
+
+-- Ромбовидная кнопка (повёрнутый квадрат)
 local FloatBtn = Instance.new("TextButton")
 FloatBtn.Size = UDim2.new(0, 60, 0, 60)
-FloatBtn.Position = UDim2.new(0, 20, 0, 200)
-FloatBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-FloatBtn.Text = "⚡"
-FloatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-FloatBtn.Font = Enum.Font.GothamBold
-FloatBtn.TextSize = 28
-FloatBtn.Active = true
-FloatBtn.Draggable = true
-FloatBtn.Parent = ScreenGui
-Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(1, 0)
-local FloatStroke = Instance.new("UIStroke", FloatBtn)
-FloatStroke.Color = Color3.fromRGB(150, 0, 255)
-FloatStroke.Thickness = 2.5
+FloatBtn.Position = UDim2.new(0.5, -30, 0.5, -30)
+FloatBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+FloatBtn.Text = ""
+FloatBtn.Rotation = 45 -- Поворот на 45 градусов = ромб
+FloatBtn.BorderSizePixel = 0
+FloatBtn.Parent = FloatBtnContainer
+Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 8)
 
+-- Градиент для кнопки
+local btnGradient = Instance.new("UIGradient", FloatBtn)
+btnGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 200)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(100, 0, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 150))
+})
+btnGradient.Rotation = 45
+
+-- Обводка
+local btnStroke = Instance.new("UIStroke", FloatBtn)
+btnStroke.Color = Color3.fromRGB(0, 255, 200)
+btnStroke.Thickness = 2
+
+-- Текст "APEX" (не повёрнут)
+local btnText = Instance.new("TextLabel")
+btnText.Size = UDim2.new(1, 0, 1, 0)
+btnText.Position = UDim2.new(0, 0, 0, 0)
+btnText.BackgroundTransparency = 1
+btnText.Text = "APEX"
+btnText.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnText.Font = Enum.Font.GothamBlack
+btnText.TextSize = 14
+btnText.TextStrokeTransparency = 0
+btnText.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+btnText.Rotation = -45 -- Компенсируем поворот родителя
+btnText.Parent = FloatBtnContainer
+
+-- Анимация пульсации
+task.spawn(function()
+    while FloatBtnContainer.Parent do
+        local pulse1 = TweenService:Create(btnStroke, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+            Thickness = 4,
+            Color = Color3.fromRGB(255, 0, 150)
+        })
+        local pulse2 = TweenService:Create(btnStroke, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+            Thickness = 2,
+            Color = Color3.fromRGB(0, 255, 200)
+        })
+        pulse1:Play()
+        pulse1.Completed:Wait()
+        pulse2:Play()
+        pulse2.Completed:Wait()
+    end
+end)
+
+-- Вращение градиента
+task.spawn(function()
+    local rot = 0
+    while FloatBtnContainer.Parent do
+        rot = rot + 1
+        btnGradient.Rotation = rot
+        task.wait(0.05)
+    end
+end)
+
+-- Hover эффекты
+FloatBtn.MouseEnter:Connect(function()
+    TweenService:Create(FloatBtn, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
+        Size = UDim2.new(0, 70, 0, 70),
+        Position = UDim2.new(0.5, -35, 0.5, -35)
+    }):Play()
+end)
+
+FloatBtn.MouseLeave:Connect(function()
+    TweenService:Create(FloatBtn, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
+        Size = UDim2.new(0, 60, 0, 60),
+        Position = UDim2.new(0.5, -30, 0.5, -30)
+    }):Play()
+end)
+
+-- ========== ГЛАВНОЕ МЕНЮ ==========
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 400, 0, 550)
-MainFrame.Position = UDim2.new(0.5, -200, 0.5, -275)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
-MainFrame.BackgroundTransparency = 0.05
+MainFrame.Size = UDim2.new(0, 420, 0, 580)
+MainFrame.Position = UDim2.new(0.5, -210, 0.5, -290)
+MainFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 15)
+MainFrame.BackgroundTransparency = 0.03
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Visible = false
 MainFrame.Parent = ScreenGui
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 14)
-local MainStroke = Instance.new("UIStroke", MainFrame)
-MainStroke.Color = Color3.fromRGB(120, 0, 200)
-MainStroke.Thickness = 2.5
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 16)
+
+local mainStroke = Instance.new("UIStroke", MainFrame)
+mainStroke.Color = Color3.fromRGB(0, 255, 200)
+mainStroke.Thickness = 2
+
+local mainGradient = Instance.new("UIGradient", MainFrame)
+mainGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(15, 5, 35)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 8, 15))
+})
+mainGradient.Rotation = 135
+
+-- Заголовок
+local TitleFrame = Instance.new("Frame")
+TitleFrame.Size = UDim2.new(1, 0, 0, 50)
+TitleFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+TitleFrame.BackgroundTransparency = 0.5
+TitleFrame.BorderSizePixel = 0
+TitleFrame.Parent = MainFrame
+Instance.new("UICorner", TitleFrame).CornerRadius = UDim.new(0, 16)
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -40, 0, 35)
-Title.Position = UDim2.new(0, 15, 0, 0)
+Title.Size = UDim2.new(1, -50, 1, 0)
+Title.Position = UDim2.new(0, 20, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "⚡ JJS ULTIMATE v5.0 ⚡"
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Text = "◆ APEX HUB ◆"
+Title.Font = Enum.Font.GothamBlack
+Title.TextSize = 20
 Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = MainFrame
+Title.Parent = TitleFrame
 
+local titleGradient = Instance.new("UIGradient", Title)
+titleGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 200)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150, 0, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 150))
+})
+
+-- Кнопка закрытия
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-CloseBtn.Position = UDim2.new(1, -35, 0, 4)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 40, 60)
+CloseBtn.Size = UDim2.new(0, 35, 0, 35)
+CloseBtn.Position = UDim2.new(1, -42, 0, 8)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 80)
 CloseBtn.Text = "×"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 20
+CloseBtn.Font = Enum.Font.GothamBlack
+CloseBtn.TextSize = 22
 CloseBtn.Parent = MainFrame
-Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 10)
 
+CloseBtn.MouseEnter:Connect(function()
+    TweenService:Create(CloseBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 100, 120)}):Play()
+end)
+CloseBtn.MouseLeave:Connect(function()
+    TweenService:Create(CloseBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 50, 80)}):Play()
+end)
+
+-- Функция открытия/закрытия
 local function ToggleMenu()
     if MainFrame.Visible then
-        if TweenService then
-            local tween = TweenService:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-                Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1
-            })
-            tween:Play()
-            tween.Completed:Connect(function()
-                MainFrame.Visible = false
-                MainFrame.Size = UDim2.new(0, 400, 0, 550)
-                MainFrame.BackgroundTransparency = 0.05
-            end)
-        else
+        local tween = TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+            Size = UDim2.new(0, 0, 0, 0),
+            BackgroundTransparency = 1
+        })
+        tween:Play()
+        tween.Completed:Connect(function()
             MainFrame.Visible = false
-        end
+            MainFrame.Size = UDim2.new(0, 420, 0, 580)
+            MainFrame.BackgroundTransparency = 0.03
+        end)
     else
         MainFrame.Visible = true
-        if TweenService then
-            local tween = TweenService:Create(MainFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.new(0, 400, 0, 550)
-            })
-            tween:Play()
-        end
+        MainFrame.Size = UDim2.new(0, 0, 0, 0)
+        local tween = TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 420, 0, 580)
+        })
+        tween:Play()
     end
 end
 
 CloseBtn.MouseButton1Click:Connect(ToggleMenu)
 FloatBtn.MouseButton1Click:Connect(ToggleMenu)
 
--- ВКЛАДКИ СЛЕВА (5 вкладок)
+-- ========== ВКЛАДКИ СЛЕВА ==========
 local TabBar = Instance.new("Frame")
-TabBar.Size = UDim2.new(0, 95, 1, -80)
-TabBar.Position = UDim2.new(0, 8, 0, 75)
+TabBar.Size = UDim2.new(0, 100, 1, -100)
+TabBar.Position = UDim2.new(0, 10, 0, 90)
 TabBar.BackgroundTransparency = 1
 TabBar.Parent = MainFrame
 
@@ -692,79 +709,94 @@ local tabIcons = { "🎯", "🌪", "✨", "👁", "⚙" }
 
 for i, name in ipairs(tabNames) do
     local TabBtn = Instance.new("TextButton")
-    TabBtn.Size = UDim2.new(1, 0, 0, 40)
-    TabBtn.Position = UDim2.new(0, 0, 0, (i-1) * 46)
-    TabBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+    TabBtn.Size = UDim2.new(1, 0, 0, 42)
+    TabBtn.Position = UDim2.new(0, 0, 0, (i-1) * 48)
+    TabBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
     TabBtn.Text = tabIcons[i] .. " " .. name
-    TabBtn.TextColor3 = Color3.fromRGB(200, 200, 220)
+    TabBtn.TextColor3 = Color3.fromRGB(180, 180, 200)
     TabBtn.Font = Enum.Font.GothamBold
     TabBtn.TextSize = 11
     TabBtn.Parent = TabBar
-    Instance.new("UICorner", TabBtn).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", TabBtn).CornerRadius = UDim.new(0, 10)
     local tabStroke = Instance.new("UIStroke", TabBtn)
-    tabStroke.Color = Color3.fromRGB(80, 0, 150)
+    tabStroke.Color = Color3.fromRGB(0, 255, 200)
     tabStroke.Thickness = 0
     Tabs[name] = {Btn = TabBtn, Stroke = tabStroke}
     
     local Page = Instance.new("ScrollingFrame")
-    Page.Size = UDim2.new(1, -115, 1, -80)
-    Page.Position = UDim2.new(0, 108, 0, 75)
+    Page.Size = UDim2.new(1, -125, 1, -100)
+    Page.Position = UDim2.new(0, 115, 0, 90)
     Page.BackgroundTransparency = 1
-    Page.ScrollBarThickness = 3
-    Page.ScrollBarImageColor3 = Color3.fromRGB(150, 0, 255)
+    Page.ScrollBarThickness = 4
+    Page.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 200)
     Page.Visible = false
-    Page.CanvasSize = UDim2.new(0, 0, 0, 1200)
+    Page.CanvasSize = UDim2.new(0, 0, 0, 1500)
     Page.Parent = MainFrame
     Pages[name] = Page
+    
+    TabBtn.MouseEnter:Connect(function()
+        if not Pages[name].Visible then
+            TweenService:Create(TabBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(40, 20, 80)}):Play()
+        end
+    end)
+    TabBtn.MouseLeave:Connect(function()
+        if not Pages[name].Visible then
+            TweenService:Create(TabBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(20, 20, 35)}):Play()
+        end
+    end)
 end
 
 Pages["Aimbot"].Visible = true
-Tabs["Aimbot"].Btn.BackgroundColor3 = Color3.fromRGB(90, 20, 160)
-Tabs["Aimbot"].Stroke.Thickness = 1.5
+Tabs["Aimbot"].Btn.BackgroundColor3 = Color3.fromRGB(60, 0, 120)
+Tabs["Aimbot"].Stroke.Thickness = 2
 
 for name, data in pairs(Tabs) do
     data.Btn.MouseButton1Click:Connect(function()
         for n, p in pairs(Pages) do 
             p.Visible = false 
-            if TweenService then TweenService:Create(Tabs[n].Btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(35, 35, 50)}):Play() end
+            TweenService:Create(Tabs[n].Btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(20, 20, 35)}):Play()
             Tabs[n].Stroke.Thickness = 0
         end
         Pages[name].Visible = true
-        if TweenService then
-            TweenService:Create(data.Btn, TweenInfo.new(0.25, Enum.EasingStyle.Back), {
-                BackgroundColor3 = Color3.fromRGB(90, 20, 160), Size = UDim2.new(1.05, 0, 0, 40)
-            }):Play()
-            task.wait(0.15)
-            TweenService:Create(data.Btn, TweenInfo.new(0.15), {Size = UDim2.new(1, 0, 0, 40)}):Play()
-        else
-            data.Btn.BackgroundColor3 = Color3.fromRGB(90, 20, 160)
-        end
-        data.Stroke.Thickness = 1.5
+        TweenService:Create(data.Btn, TweenInfo.new(0.25, Enum.EasingStyle.Back), {
+            BackgroundColor3 = Color3.fromRGB(60, 0, 120),
+            Size = UDim2.new(1.08, 0, 0, 42)
+        }):Play()
+        task.wait(0.15)
+        TweenService:Create(data.Btn, TweenInfo.new(0.15), {Size = UDim2.new(1, 0, 0, 42)}):Play()
+        data.Stroke.Thickness = 2
     end)
 end
 
--- УТИЛИТЫ
+-- ========== УТИЛИТЫ UI ==========
 local function CreateButton(parent, text, y, color, callback)
     local B = Instance.new("TextButton")
-    B.Size = UDim2.new(1, -10, 0, 36)
+    B.Size = UDim2.new(1, -10, 0, 38)
     B.Position = UDim2.new(0, 5, 0, y)
-    B.BackgroundColor3 = color or Color3.fromRGB(55, 55, 75)
+    B.BackgroundColor3 = color or Color3.fromRGB(30, 30, 50)
     B.Text = text
     B.TextColor3 = Color3.fromRGB(255, 255, 255)
     B.Font = Enum.Font.GothamBold
     B.TextSize = 13
     B.Parent = parent
-    Instance.new("UICorner", B).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", B).CornerRadius = UDim.new(0, 10)
     local bStroke = Instance.new("UIStroke", B)
-    bStroke.Color = Color3.fromRGB(100, 0, 180)
+    bStroke.Color = Color3.fromRGB(0, 255, 200)
     bStroke.Thickness = 1
     
+    B.MouseEnter:Connect(function()
+        TweenService:Create(B, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(50, 30, 90)}):Play()
+        TweenService:Create(bStroke, TweenInfo.new(0.15), {Thickness = 2}):Play()
+    end)
+    B.MouseLeave:Connect(function()
+        TweenService:Create(B, TweenInfo.new(0.15), {BackgroundColor3 = color or Color3.fromRGB(30, 30, 50)}):Play()
+        TweenService:Create(bStroke, TweenInfo.new(0.15), {Thickness = 1}):Play()
+    end)
+    
     B.MouseButton1Click:Connect(function()
-        if TweenService then
-            TweenService:Create(B, TweenInfo.new(0.08), {Size = UDim2.new(1, -14, 0, 34)}):Play()
-            task.wait(0.08)
-            TweenService:Create(B, TweenInfo.new(0.12, Enum.EasingStyle.Back), {Size = UDim2.new(1, -10, 0, 36)}):Play()
-        end
+        TweenService:Create(B, TweenInfo.new(0.08), {Size = UDim2.new(1, -14, 0, 36)}):Play()
+        task.wait(0.08)
+        TweenService:Create(B, TweenInfo.new(0.12, Enum.EasingStyle.Back), {Size = UDim2.new(1, -10, 0, 38)}):Play()
         pcall(callback, B)
     end)
     return B
@@ -776,7 +808,7 @@ local function CreateLabel(parent, text, y, size)
     L.Position = UDim2.new(0, 5, 0, y)
     L.BackgroundTransparency = 1
     L.Text = text
-    L.TextColor3 = Color3.fromRGB(200, 200, 220)
+    L.TextColor3 = Color3.fromRGB(180, 180, 200)
     L.Font = Enum.Font.GothamBold
     L.TextSize = 11
     L.TextXAlignment = Enum.TextXAlignment.Left
@@ -786,12 +818,12 @@ end
 
 local function CreateSectionLabel(parent, text, y)
     local L = Instance.new("TextLabel")
-    L.Size = UDim2.new(1, -10, 0, 22)
+    L.Size = UDim2.new(1, -10, 0, 24)
     L.Position = UDim2.new(0, 5, 0, y)
     L.BackgroundTransparency = 1
-    L.Text = "▸ " .. text
-    L.TextColor3 = Color3.fromRGB(180, 100, 255)
-    L.Font = Enum.Font.GothamBold
+    L.Text = "◆ " .. text
+    L.TextColor3 = Color3.fromRGB(0, 255, 200)
+    L.Font = Enum.Font.GothamBlack
     L.TextSize = 12
     L.TextXAlignment = Enum.TextXAlignment.Left
     L.Parent = parent
@@ -800,55 +832,53 @@ end
 
 local function CreateSlider(parent, text, y, min, max, default, isFloat, callback)
     local Container = Instance.new("Frame")
-    Container.Size = UDim2.new(1, -10, 0, 45)
+    Container.Size = UDim2.new(1, -10, 0, 48)
     Container.Position = UDim2.new(0, 5, 0, y)
     Container.BackgroundTransparency = 1
     Container.Parent = parent
     
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, 0, 0, 16)
+    Label.Size = UDim2.new(1, 0, 0, 18)
     Label.BackgroundTransparency = 1
     Label.Text = text .. ": " .. tostring(default)
-    Label.TextColor3 = Color3.fromRGB(220, 220, 240)
+    Label.TextColor3 = Color3.fromRGB(200, 200, 220)
     Label.Font = Enum.Font.GothamBold
     Label.TextSize = 11
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Container
     
     local Track = Instance.new("Frame")
-    Track.Size = UDim2.new(1, -10, 0, 10)
-    Track.Position = UDim2.new(0, 5, 0, 26)
-    Track.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+    Track.Size = UDim2.new(1, -10, 0, 8)
+    Track.Position = UDim2.new(0, 5, 0, 28)
+    Track.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
     Track.BorderSizePixel = 0
     Track.Parent = Container
     Instance.new("UICorner", Track).CornerRadius = UDim.new(1, 0)
     
     local Fill = Instance.new("Frame")
     Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    Fill.BackgroundColor3 = Color3.fromRGB(150, 0, 255)
+    Fill.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
     Fill.BorderSizePixel = 0
     Fill.Parent = Track
     Instance.new("UICorner", Fill).CornerRadius = UDim.new(1, 0)
     
     local Knob = Instance.new("Frame")
-    Knob.Size = UDim2.new(0, 20, 0, 20)
-    Knob.Position = UDim2.new((default - min) / (max - min), -10, 0.5, -10)
+    Knob.Size = UDim2.new(0, 22, 0, 22)
+    Knob.Position = UDim2.new((default - min) / (max - min), -11, 0.5, -11)
     Knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     Knob.BorderSizePixel = 0
     Knob.Parent = Track
     Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
+    local KnobStroke = Instance.new("UIStroke", Knob)
+    KnobStroke.Color = Color3.fromRGB(0, 255, 200)
+    KnobStroke.Thickness = 2
     
     local function Update(inputX)
         local rel = math.clamp((inputX - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
         local val = min + (max - min) * rel
         if not isFloat then val = math.floor(val + 0.5) end
-        if TweenService then
-            TweenService:Create(Fill, TweenInfo.new(0.05), {Size = UDim2.new(rel, 0, 1, 0)}):Play()
-            TweenService:Create(Knob, TweenInfo.new(0.05), {Position = UDim2.new(rel, -10, 0.5, -10)}):Play()
-        else
-            Fill.Size = UDim2.new(rel, 0, 1, 0)
-            Knob.Position = UDim2.new(rel, -10, 0.5, -10)
-        end
+        TweenService:Create(Fill, TweenInfo.new(0.05), {Size = UDim2.new(rel, 0, 1, 0)}):Play()
+        TweenService:Create(Knob, TweenInfo.new(0.05), {Position = UDim2.new(rel, -11, 0.5, -11)}):Play()
         Label.Text = text .. ": " .. (isFloat and string.format("%.2f", val) or tostring(val))
         pcall(callback, val)
     end
@@ -873,12 +903,12 @@ local function CreateSlider(parent, text, y, min, max, default, isFloat, callbac
 end
 
 local function CreateSelector(parent, text, y, options, default, callback)
-    local L = CreateLabel(parent, text, y, 16)
+    CreateLabel(parent, text, y, 16)
     local current = default
     local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(1, -10, 0, 32)
+    Btn.Size = UDim2.new(1, -10, 0, 34)
     Btn.Position = UDim2.new(0, 5, 0, y + 18)
-    Btn.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
+    Btn.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
     Btn.Text = "▶ " .. current
     Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     Btn.Font = Enum.Font.GothamBold
@@ -898,30 +928,26 @@ local function CreateSelector(parent, text, y, options, default, callback)
     return Btn
 end
 
--- ==========================================================
---  СТРАНИЦА FLING (НОВАЯ!)
--- ==========================================================
+-- ========== СТРАНИЦА FLING ==========
 local FlingPage = Pages["Fling"]
 local y = 10
 
-CreateSectionLabel(FlingPage, "🌪 FLING ИГРОКОВ", y); y = y + 25
+CreateSectionLabel(FlingPage, "🌪 FLING В КОСМОС", y); y = y + 28
+CreateLabel(FlingPage, "Выбери игрока и отправь его в космос!", y, 35); y = y + 40
 
-CreateLabel(FlingPage, "Выбери игрока из списка и нажми FLING", y, 30); y = y + 35
-
--- Список игроков для флинга
 local selectedFlingTarget = nil
 local playerListFrame = Instance.new("ScrollingFrame")
-playerListFrame.Size = UDim2.new(1, -10, 0, 150)
+playerListFrame.Size = UDim2.new(1, -10, 0, 180)
 playerListFrame.Position = UDim2.new(0, 5, 0, y)
 playerListFrame.BackgroundTransparency = 1
 playerListFrame.BorderSizePixel = 0
 playerListFrame.ScrollBarThickness = 3
-playerListFrame.ScrollBarImageColor3 = Color3.fromRGB(150, 0, 255)
+playerListFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 200)
 playerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 playerListFrame.Parent = FlingPage
 
 local playerListLayout = Instance.new("UIListLayout")
-playerListLayout.Padding = UDim.new(0, 4)
+playerListLayout.Padding = UDim.new(0, 5)
 playerListLayout.Parent = playerListFrame
 
 local function RefreshPlayerList()
@@ -932,23 +958,24 @@ local function RefreshPlayerList()
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             local PlayerBtn = Instance.new("TextButton")
-            PlayerBtn.Size = UDim2.new(1, -5, 0, 28)
-            PlayerBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-            PlayerBtn.Text = player.Name
+            PlayerBtn.Size = UDim2.new(1, -5, 0, 32)
+            PlayerBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+            PlayerBtn.Text = "  " .. player.Name
             PlayerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
             PlayerBtn.Font = Enum.Font.GothamBold
-            PlayerBtn.TextSize = 11
+            PlayerBtn.TextSize = 12
+            PlayerBtn.TextXAlignment = Enum.TextXAlignment.Left
             PlayerBtn.Parent = playerListFrame
-            Instance.new("UICorner", PlayerBtn).CornerRadius = UDim.new(0, 6)
+            Instance.new("UICorner", PlayerBtn).CornerRadius = UDim.new(0, 8)
             
             PlayerBtn.MouseButton1Click:Connect(function()
                 selectedFlingTarget = player
                 for _, btn in ipairs(playerListFrame:GetChildren()) do
                     if btn:IsA("TextButton") then
-                        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+                        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(25, 25, 40)}):Play()
                     end
                 end
-                PlayerBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 255)
+                TweenService:Create(PlayerBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(0, 200, 150)}):Play()
             end)
         end
     end
@@ -960,62 +987,67 @@ RefreshPlayerList()
 Players.PlayerAdded:Connect(RefreshPlayerList)
 Players.PlayerRemoving:Connect(RefreshPlayerList)
 
-y = y + 160
+y = y + 190
 
-CreateSlider(FlingPage, "Сила флинга", y, 100, 2000, Config.FlingPower, false, function(v) Config.FlingPower = v end); y = y + 50
+CreateSlider(FlingPage, "Сила флинга", y, 1000, 10000, Config.FlingPower, false, function(v) Config.FlingPower = v end); y = y + 52
+CreateSlider(FlingPage, "Высота запуска", y, 1000, 20000, Config.FlingHeight, false, function(v) Config.FlingHeight = v end); y = y + 55
 
-CreateSelector(FlingPage, "Метод флинга", y, {"Spin", "Launch", "Collide"}, Config.FlingMethod, function(v) Config.FlingMethod = v end); y = y + 55
-
-local FlingBtn = CreateButton(FlingPage, "🌪 FLING ВЫБРАННОГО ИГРОКА", y, Color3.fromRGB(255, 100, 0), function(self)
+local FlingBtn = CreateButton(FlingPage, "🌪 ОТПРАВИТЬ В КОСМОС", y, Color3.fromRGB(255, 100, 0), function(self)
     if selectedFlingTarget and selectedFlingTarget.Parent then
-        local success = pcall(function() FlingPlayer(selectedFlingTarget) end)
+        local success = pcall(function() FlingToCosmos(selectedFlingTarget) end)
         if success then
-            self.Text = "✅ ФЛИНГ ОТПРАВЛЕН!"
-            self.BackgroundColor3 = Color3.fromRGB(0, 160, 60)
-            task.delay(1.5, function()
-                self.Text = "🌪 FLING ВЫБРАННОГО ИГРОКА"
+            self.Text = "✅ ОТПРАВЛЕН В КОСМОС!"
+            self.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+            task.delay(2, function()
+                self.Text = "🌪 ОТПРАВИТЬ В КОСМОС"
                 self.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
             end)
         else
-            self.Text = "❌ ОШИБКА ФЛИНГА"
-            self.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
-            task.delay(1.5, function()
-                self.Text = "🌪 FLING ВЫБРАННОГО ИГРОКА"
+            self.Text = "❌ ОШИБКА"
+            self.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+            task.delay(2, function()
+                self.Text = "🌪 ОТПРАВИТЬ В КОСМОС"
                 self.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
             end)
         end
     else
         self.Text = "⚠ ВЫБЕРИ ИГРОКА ИЗ СПИСКА"
         self.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
-        task.delay(1.5, function()
-            self.Text = "🌪 FLING ВЫБРАННОГО ИГРОКА"
+        task.delay(2, function()
+            self.Text = "🌪 ОТПРАВИТЬ В КОСМОС"
             self.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
         end)
     end
 end); y = y + 45
 
-CreateButton(FlingPage, "🔄 ОБНОВИТЬ СПИСОК ИГРОКОВ", y, Color3.fromRGB(60, 60, 90), function(self)
+CreateButton(FlingPage, "🔄 ОБНОВИТЬ СПИСОК", y, Color3.fromRGB(40, 40, 70), function(self)
     RefreshPlayerList()
-    self.Text = "✅ СПИСОК ОБНОВЛЁН"
-    task.delay(1, function()
-        self.Text = "🔄 ОБНОВИТЬ СПИСОК ИГРОКОВ"
-    end)
-end); y = y + 45
-
-CreateButton(FlingPage, "Anti-Fling (защита себя): ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
-    Config.AntiFling = not Config.AntiFling
-    self.Text = "Anti-Fling: " .. (Config.AntiFling and "ВКЛ ✓" or "ВЫКЛ")
-    self.BackgroundColor3 = Config.AntiFling and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(140, 40, 40)
-    EnableAntiFling(Config.AntiFling)
+    self.Text = "✅ ОБНОВЛЕНО"
+    task.delay(1, function() self.Text = "🔄 ОБНОВИТЬ СПИСОК" end)
 end)
 
--- ==========================================================
---  СТРАНИЦА MISC (с кнопкой косметики)
--- ==========================================================
+-- ========== СТРАНИЦA MISC ==========
 local MiscPage = Pages["Misc"]
 y = 10
 
-CreateSectionLabel(MiscPage, "⚙ AUTO", y); y = y + 25
+CreateSectionLabel(MiscPage, "👻 НЕВИДИМОСТЬ", y); y = y + 28
+CreateLabel(MiscPage, "Телепортирует тебя далеко под карту.", y, 16); y = y + 18
+CreateLabel(MiscPage, "Другие игроки тебя НЕ УВИДЯТ!", y, 16); y = y + 25
+
+CreateButton(MiscPage, "👻 СТАТЬ НЕВИДИМЫМ", y, Color3.fromRGB(150, 0, 255), function(self)
+    Config.Invisibility = not Config.Invisibility
+    if Config.Invisibility then
+        self.Text = "✅ ТЫ НЕВИДИМ! (Нажми чтобы вернуться)"
+        self.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        SetTrueInvisibility(true)
+    else
+        self.Text = "👻 СТАТЬ НЕВИДИМЫМ"
+        self.BackgroundColor3 = Color3.fromRGB(150, 0, 255)
+        SetTrueInvisibility(false)
+    end
+end); y = y + 50
+
+CreateSectionLabel(MiscPage, "⚙ AUTO", y); y = y + 28
 
 CreateButton(MiscPage, "Auto Block: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
     Config.AutoBlock = not Config.AutoBlock
@@ -1023,51 +1055,18 @@ CreateButton(MiscPage, "Auto Block: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), f
     self.BackgroundColor3 = Config.AutoBlock and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
 end); y = y + 42
 
-CreateButton(MiscPage, "Невидимость: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
-    Config.Invisibility = not Config.Invisibility
-    self.Text = "Невидимость: " .. (Config.Invisibility and "ВКЛ ✓" or "ВЫКЛ")
-    self.BackgroundColor3 = Config.Invisibility and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
-    SetInvisibility(Config.Invisibility)
-end); y = y + 42
+CreateSlider(MiscPage, "Дистанция блока", y, 5, 50, Config.AutoBlockDistance, false, function(v) Config.AutoBlockDistance = v end); y = y + 52
 
 CreateButton(MiscPage, "No Cooldown: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
     Config.NoCooldown = not Config.NoCooldown
     self.Text = "No Cooldown: " .. (Config.NoCooldown and "ВКЛ ✓" or "ВЫКЛ")
     self.BackgroundColor3 = Config.NoCooldown and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(140, 40, 40)
-end); y = y + 55
-
-CreateSectionLabel(MiscPage, "🎨 КОСМЕТИКА", y); y = y + 25
-
-CreateLabel(MiscPage, "⚠ ВНИМАНИЕ: Косметика хранится на сервере.", y, 16); y = y + 18
-CreateLabel(MiscPage, "Клиент НЕ МОЖЕТ разблокировать её.", y, 16); y = y + 18
-CreateLabel(MiscPage, "Кнопка ниже попытается, но это не сработает.", y, 16); y = y + 25
-
-CreateButton(MiscPage, "🔓 ПОПЫТКА РАЗБЛОКИРОВКИ ВСЕЙ КОСМЕТИКИ", y, Color3.fromRGB(255, 150, 0), function(self)
-    self.Text = "⏳ ПОИСК КОСМЕТИКИ..."
-    task.wait(0.5)
-    
-    local found = TryUnlockCosmetics()
-    
-    if found > 0 then
-        self.Text = "⚠ НАЙДЕНО " .. found .. " ЛОКАЛЬНЫХ ЗНАЧЕНИЙ"
-        self.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
-    else
-        self.Text = "❌ КОСМЕТИКА НА СЕРВЕРЕ - НЕВОЗМОЖНО"
-        self.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
-    end
-    
-    task.delay(3, function()
-        self.Text = "🔓 ПОПЫТКА РАЗБЛОКИРОВКИ ВСЕЙ КОСМЕТИКИ"
-        self.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-    end)
 end)
 
--- ==========================================================
---  ОСТАЛЬНЫЕ СТРАНИЦЫ (Aimbot, Visuals, ESP)
--- ==========================================================
+-- ========== ОСТАЛЬНЫЕ СТРАНИЦЫ ==========
 local AimbotPage = Pages["Aimbot"]
 y = 10
-CreateSectionLabel(AimbotPage, "⚔ ОСНОВНЫЕ", y); y = y + 25
+CreateSectionLabel(AimbotPage, "🎯 AIMBOT", y); y = y + 28
 CreateButton(AimbotPage, "Aimbot: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
     Config.AimbotEnabled = not Config.AimbotEnabled
     self.Text = "Aimbot: " .. (Config.AimbotEnabled and "ВКЛ ✓" or "ВЫКЛ")
@@ -1078,14 +1077,14 @@ CreateButton(AimbotPage, "WallCheck: ВКЛ", y, Color3.fromRGB(0, 130, 0), func
     self.Text = "WallCheck: " .. (Config.WallCheck and "ВКЛ ✓" or "ВЫКЛ")
     self.BackgroundColor3 = Config.WallCheck and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)
 end); y = y + 45
-CreateSlider(AimbotPage, "FOV", y, 10, 800, Config.FOV, false, function(v) Config.FOV = v end); y = y + 50
-CreateSlider(AimbotPage, "Плавность", y, 0.01, 1.0, Config.Smoothness, true, function(v) Config.Smoothness = v end); y = y + 50
-CreateSelector(AimbotPage, "Режим цели", y, {"FOV", "LowestHP", "HighestHP", "Distance"}, Config.TargetMode, function(v) Config.TargetMode = v end); y = y + 55
+CreateSlider(AimbotPage, "FOV", y, 10, 800, Config.FOV, false, function(v) Config.FOV = v end); y = y + 52
+CreateSlider(AimbotPage, "Плавность", y, 0.01, 1.0, Config.Smoothness, true, function(v) Config.Smoothness = v end); y = y + 52
+CreateSelector(AimbotPage, "Режим цели", y, {"FOV", "LowestHP", "HighestHP", "Distance"}, Config.TargetMode, function(v) Config.TargetMode = v end); y = y + 58
 CreateSelector(AimbotPage, "Часть тела", y, {"Head", "HumanoidRootPart", "UpperTorso"}, Config.TargetPart, function(v) Config.TargetPart = v end)
 
 local VisPage = Pages["Visuals"]
 y = 10
-CreateSectionLabel(VisPage, "✨ АУРА И КРЫЛЬЯ", y); y = y + 25
+CreateSectionLabel(VisPage, "✨ АУРА И КРЫЛЬЯ", y); y = y + 28
 CreateButton(VisPage, "Аура: ВКЛ", y, Color3.fromRGB(0, 130, 0), function(self)
     Config.AuraEnabled = not Config.AuraEnabled
     self.Text = "Аура: " .. (Config.AuraEnabled and "ВКЛ ✓" or "ВЫКЛ")
@@ -1100,7 +1099,7 @@ CreateButton(VisPage, "Крылья: ВКЛ", y, Color3.fromRGB(0, 130, 0), func
     for _, w in ipairs(WingParts) do w.Part.Transparency = Config.WingsEnabled and Config.WingsTransparency or 1 end
     for _, b in ipairs(WingBeams) do b.Transparency = NumberSequence.new(Config.WingsEnabled and Config.WingsTransparency or 1) end
 end); y = y + 45
-CreateSlider(VisPage, "Размер ауры", y, 2, 15, Config.AuraSize, false, function(v) Config.AuraSize = v; AuraRing.Size = Vector3.new(0.15, v, v) end); y = y + 50
+CreateSlider(VisPage, "Размер ауры", y, 2, 15, Config.AuraSize, false, function(v) Config.AuraSize = v; AuraRing.Size = Vector3.new(0.15, v, v) end); y = y + 52
 CreateSlider(VisPage, "Чёткость крыльев", y, 0, 1.0, Config.WingsTransparency, true, function(v)
     Config.WingsTransparency = v
     for _, w in ipairs(WingParts) do if Config.WingsEnabled then w.Part.Transparency = v end end
@@ -1109,7 +1108,7 @@ end)
 
 local EspPage = Pages["ESP"]
 y = 10
-CreateSectionLabel(EspPage, "👁 ВИДЫ ESP", y); y = y + 25
+CreateSectionLabel(EspPage, "👁 ESP", y); y = y + 28
 CreateButton(EspPage, "ESP Игроков: ВЫКЛ", y, Color3.fromRGB(140, 40, 40), function(self)
     Config.EspPlayers = not Config.EspPlayers
     self.Text = "ESP Игроков: " .. (Config.EspPlayers and "ВКЛ ✓" or "ВЫКЛ")
@@ -1121,6 +1120,7 @@ CreateButton(EspPage, "Tracers: ВКЛ", y, Color3.fromRGB(0, 130, 0), function(
     self.BackgroundColor3 = Config.ShowTracers and Color3.fromRGB(0, 130, 0) or Color3.fromRGB(130, 0, 0)
 end)
 
-print("[JJS v5.0] ✅ СКРИПТ ЗАГРУЖЕН! Меню должно появиться.")
-print("[JJS] 🌪 FLING: Выбери игрока из списка и нажми кнопку")
-print("[JJS] ⚠ Косметика: Хранится на сервере, разблокировка невозможна")
+print("[APEX HUB v6.0] ✅ ЗАГРУЖЕНО!")
+print("[APEX] 🌪 Fling: Выбери игрока и отправь в космос")
+print("[APEX] 👻 Невидимость: Телепортирует тебя далеко, другие не увидят")
+print("[APEX] ◆ Красивая кнопка APEX в форме ромба")
