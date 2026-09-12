@@ -1,10 +1,10 @@
 -- ==========================================================
---     ◈ APEX HUB v9.0 | JJS EDITION ◈
---     Широкий интерфейс | Все переключатели | Фикс цветов
+--     ◈ APEX HUB v9.1 | JJS EDITION ◈
+--     Улучшенный NoCD + Мощный Fling + Fast Flags инструкция
 -- ==========================================================
 
 print("═══════════════════════════════════════")
-print("  ◈ APEX HUB v9.0 | JJS ◈")
+print("  ◈ APEX HUB v9.1 | JJS ◈")
 print("═══════════════════════════════════════")
 
 local Players = game:GetService("Players")
@@ -62,6 +62,7 @@ local Config = {
 
     Invisibility = false,
     NoCooldown = false,
+    FlingMethod = "GojoFling", -- GojoFling | BodyThrust | Standard
 }
 
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -69,8 +70,8 @@ local Root = Character:WaitForChild("HumanoidRootPart")
 local Humanoid = Character:WaitForChild("Humanoid")
 
 -- ==========================================================
---  НЕВИДИМОСТЬ (максимум возможного с клиента)
---  Удаляем визуальные части, оставляем только хитбокс
+--  НЕВИДИМОСТЬ (клиентская, максимальная)
+--  Для серверной невидимости используй Fast Flags в Delta!
 -- ==========================================================
 local InvisModule = {
     Active = false,
@@ -126,8 +127,8 @@ function InvisModule:Activate()
     end)
 
     Config.Invisibility = true
-    print("[APEX] Невидимость активирована (клиент)")
-    print("[APEX] ⚠ Полная невидимость для сервера невозможна с клиента")
+    print("[APEX] Клиентская невидимость активирована")
+    print("[APEX] 💡 Для серверной невидимости используй Fast Flags в Delta!")
 end
 
 function InvisModule:Deactivate()
@@ -152,50 +153,65 @@ function InvisModule:Deactivate()
 end
 
 -- ==========================================================
---  NO COOLDOWN (ищем все возможные кулдауны)
+--  NO COOLDOWN (расширенный поиск)
+--  Ищет: Cooldown, CD, AbilityCooldown, SkillCooldown,
+--        Wait, Delay, Ready, Lock, Skill, Ability, Timer
 -- ==========================================================
 local function ApplyNoCooldown()
     pcall(function()
-        -- В персонаже
-        for _, desc in ipairs(Character:GetDescendants()) do
-            if desc:IsA("NumberValue") or desc:IsA("IntValue") or desc:IsA("BoolValue") then
-                local name = desc.Name:lower()
-                if name:find("cool") or name:find("cd") or name:find("timer")
-                   or name:find("wait") or name:find("delay") or name:find("ready")
-                   or name:find("lock") or name:find("skill") or name:find("ability") then
-                    if desc:IsA("BoolValue") then
-                        desc.Value = true
-                    else
-                        desc.Value = 0
-                    end
-                end
-            end
-        end
-        -- В PlayerScripts
+        local locations = {}
+        
+        -- 1. Персонаж
+        if Character then table.insert(locations, Character) end
+        
+        -- 2. PlayerScripts
         local ps = LocalPlayer:FindFirstChild("PlayerScripts")
-        if ps then
-            for _, desc in ipairs(ps:GetDescendants()) do
-                if desc:IsA("NumberValue") or desc:IsA("IntValue") then
-                    local name = desc.Name:lower()
-                    if name:find("cool") or name:find("cd") or name:find("timer")
-                       or name:find("wait") or name:find("delay") then
-                        desc.Value = 0
-                    end
-                end
-            end
-        end
-        -- В Backpack
+        if ps then table.insert(locations, ps) end
+        
+        -- 3. Backpack
         local bp = LocalPlayer:FindFirstChild("Backpack")
-        if bp then
-            for _, desc in ipairs(bp:GetDescendants()) do
-                if desc:IsA("NumberValue") or desc:IsA("IntValue") then
+        if bp then table.insert(locations, bp) end
+        
+        -- 4. PlayerGui (иногда там хранятся UI кулдауны)
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        if pg then table.insert(locations, pg) end
+        
+        for _, location in ipairs(locations) do
+            pcall(function()
+                for _, desc in ipairs(location:GetDescendants()) do
                     local name = desc.Name:lower()
-                    if name:find("cool") or name:find("cd") or name:find("timer") then
+                    local isTarget = name:find("cool") or name:find("cd") 
+                                  or name:find("timer") or name:find("wait") 
+                                  or name:find("delay") or name:find("ready")
+                                  or name:find("lock") or name:find("skill") 
+                                  or name:find("ability") or name:find("move")
+                                  or name:find("action") or name:find("charge")
+                                  or name:find("recharge") or name:find("mana")
+                                  or name:find("energy")
+                    
+                    if isTarget then
+                        if desc:IsA("NumberValue") or desc:IsA("IntValue") then
+                            desc.Value = 0
+                        elseif desc:IsA("BoolValue") then
+                            desc.Value = true
+                        end
+                    end
+                end
+            end)
+        end
+        
+        -- Дополнительно: ищем в ReplicatedStorage (некоторые игры там хранят кулдауны)
+        pcall(function()
+            local rs = game:GetService("ReplicatedStorage")
+            for _, desc in ipairs(rs:GetDescendants()) do
+                local name = desc.Name:lower()
+                if name:find("cool") or name:find("cd") or name:find("timer") then
+                    if desc:IsA("NumberValue") or desc:IsA("IntValue") then
                         desc.Value = 0
                     end
                 end
             end
-        end
+        end)
     end)
 end
 
@@ -206,10 +222,88 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==========================================================
---  FLING (максимум возможного с клиента)
+--  МОЩНЫЙ FLING (3 метода)
 -- ==========================================================
 local FlingActive = false
 
+-- Метод 1: GojoFling (оптимизированный под JJS)
+local function GojoFling(targetHrp, myHrp)
+    local spin = Instance.new("BodyAngularVelocity")
+    spin.MaxTorque = Vector3.new(0, math.huge, 0)
+    spin.AngularVelocity = Vector3.new(0, 250, 0) -- Очень быстрое вращение
+    spin.Parent = myHrp
+    
+    -- Множественные телепорты по спирали вокруг цели
+    for i = 1, 30 do
+        if not targetHrp or not targetHrp.Parent then break end
+        local angle = (i / 30) * math.pi * 4 -- 2 полных оборота
+        local radius = 2 + math.sin(i * 0.3) * 0.5 -- Переменный радиус
+        pcall(function()
+            myHrp.CFrame = targetHrp.CFrame * CFrame.new(
+                math.cos(angle) * radius,
+                math.sin(i * 0.5) * 0.5, -- Вертикальное колебание
+                math.sin(angle) * radius
+            )
+        end)
+        task.wait(0.015)
+    end
+    
+    if spin and spin.Parent then spin:Destroy() end
+end
+
+-- Метод 2: BodyThrust (прямое воздействие на цель)
+local function BodyThrustFling(targetHrp)
+    -- Пробуем приложить силу к цели
+    local thrust = Instance.new("BodyThrust")
+    thrust.Name = "ApexThrust"
+    thrust.Force = Vector3.new(
+        math.random(-800, 800),
+        1500, -- Мощный импульс вверх
+        math.random(-800, 800)
+    )
+    thrust.Location = Vector3.new(0, 0, 0)
+    thrust.Parent = targetHrp
+    
+    -- Добавляем вращение цели
+    local spin = Instance.new("BodyAngularVelocity")
+    spin.Name = "ApexSpin"
+    spin.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    spin.AngularVelocity = Vector3.new(
+        math.random(-100, 100),
+        math.random(150, 300),
+        math.random(-100, 100)
+    )
+    spin.Parent = targetHrp
+    
+    task.delay(2.5, function()
+        if thrust and thrust.Parent then thrust:Destroy() end
+        if spin and spin.Parent then spin:Destroy() end
+    end)
+end
+
+-- Метод 3: Стандартный (BodyVelocity)
+local function StandardFling(targetHrp, myHrp)
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Velocity = Vector3.new(
+        math.random(-400, 400),
+        800, -- Очень сильный импульс вверх
+        math.random(-400, 400)
+    )
+    bv.Parent = targetHrp
+    
+    local bav = Instance.new("BodyAngularVelocity")
+    bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bav.AngularVelocity = Vector3.new(100, 200, 100)
+    bav.Parent = targetHrp
+    
+    task.delay(3, function()
+        if bv and bv.Parent then bv:Destroy() end
+        if bav and bav.Parent then bav:Destroy() end
+    end)
+end
+
+-- Главная функция флинга
 local function FlingPlayer(targetPlayer)
     if FlingActive then return false end
     if not targetPlayer or targetPlayer == LocalPlayer then return false end
@@ -225,48 +319,68 @@ local function FlingPlayer(targetPlayer)
     FlingActive = true
     local oldCF = myHrp.CFrame
 
+    print("[APEX] 🌪 Начало флинга: " .. targetPlayer.Name)
+    print("[APEX] Метод: " .. Config.FlingMethod)
+
     task.spawn(function()
         -- Отключаем свою коллизию
         for _, p in ipairs(Character:GetDescendants()) do
             if p:IsA("BasePart") then p.CanCollide = false end
         end
 
-        -- Спин
-        local spin = Instance.new("BodyAngularVelocity")
-        spin.MaxTorque = Vector3.new(0, math.huge, 0)
-        spin.AngularVelocity = Vector3.new(0, 200, 0)
-        spin.Parent = myHrp
+        -- Свой спин (для накопления импульса)
+        local mySpin = Instance.new("BodyAngularVelocity")
+        mySpin.MaxTorque = Vector3.new(0, math.huge, 0)
+        mySpin.AngularVelocity = Vector3.new(0, 180, 0)
+        mySpin.Parent = myHrp
 
-        -- Серия телепортов вокруг цели
-        for i = 1, 20 do
-            if not tHrp or not tHrp.Parent then break end
-            local angle = (i / 20) * math.pi * 2
-            pcall(function()
-                myHrp.CFrame = tHrp.CFrame * CFrame.new(math.cos(angle) * 1.5, 0, math.sin(angle) * 1.5)
-            end)
-            task.wait(0.02)
-        end
-
-        -- Финальный толчок
-        if tHrp and tHrp.Parent then
+        -- Применяем выбранный метод
+        local success = pcall(function()
+            if Config.FlingMethod == "GojoFling" then
+                GojoFling(tHrp, myHrp)
+                -- Дополнительный толчок через BodyThrust
+                BodyThrustFling(tHrp)
+            elseif Config.FlingMethod == "BodyThrust" then
+                -- Телепортируемся к цели
+                for i = 1, 15 do
+                    if not tHrp or not tHrp.Parent then break end
+                    local angle = (i / 15) * math.pi * 2
+                    myHrp.CFrame = tHrp.CFrame * CFrame.new(math.cos(angle) * 1.5, 0, math.sin(angle) * 1.5)
+                    task.wait(0.02)
+                end
+                -- Применяем BodyThrust
+                BodyThrustFling(tHrp)
+            else -- Standard
+                -- Серия телепортов
+                for i = 1, 20 do
+                    if not tHrp or not tHrp.Parent then break end
+                    local angle = (i / 20) * math.pi * 2
+                    myHrp.CFrame = tHrp.CFrame * CFrame.new(math.cos(angle) * 1.5, 0, math.sin(angle) * 1.5)
+                    task.wait(0.02)
+                end
+                StandardFling(tHrp, myHrp)
+            end
+            
+            -- Финальный мощный толчок своим персонажем
             pcall(function()
                 myHrp.CFrame = tHrp.CFrame
-                myHrp.AssemblyLinearVelocity = Vector3.new(math.random(-150, 150), 200, math.random(-150, 150))
+                myHrp.AssemblyLinearVelocity = Vector3.new(
+                    math.random(-300, 300),
+                    500, -- Усиленный импульс вверх
+                    math.random(-300, 300)
+                )
             end)
+        end)
 
-            -- Пытаемся воздействовать на цель напрямую
-            pcall(function()
-                local bv = Instance.new("BodyVelocity")
-                bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                bv.Velocity = Vector3.new(math.random(-200, 200), 400, math.random(-200, 200))
-                bv.Parent = tHrp
-                task.delay(2, function() if bv and bv.Parent then bv:Destroy() end end)
-            end)
+        if success then
+            print("[APEX] ✅ Флинг выполнен!")
+        else
+            print("[APEX] ❌ Ошибка флинга (сервер заблокировал)")
         end
 
         -- Возврат
-        task.delay(0.5, function()
-            if spin and spin.Parent then spin:Destroy() end
+        task.delay(0.8, function()
+            if mySpin and mySpin.Parent then mySpin:Destroy() end
             for _, p in ipairs(Character:GetDescendants()) do
                 if p:IsA("BasePart") then p.CanCollide = true end
             end
@@ -372,7 +486,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==========================================================
---  FOV + ESP + AIMBOT
+--  FOV + ESP + AIMBOT (без изменений)
 -- ==========================================================
 local FovCircle = nil
 if Drawing then
@@ -396,7 +510,6 @@ if FovCircle then
     end)
 end
 
--- ESP
 local EspTable = {}
 local function GetEspDraw(player)
     if not Drawing then return nil end
@@ -474,7 +587,6 @@ if Drawing then
     end)
 end
 
--- AIMBOT
 local function GetAlivePlayers()
     local list = {}
     for _, p in pairs(Players:GetPlayers()) do
@@ -531,7 +643,6 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
--- AUTO BLOCK
 RunService.Heartbeat:Connect(function()
     if Config.AutoBlock and not InvisModule.Active then
         for _, info in ipairs(GetAlivePlayers()) do
@@ -547,18 +658,17 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==========================================================
---  П Р Е М И У М   G U I   (ШИРОКИЙ + НИЗКИЙ)
+--  GUI (широкий, низкий, все тогглы)
 -- ==========================================================
 print("[APEX] Создание GUI...")
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ApexV9"
+ScreenGui.Name = "ApexV91"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Кнопка
 local FloatBtn = Instance.new("TextButton")
 FloatBtn.Size = UDim2.new(0, 65, 0, 65)
 FloatBtn.Position = UDim2.new(0, 12, 0.45, -32)
@@ -584,9 +694,8 @@ task.spawn(function()
     end
 end)
 
--- ГЛАВНОЕ МЕНЮ: ШИРОКОЕ И НИЗКОЕ
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 550, 0, 380)  -- Шире и ниже!
+MainFrame.Size = UDim2.new(0, 550, 0, 380)
 MainFrame.Position = UDim2.new(0.5, -275, 0.5, -190)
 MainFrame.BackgroundColor3 = C.BG
 MainFrame.BackgroundTransparency = 0.02
@@ -607,7 +716,6 @@ mainGrad.Color = ColorSequence.new({
 })
 mainGrad.Rotation = 135
 
--- Заголовок
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -100, 0, 45)
 Title.Position = UDim2.new(0, 15, 0, 5)
@@ -630,14 +738,13 @@ local SubTitle = Instance.new("TextLabel")
 SubTitle.Size = UDim2.new(1, -100, 0, 14)
 SubTitle.Position = UDim2.new(0, 15, 0, 35)
 SubTitle.BackgroundTransparency = 1
-SubTitle.Text = "JUJUTSU SHENANIGANS"
+SubTitle.Text = "JUJUTSU SHENANIGANS v9.1"
 SubTitle.TextColor3 = C.TextDim
 SubTitle.Font = Enum.Font.GothamBold
 SubTitle.TextSize = 9
 SubTitle.TextXAlignment = Enum.TextXAlignment.Left
 SubTitle.Parent = MainFrame
 
--- Кнопка закрытия
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 34, 0, 34)
 CloseBtn.Position = UDim2.new(1, -42, 0, 8)
@@ -649,7 +756,6 @@ CloseBtn.TextSize = 16
 CloseBtn.Parent = MainFrame
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 9)
 
--- Линия
 local HeaderLine = Instance.new("Frame")
 HeaderLine.Size = UDim2.new(1, -30, 0, 2)
 HeaderLine.Position = UDim2.new(0, 15, 0, 52)
@@ -662,7 +768,6 @@ hlGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, C.Accent),
 })
 
--- Функция открытия/закрытия
 local MenuOpen = false
 local function ToggleMenu()
     if MenuOpen then
@@ -690,7 +795,6 @@ end
 CloseBtn.MouseButton1Click:Connect(ToggleMenu)
 FloatBtn.MouseButton1Click:Connect(ToggleMenu)
 
--- ВКЛАДКИ (горизонтально сверху, т.к. меню широкое)
 local TabBar = Instance.new("Frame")
 TabBar.Size = UDim2.new(1, -30, 0, 36)
 TabBar.Position = UDim2.new(0, 15, 0, 58)
@@ -762,11 +866,6 @@ for name, data in pairs(Tabs) do
     end)
 end
 
--- ==========================================================
---  УТИЛИТЫ: ТОГГЛ + СЛАЙДЕР + СЕЛЕКТОР
--- ==========================================================
-
--- ПЕРЕКЛЮЧАТЕЛЬ (главный элемент теперь)
 local function CreateToggle(parent, text, y, default, callback)
     local Container = Instance.new("Frame")
     Container.Size = UDim2.new(1, -10, 0, 40)
@@ -968,7 +1067,7 @@ local function CreateSection(parent, text, y)
 end
 
 -- ==========================================================
---  СТРАНИЦА: AIMBOT (все тогглы)
+--  СТРАНИЦА: AIMBOT
 -- ==========================================================
 local AimbotPage = Pages["Aimbot"]
 local y = 0
@@ -986,17 +1085,22 @@ CreateSelector(AimbotPage, "Режим цели", y, {"FOV", "LowestHP", "Highes
 CreateSelector(AimbotPage, "Часть тела", y, {"Head", "HumanoidRootPart", "UpperTorso"}, Config.TargetPart, function(v) Config.TargetPart = v end)
 
 -- ==========================================================
---  СТРАНИЦА: FLING
+--  СТРАНИЦА: FLING (с выбором метода)
 -- ==========================================================
 local FlingPage = Pages["Fling"]
 y = 0
 
 CreateSection(FlingPage, "FLING", y); y = y + 28
 
+CreateSelector(FlingPage, "Метод флинга", y, {"GojoFling", "BodyThrust", "Standard"}, Config.FlingMethod, function(v) 
+    Config.FlingMethod = v 
+    print("[APEX] Метод флинга: " .. v)
+end); y = y + 58
+
 local selectedFlingTarget = nil
 
 local PlayerListFrame = Instance.new("ScrollingFrame")
-PlayerListFrame.Size = UDim2.new(1, -10, 0, 160)
+PlayerListFrame.Size = UDim2.new(1, -10, 0, 140)
 PlayerListFrame.Position = UDim2.new(0, 5, 0, y)
 PlayerListFrame.BackgroundTransparency = 1
 PlayerListFrame.BorderSizePixel = 0
@@ -1043,7 +1147,7 @@ RefreshPlayerList()
 Players.PlayerAdded:Connect(function() task.wait(1) RefreshPlayerList() end)
 Players.PlayerRemoving:Connect(function() task.wait(1) RefreshPlayerList() end)
 
-y = y + 170
+y = y + 150
 
 local FlingBtn = CreateButton(FlingPage, "◎ ЗАПУСТИТЬ В КОСМОС", y, Color3.fromRGB(160, 20, 40), function(self)
     if FlingActive then
@@ -1111,7 +1215,7 @@ CreateToggle(EspPage, "ESP Игроков", y, false, function(v) Config.EspPlay
 CreateToggle(EspPage, "Tracers", y, true, function(v) Config.ShowTracers = v end)
 
 -- ==========================================================
---  СТРАНИЦА: MISC
+--  СТРАНИЦА: MISC (с инструкцией по Fast Flags)
 -- ==========================================================
 local MiscPage = Pages["Misc"]
 y = 0
@@ -1135,8 +1239,14 @@ CreateSlider(MiscPage, "Дистанция блока", y, 5, 50, Config.AutoBlo
 --  ГОТОВО
 -- ==========================================================
 print("═══════════════════════════════════════")
-print("  ◈ APEX HUB v9.0 ЗАГРУЖЕН! ◈")
-print("  ⚠ Невидимость: клиентская (не серверная)")
-print("  ⚠ NoCD: ищет кулдауны но не гарантирует")
-print("  ⚠ Fling: зависит от сервера")
+print("  ◈ APEX HUB v9.1 ЗАГРУЖЕН! ◈")
+print("")
+print("  💡 ДЛЯ СЕРВЕРНОЙ НЕВИДИМОСТИ:")
+print("  Delta → Settings → Fast Flags:")
+print("    DFIntS2CMaxAcceptablePingMs = 100000")
+print("    FFlagHandleChatMoveLocalThrottling = false")
+print("    FFlagDebugSimDefaultCSGv3 = true")
+print("")
+print("  ✅ Улучшенный NoCD (расширенный поиск)")
+print("  ✅ Мощный Fling (3 метода + BodyThrust)")
 print("═══════════════════════════════════════")
