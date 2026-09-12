@@ -372,7 +372,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==========================================================
---  FOV + ESP + AIMBOT (как раньше)
+--  FOV + ESP + AIMBOT
 -- ==========================================================
 local FovCircle = nil
 if Drawing then
