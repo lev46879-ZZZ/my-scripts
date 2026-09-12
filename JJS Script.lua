@@ -1,19 +1,21 @@
 -- ==========================================================
---     ◈ APEX HUB v9.1 | JJS EDITION ◈
---     Улучшенный NoCD + Мощный Fling + Fast Flags инструкция
+--     ◈ APEX HUB | JJS CLEAN EDITION ◈
+--     Чистая версия без Fast Flags | 100% загрузка
 -- ==========================================================
 
-print("═══════════════════════════════════════")
-print("  ◈ APEX HUB v9.1 | JJS ◈")
-print("═══════════════════════════════════════")
+print("[APEX] Загрузка...")
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
-local Drawing = drawing or Drawing or (getgenv and getgenv().drawing)
 local Camera = workspace.CurrentCamera
+
+-- Безопасное определение Drawing
+local Drawing = drawing or Drawing
+if not Drawing then
+    pcall(function() Drawing = getgenv().drawing end)
+end
 
 -- Палитра
 local C = {
@@ -25,12 +27,9 @@ local C = {
     AccentDark = Color3.fromRGB(90, 15, 180),
     Red = Color3.fromRGB(255, 40, 70),
     Green = Color3.fromRGB(40, 230, 120),
-    GreenDark = Color3.fromRGB(25, 140, 75),
-    Gold = Color3.fromRGB(255, 200, 50),
-    White = Color3.fromRGB(255, 255, 255),
     Text = Color3.fromRGB(225, 218, 255),
     TextDim = Color3.fromRGB(130, 120, 165),
-    Black = Color3.fromRGB(0, 0, 0),
+    White = Color3.fromRGB(255, 255, 255),
 }
 
 local Config = {
@@ -55,262 +54,48 @@ local Config = {
     AuraRate = 35,
 
     EspPlayers = false,
-    EspCharms = false,
     ShowTracers = true,
     EspColor = Color3.fromRGB(255, 50, 50),
-    CharmColor = Color3.fromRGB(255, 215, 0),
 
-    Invisibility = false,
     NoCooldown = false,
-    FlingMethod = "GojoFling", -- GojoFling | BodyThrust | Standard
 }
 
+print("[APEX] Ожидание персонажа...")
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Root = Character:WaitForChild("HumanoidRootPart")
 local Humanoid = Character:WaitForChild("Humanoid")
 
--- ==========================================================
---  НЕВИДИМОСТЬ (клиентская, максимальная)
---  Для серверной невидимости используй Fast Flags в Delta!
--- ==========================================================
-local InvisModule = {
-    Active = false,
-    Clone = nil,
-    Conn = nil,
-}
-
-function InvisModule:Activate()
-    if self.Active then return end
-    self.Active = true
-
-    -- Создаём полупрозрачный клон для себя
-    pcall(function()
-        self.Clone = Character:Clone()
-        self.Clone.Name = "ApexVisClone"
-        self.Clone.Parent = workspace
-        for _, obj in ipairs(self.Clone:GetDescendants()) do
-            if obj:IsA("BaseScript") then obj:Destroy() end
-            if obj:IsA("BasePart") then
-                obj.Transparency = math.clamp(obj.Transparency + 0.65, 0, 0.95)
-                obj.CanCollide = false
-                obj.CanQuery = false
-                obj.CastShadow = false
-            end
-        end
-        local hum = self.Clone:FindFirstChildOfClass("Humanoid")
-        if hum then hum:Destroy() end
-    end)
-
-    -- Делаем оригинал невидимым
-    for _, part in ipairs(Character:GetDescendants()) do
-        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-            pcall(function()
-                part.Transparency = 1
-                part.CastShadow = false
-            end)
-        end
-    end
-
-    -- Синхронизация клона
-    self.Conn = RunService.Heartbeat:Connect(function()
-        if not self.Active or not self.Clone or not self.Clone.Parent then return end
-        pcall(function()
-            for _, orig in ipairs(Character:GetDescendants()) do
-                if orig:IsA("BasePart") then
-                    local cl = self.Clone:FindFirstChild(orig.Name)
-                    if cl and cl:IsA("BasePart") then
-                        cl.CFrame = orig.CFrame
-                    end
-                end
-            end
-        end)
-    end)
-
-    Config.Invisibility = true
-    print("[APEX] Клиентская невидимость активирована")
-    print("[APEX] 💡 Для серверной невидимости используй Fast Flags в Delta!")
-end
-
-function InvisModule:Deactivate()
-    if not self.Active then return end
-    self.Active = false
-
-    if self.Conn then self.Conn:Disconnect() self.Conn = nil end
-    if self.Clone and self.Clone.Parent then self.Clone:Destroy() self.Clone = nil end
-
-    -- Восстанавливаем прозрачность
-    pcall(function()
-        for _, part in ipairs(Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Transparency = 0
-                part.CastShadow = true
-            end
-        end
-    end)
-
-    Config.Invisibility = false
-    print("[APEX] Невидимость деактивирована")
-end
+print("[APEX] Персонаж найден!")
 
 -- ==========================================================
---  NO COOLDOWN (расширенный поиск)
---  Ищет: Cooldown, CD, AbilityCooldown, SkillCooldown,
---        Wait, Delay, Ready, Lock, Skill, Ability, Timer
+--  NO COOLDOWN (простой и безопасный)
 -- ==========================================================
-local function ApplyNoCooldown()
-    pcall(function()
-        local locations = {}
-        
-        -- 1. Персонаж
-        if Character then table.insert(locations, Character) end
-        
-        -- 2. PlayerScripts
-        local ps = LocalPlayer:FindFirstChild("PlayerScripts")
-        if ps then table.insert(locations, ps) end
-        
-        -- 3. Backpack
-        local bp = LocalPlayer:FindFirstChild("Backpack")
-        if bp then table.insert(locations, bp) end
-        
-        -- 4. PlayerGui (иногда там хранятся UI кулдауны)
-        local pg = LocalPlayer:FindFirstChild("PlayerGui")
-        if pg then table.insert(locations, pg) end
-        
-        for _, location in ipairs(locations) do
-            pcall(function()
-                for _, desc in ipairs(location:GetDescendants()) do
-                    local name = desc.Name:lower()
-                    local isTarget = name:find("cool") or name:find("cd") 
-                                  or name:find("timer") or name:find("wait") 
-                                  or name:find("delay") or name:find("ready")
-                                  or name:find("lock") or name:find("skill") 
-                                  or name:find("ability") or name:find("move")
-                                  or name:find("action") or name:find("charge")
-                                  or name:find("recharge") or name:find("mana")
-                                  or name:find("energy")
-                    
-                    if isTarget then
-                        if desc:IsA("NumberValue") or desc:IsA("IntValue") then
-                            desc.Value = 0
-                        elseif desc:IsA("BoolValue") then
-                            desc.Value = true
-                        end
-                    end
-                end
-            end)
-        end
-        
-        -- Дополнительно: ищем в ReplicatedStorage (некоторые игры там хранят кулдауны)
-        pcall(function()
-            local rs = game:GetService("ReplicatedStorage")
-            for _, desc in ipairs(rs:GetDescendants()) do
-                local name = desc.Name:lower()
-                if name:find("cool") or name:find("cd") or name:find("timer") then
-                    if desc:IsA("NumberValue") or desc:IsA("IntValue") then
-                        desc.Value = 0
-                    end
-                end
-            end
-        end)
-    end)
-end
-
 RunService.Heartbeat:Connect(function()
-    if Config.NoCooldown then
-        ApplyNoCooldown()
-    end
+    if not Config.NoCooldown then return end
+    pcall(function()
+        for _, desc in ipairs(Character:GetDescendants()) do
+            if desc:IsA("NumberValue") or desc:IsA("IntValue") then
+                local n = desc.Name:lower()
+                if n:find("cool") or n:find("cd") or n:find("timer") or n:find("wait") then
+                    desc.Value = 0
+                end
+            end
+        end
+    end)
 end)
 
 -- ==========================================================
---  МОЩНЫЙ FLING (3 метода)
+--  FLING (простой и безопасный)
 -- ==========================================================
 local FlingActive = false
 
--- Метод 1: GojoFling (оптимизированный под JJS)
-local function GojoFling(targetHrp, myHrp)
-    local spin = Instance.new("BodyAngularVelocity")
-    spin.MaxTorque = Vector3.new(0, math.huge, 0)
-    spin.AngularVelocity = Vector3.new(0, 250, 0) -- Очень быстрое вращение
-    spin.Parent = myHrp
-    
-    -- Множественные телепорты по спирали вокруг цели
-    for i = 1, 30 do
-        if not targetHrp or not targetHrp.Parent then break end
-        local angle = (i / 30) * math.pi * 4 -- 2 полных оборота
-        local radius = 2 + math.sin(i * 0.3) * 0.5 -- Переменный радиус
-        pcall(function()
-            myHrp.CFrame = targetHrp.CFrame * CFrame.new(
-                math.cos(angle) * radius,
-                math.sin(i * 0.5) * 0.5, -- Вертикальное колебание
-                math.sin(angle) * radius
-            )
-        end)
-        task.wait(0.015)
-    end
-    
-    if spin and spin.Parent then spin:Destroy() end
-end
-
--- Метод 2: BodyThrust (прямое воздействие на цель)
-local function BodyThrustFling(targetHrp)
-    -- Пробуем приложить силу к цели
-    local thrust = Instance.new("BodyThrust")
-    thrust.Name = "ApexThrust"
-    thrust.Force = Vector3.new(
-        math.random(-800, 800),
-        1500, -- Мощный импульс вверх
-        math.random(-800, 800)
-    )
-    thrust.Location = Vector3.new(0, 0, 0)
-    thrust.Parent = targetHrp
-    
-    -- Добавляем вращение цели
-    local spin = Instance.new("BodyAngularVelocity")
-    spin.Name = "ApexSpin"
-    spin.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    spin.AngularVelocity = Vector3.new(
-        math.random(-100, 100),
-        math.random(150, 300),
-        math.random(-100, 100)
-    )
-    spin.Parent = targetHrp
-    
-    task.delay(2.5, function()
-        if thrust and thrust.Parent then thrust:Destroy() end
-        if spin and spin.Parent then spin:Destroy() end
-    end)
-end
-
--- Метод 3: Стандартный (BodyVelocity)
-local function StandardFling(targetHrp, myHrp)
-    local bv = Instance.new("BodyVelocity")
-    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bv.Velocity = Vector3.new(
-        math.random(-400, 400),
-        800, -- Очень сильный импульс вверх
-        math.random(-400, 400)
-    )
-    bv.Parent = targetHrp
-    
-    local bav = Instance.new("BodyAngularVelocity")
-    bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    bav.AngularVelocity = Vector3.new(100, 200, 100)
-    bav.Parent = targetHrp
-    
-    task.delay(3, function()
-        if bv and bv.Parent then bv:Destroy() end
-        if bav and bav.Parent then bav:Destroy() end
-    end)
-end
-
--- Главная функция флинга
 local function FlingPlayer(targetPlayer)
     if FlingActive then return false end
     if not targetPlayer or targetPlayer == LocalPlayer then return false end
 
     local tChar = targetPlayer.Character
     if not tChar then return false end
-    local tHrp = tChar:FindFirstChild("HumanoidRootPart") or tChar:FindFirstChild("Torso")
+    local tHrp = tChar:FindFirstChild("HumanoidRootPart")
     if not tHrp then return false end
 
     local myHrp = Character:FindFirstChild("HumanoidRootPart")
@@ -319,68 +104,46 @@ local function FlingPlayer(targetPlayer)
     FlingActive = true
     local oldCF = myHrp.CFrame
 
-    print("[APEX] 🌪 Начало флинга: " .. targetPlayer.Name)
-    print("[APEX] Метод: " .. Config.FlingMethod)
-
     task.spawn(function()
-        -- Отключаем свою коллизию
+        -- Отключаем коллизию
         for _, p in ipairs(Character:GetDescendants()) do
             if p:IsA("BasePart") then p.CanCollide = false end
         end
 
-        -- Свой спин (для накопления импульса)
-        local mySpin = Instance.new("BodyAngularVelocity")
-        mySpin.MaxTorque = Vector3.new(0, math.huge, 0)
-        mySpin.AngularVelocity = Vector3.new(0, 180, 0)
-        mySpin.Parent = myHrp
+        -- Спин
+        local spin = Instance.new("BodyAngularVelocity")
+        spin.MaxTorque = Vector3.new(0, math.huge, 0)
+        spin.AngularVelocity = Vector3.new(0, 200, 0)
+        spin.Parent = myHrp
 
-        -- Применяем выбранный метод
-        local success = pcall(function()
-            if Config.FlingMethod == "GojoFling" then
-                GojoFling(tHrp, myHrp)
-                -- Дополнительный толчок через BodyThrust
-                BodyThrustFling(tHrp)
-            elseif Config.FlingMethod == "BodyThrust" then
-                -- Телепортируемся к цели
-                for i = 1, 15 do
-                    if not tHrp or not tHrp.Parent then break end
-                    local angle = (i / 15) * math.pi * 2
-                    myHrp.CFrame = tHrp.CFrame * CFrame.new(math.cos(angle) * 1.5, 0, math.sin(angle) * 1.5)
-                    task.wait(0.02)
-                end
-                -- Применяем BodyThrust
-                BodyThrustFling(tHrp)
-            else -- Standard
-                -- Серия телепортов
-                for i = 1, 20 do
-                    if not tHrp or not tHrp.Parent then break end
-                    local angle = (i / 20) * math.pi * 2
-                    myHrp.CFrame = tHrp.CFrame * CFrame.new(math.cos(angle) * 1.5, 0, math.sin(angle) * 1.5)
-                    task.wait(0.02)
-                end
-                StandardFling(tHrp, myHrp)
-            end
-            
-            -- Финальный мощный толчок своим персонажем
+        -- Телепорты вокруг цели
+        for i = 1, 20 do
+            if not tHrp or not tHrp.Parent then break end
+            local angle = (i / 20) * math.pi * 2
+            pcall(function()
+                myHrp.CFrame = tHrp.CFrame * CFrame.new(math.cos(angle) * 1.5, 0, math.sin(angle) * 1.5)
+            end)
+            task.wait(0.02)
+        end
+
+        -- Толчок
+        if tHrp and tHrp.Parent then
             pcall(function()
                 myHrp.CFrame = tHrp.CFrame
-                myHrp.AssemblyLinearVelocity = Vector3.new(
-                    math.random(-300, 300),
-                    500, -- Усиленный импульс вверх
-                    math.random(-300, 300)
-                )
+                myHrp.AssemblyLinearVelocity = Vector3.new(math.random(-150, 150), 200, math.random(-150, 150))
             end)
-        end)
-
-        if success then
-            print("[APEX] ✅ Флинг выполнен!")
-        else
-            print("[APEX] ❌ Ошибка флинга (сервер заблокировал)")
+            pcall(function()
+                local bv = Instance.new("BodyVelocity")
+                bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                bv.Velocity = Vector3.new(math.random(-200, 200), 400, math.random(-200, 200))
+                bv.Parent = tHrp
+                task.delay(2, function() if bv and bv.Parent then bv:Destroy() end end)
+            end)
         end
 
         -- Возврат
-        task.delay(0.8, function()
-            if mySpin and mySpin.Parent then mySpin:Destroy() end
+        task.delay(0.5, function()
+            if spin and spin.Parent then spin:Destroy() end
             for _, p in ipairs(Character:GetDescendants()) do
                 if p:IsA("BasePart") then p.CanCollide = true end
             end
@@ -472,13 +235,12 @@ CreateWing(-1)
 
 RunService.Heartbeat:Connect(function()
     if not Root or not Root.Parent then return end
-    local showVis = not InvisModule.Active
-    if Config.AuraEnabled and showVis then
+    if Config.AuraEnabled then
         AuraRing.CFrame = Root.CFrame * CFrame.new(0, -2.5, 0) * CFrame.Angles(0, 0, math.rad(90))
     else
         AuraRing.CFrame = CFrame.new(0, -10000, 0)
     end
-    if Config.WingsEnabled and showVis then
+    if Config.WingsEnabled then
         for _, w in ipairs(WingParts) do w.Part.CFrame = Root.CFrame * w.BaseOffset end
     else
         for _, w in ipairs(WingParts) do w.Part.CFrame = CFrame.new(0, -10000, 0) end
@@ -486,7 +248,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==========================================================
---  FOV + ESP + AIMBOT (без изменений)
+--  FOV CIRCLE
 -- ==========================================================
 local FovCircle = nil
 if Drawing then
@@ -510,38 +272,14 @@ if FovCircle then
     end)
 end
 
+-- ==========================================================
+--  ESP
+-- ==========================================================
 local EspTable = {}
-local function GetEspDraw(player)
-    if not Drawing then return nil end
-    if not EspTable[player] then
-        EspTable[player] = {
-            Box = Drawing.new("Square"),
-            Name = Drawing.new("Text"),
-            Hp = Drawing.new("Text"),
-            Tracer = Drawing.new("Line"),
-        }
-        EspTable[player].Box.Thickness = 1.5
-        EspTable[player].Box.Filled = false
-        EspTable[player].Box.Color = Config.EspColor
-        EspTable[player].Name.Size = 14
-        EspTable[player].Name.Center = true
-        EspTable[player].Name.Outline = true
-        EspTable[player].Name.Color = C.White
-        EspTable[player].Hp.Size = 12
-        EspTable[player].Hp.Center = true
-        EspTable[player].Hp.Outline = true
-        EspTable[player].Hp.Color = C.Green
-        EspTable[player].Tracer.Thickness = 2
-        EspTable[player].Tracer.Color = Config.EspColor
-        EspTable[player].Tracer.Transparency = 0.7
-    end
-    return EspTable[player]
-end
 
 if Drawing then
     RunService.RenderStepped:Connect(function()
         for _, player in pairs(Players:GetPlayers()) do
-            local draw = EspTable[player]
             if player ~= LocalPlayer and Config.EspPlayers then
                 local char = player.Character
                 if char then
@@ -550,43 +288,80 @@ if Drawing then
                     if hrp and hum and hum.Health > 0 then
                         local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
                         if onScreen then
-                            draw = GetEspDraw(player)
-                            if draw then
-                                local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
-                                local scale = 1200 / dist
-                                local boxSize = Vector2.new(scale * 1.5, scale * 2.5)
-                                draw.Box.Size = boxSize
-                                draw.Box.Position = Vector2.new(pos.X - boxSize.X / 2, pos.Y - boxSize.Y / 2)
-                                draw.Box.Color = Config.EspColor
-                                draw.Box.Visible = true
-                                draw.Name.Text = player.Name
-                                draw.Name.Position = Vector2.new(pos.X, pos.Y - boxSize.Y / 2 - 20)
-                                draw.Name.Visible = true
-                                draw.Hp.Text = math.floor(hum.Health) .. " HP"
-                                draw.Hp.Position = Vector2.new(pos.X, pos.Y + boxSize.Y / 2 + 5)
-                                draw.Hp.Visible = true
-                                if Config.ShowTracers then
-                                    draw.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                                    draw.Tracer.To = Vector2.new(pos.X, pos.Y)
-                                    draw.Tracer.Visible = true
-                                else
-                                    draw.Tracer.Visible = false
-                                end
+                            if not EspTable[player] then
+                                EspTable[player] = {
+                                    Box = Drawing.new("Square"),
+                                    Name = Drawing.new("Text"),
+                                    Hp = Drawing.new("Text"),
+                                    Tracer = Drawing.new("Line"),
+                                }
+                                EspTable[player].Box.Thickness = 1.5
+                                EspTable[player].Box.Filled = false
+                                EspTable[player].Box.Color = Config.EspColor
+                                EspTable[player].Name.Size = 14
+                                EspTable[player].Name.Center = true
+                                EspTable[player].Name.Outline = true
+                                EspTable[player].Name.Color = C.White
+                                EspTable[player].Hp.Size = 12
+                                EspTable[player].Hp.Center = true
+                                EspTable[player].Hp.Outline = true
+                                EspTable[player].Hp.Color = C.Green
+                                EspTable[player].Tracer.Thickness = 2
+                                EspTable[player].Tracer.Color = Config.EspColor
+                                EspTable[player].Tracer.Transparency = 0.7
+                            end
+                            local d = EspTable[player]
+                            local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
+                            local scale = 1200 / dist
+                            local boxSize = Vector2.new(scale * 1.5, scale * 2.5)
+                            d.Box.Size = boxSize
+                            d.Box.Position = Vector2.new(pos.X - boxSize.X / 2, pos.Y - boxSize.Y / 2)
+                            d.Box.Visible = true
+                            d.Name.Text = player.Name
+                            d.Name.Position = Vector2.new(pos.X, pos.Y - boxSize.Y / 2 - 20)
+                            d.Name.Visible = true
+                            d.Hp.Text = math.floor(hum.Health) .. " HP"
+                            d.Hp.Position = Vector2.new(pos.X, pos.Y + boxSize.Y / 2 + 5)
+                            d.Hp.Visible = true
+                            if Config.ShowTracers then
+                                d.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                                d.Tracer.To = Vector2.new(pos.X, pos.Y)
+                                d.Tracer.Visible = true
+                            else
+                                d.Tracer.Visible = false
                             end
                         else
-                            if draw then draw.Box.Visible = false; draw.Name.Visible = false; draw.Hp.Visible = false; draw.Tracer.Visible = false end
+                            if EspTable[player] then
+                                EspTable[player].Box.Visible = false
+                                EspTable[player].Name.Visible = false
+                                EspTable[player].Hp.Visible = false
+                                EspTable[player].Tracer.Visible = false
+                            end
                         end
                     else
-                        if draw then draw.Box.Visible = false; draw.Name.Visible = false; draw.Hp.Visible = false; draw.Tracer.Visible = false end
+                        if EspTable[player] then
+                            EspTable[player].Box.Visible = false
+                            EspTable[player].Name.Visible = false
+                            EspTable[player].Hp.Visible = false
+                            EspTable[player].Tracer.Visible = false
+                        end
                     end
                 end
             else
-                if draw then draw.Box.Visible = false; draw.Name.Visible = false; draw.Hp.Visible = false; draw.Tracer.Visible = false end
+                if EspTable[player] then
+                    EspTable[player].Box.Visible = false
+                    EspTable[player].Name.Visible = false
+                    EspTable[player].Hp.Visible = false
+                    EspTable[player].Tracer.Visible = false
+                end
             end
         end
     end)
 end
 
+-- ==========================================================
+--  AIMBOT (с WallCheck)
+-- ==========================================================
 local function GetAlivePlayers()
     local list = {}
     for _, p in pairs(Players:GetPlayers()) do
@@ -601,12 +376,28 @@ local function GetAlivePlayers()
     return list
 end
 
+local function IsVisible(targetPart)
+    if not Config.WallCheck then return true end
+    local origin = Camera.CFrame.Position
+    local direction = targetPart.Position - origin
+    local distance = direction.Magnitude
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {LocalPlayer.Character}
+    params.IgnoreWater = true
+    local result = workspace:Raycast(origin, direction.Unit * distance, params)
+    if result then
+        return result.Instance:IsDescendantOf(targetPart.Parent)
+    end
+    return true
+end
+
 local function PickTarget()
     local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     local best, bestScore = nil, nil
     for _, info in ipairs(GetAlivePlayers()) do
         local part = info.Player.Character:FindFirstChild(Config.TargetPart) or info.Player.Character:FindFirstChild("Head")
-        if part then
+        if part and IsVisible(part) then
             local screenPos = Camera:WorldToViewportPoint(part.Position)
             local fovDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
             if fovDist <= Config.FOV * 5 then
@@ -643,8 +434,9 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
+-- AUTO BLOCK
 RunService.Heartbeat:Connect(function()
-    if Config.AutoBlock and not InvisModule.Active then
+    if Config.AutoBlock then
         for _, info in ipairs(GetAlivePlayers()) do
             local dist = (info.Root.Position - Root.Position).Magnitude
             if dist < Config.AutoBlockDistance then
@@ -658,17 +450,18 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==========================================================
---  GUI (широкий, низкий, все тогглы)
+--  GUI (ШИРОКИЙ + НИЗКИЙ + ВСЁ ТОГГЛЫ)
 -- ==========================================================
 print("[APEX] Создание GUI...")
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ApexV91"
+ScreenGui.Name = "ApexClean"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
+-- Кнопка
 local FloatBtn = Instance.new("TextButton")
 FloatBtn.Size = UDim2.new(0, 65, 0, 65)
 FloatBtn.Position = UDim2.new(0, 12, 0.45, -32)
@@ -694,6 +487,7 @@ task.spawn(function()
     end
 end)
 
+-- Меню
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 550, 0, 380)
 MainFrame.Position = UDim2.new(0.5, -275, 0.5, -190)
@@ -709,13 +503,6 @@ local mainStroke = Instance.new("UIStroke", MainFrame)
 mainStroke.Color = C.Accent
 mainStroke.Thickness = 2
 
-local mainGrad = Instance.new("UIGradient", MainFrame)
-mainGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(14, 8, 30)),
-    ColorSequenceKeypoint.new(1, C.BG),
-})
-mainGrad.Rotation = 135
-
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -100, 0, 45)
 Title.Position = UDim2.new(0, 15, 0, 5)
@@ -727,18 +514,11 @@ Title.TextSize = 20
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = MainFrame
 
-local titleGrad = Instance.new("UIGradient", Title)
-titleGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, C.Accent),
-    ColorSequenceKeypoint.new(0.5, C.Red),
-    ColorSequenceKeypoint.new(1, C.Accent),
-})
-
 local SubTitle = Instance.new("TextLabel")
 SubTitle.Size = UDim2.new(1, -100, 0, 14)
 SubTitle.Position = UDim2.new(0, 15, 0, 35)
 SubTitle.BackgroundTransparency = 1
-SubTitle.Text = "JUJUTSU SHENANIGANS v9.1"
+SubTitle.Text = "JUJUTSU SHENANIGANS | CLEAN"
 SubTitle.TextColor3 = C.TextDim
 SubTitle.Font = Enum.Font.GothamBold
 SubTitle.TextSize = 9
@@ -795,6 +575,7 @@ end
 CloseBtn.MouseButton1Click:Connect(ToggleMenu)
 FloatBtn.MouseButton1Click:Connect(ToggleMenu)
 
+-- Вкладки
 local TabBar = Instance.new("Frame")
 TabBar.Size = UDim2.new(1, -30, 0, 36)
 TabBar.Position = UDim2.new(0, 15, 0, 58)
@@ -804,7 +585,7 @@ TabBar.Parent = MainFrame
 local Tabs = {}
 local Pages = {}
 local tabNames = { "Aimbot", "Fling", "Visuals", "ESP", "Misc" }
-local tabIcons = { "⊕", "◎", "✦", "◉", "⚙" }
+local tabIcons = { "⊕", "◎", "✦", "◉", "" }
 
 for i, name in ipairs(tabNames) do
     local TabBtn = Instance.new("TextButton")
@@ -866,6 +647,7 @@ for name, data in pairs(Tabs) do
     end)
 end
 
+-- Утилиты
 local function CreateToggle(parent, text, y, default, callback)
     local Container = Instance.new("Frame")
     Container.Size = UDim2.new(1, -10, 0, 40)
@@ -903,7 +685,6 @@ local function CreateToggle(parent, text, y, default, callback)
     Instance.new("UICorner", ToggleKnob).CornerRadius = UDim.new(1, 0)
 
     local state = default
-
     Container.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             state = not state
@@ -917,7 +698,6 @@ local function CreateToggle(parent, text, y, default, callback)
             pcall(callback, state)
         end
     end)
-
     return Container
 end
 
@@ -1067,40 +847,30 @@ local function CreateSection(parent, text, y)
 end
 
 -- ==========================================================
---  СТРАНИЦА: AIMBOT
+--  СТРАНИЦЫ
 -- ==========================================================
+
+-- AIMBOT
 local AimbotPage = Pages["Aimbot"]
 local y = 0
-
 CreateSection(AimbotPage, "AIMBOT", y); y = y + 28
 CreateToggle(AimbotPage, "Aimbot", y, false, function(v) Config.AimbotEnabled = v end); y = y + 46
 CreateToggle(AimbotPage, "WallCheck", y, true, function(v) Config.WallCheck = v end); y = y + 46
 CreateToggle(AimbotPage, "Поворот персонажа", y, true, function(v) Config.RotateCharacter = v end); y = y + 46
 CreateToggle(AimbotPage, "Показать FOV", y, true, function(v) Config.ShowFOV = v end); y = y + 50
-
 CreateSlider(AimbotPage, "FOV", y, 50, 1000, Config.FOV, false, function(v) Config.FOV = v end); y = y + 54
 CreateSlider(AimbotPage, "Плавность", y, 0.01, 1.0, Config.Smoothness, true, function(v) Config.Smoothness = v end); y = y + 54
-
 CreateSelector(AimbotPage, "Режим цели", y, {"FOV", "LowestHP", "HighestHP", "Distance"}, Config.TargetMode, function(v) Config.TargetMode = v end); y = y + 58
 CreateSelector(AimbotPage, "Часть тела", y, {"Head", "HumanoidRootPart", "UpperTorso"}, Config.TargetPart, function(v) Config.TargetPart = v end)
 
--- ==========================================================
---  СТРАНИЦА: FLING (с выбором метода)
--- ==========================================================
+-- FLING
 local FlingPage = Pages["Fling"]
 y = 0
-
 CreateSection(FlingPage, "FLING", y); y = y + 28
 
-CreateSelector(FlingPage, "Метод флинга", y, {"GojoFling", "BodyThrust", "Standard"}, Config.FlingMethod, function(v) 
-    Config.FlingMethod = v 
-    print("[APEX] Метод флинга: " .. v)
-end); y = y + 58
-
 local selectedFlingTarget = nil
-
 local PlayerListFrame = Instance.new("ScrollingFrame")
-PlayerListFrame.Size = UDim2.new(1, -10, 0, 140)
+PlayerListFrame.Size = UDim2.new(1, -10, 0, 160)
 PlayerListFrame.Position = UDim2.new(0, 5, 0, y)
 PlayerListFrame.BackgroundTransparency = 1
 PlayerListFrame.BorderSizePixel = 0
@@ -1147,7 +917,7 @@ RefreshPlayerList()
 Players.PlayerAdded:Connect(function() task.wait(1) RefreshPlayerList() end)
 Players.PlayerRemoving:Connect(function() task.wait(1) RefreshPlayerList() end)
 
-y = y + 150
+y = y + 170
 
 local FlingBtn = CreateButton(FlingPage, "◎ ЗАПУСТИТЬ В КОСМОС", y, Color3.fromRGB(160, 20, 40), function(self)
     if FlingActive then
@@ -1176,12 +946,9 @@ CreateButton(FlingPage, "↻ ОБНОВИТЬ СПИСОК", y, C.Panel, functio
     task.delay(1, function() self.Text = "↻ ОБНОВИТЬ СПИСОК" end)
 end)
 
--- ==========================================================
---  СТРАНИЦА: VISUALS
--- ==========================================================
+-- VISUALS
 local VisPage = Pages["Visuals"]
 y = 0
-
 CreateSection(VisPage, "VISUALS", y); y = y + 28
 CreateToggle(VisPage, "Аура", y, true, function(v)
     Config.AuraEnabled = v
@@ -1193,7 +960,6 @@ CreateToggle(VisPage, "Крылья", y, true, function(v)
     for _, w in ipairs(WingParts) do w.Part.Transparency = v and Config.WingsTransparency or 1 end
     for _, b in ipairs(WingBeams) do b.Transparency = NumberSequence.new(v and Config.WingsTransparency or 1) end
 end); y = y + 50
-
 CreateSlider(VisPage, "Размер ауры", y, 2, 15, Config.AuraSize, false, function(v) Config.AuraSize = v; AuraRing.Size = Vector3.new(0.15, v, v) end); y = y + 54
 CreateSlider(VisPage, "Частицы ауры", y, 0, 100, Config.AuraRate, false, function(v) Config.AuraRate = v; AuraParticles.Rate = v end); y = y + 54
 CreateSlider(VisPage, "Прозрачность крыльев", y, 0, 1.0, Config.WingsTransparency, true, function(v)
@@ -1204,49 +970,23 @@ CreateSlider(VisPage, "Прозрачность крыльев", y, 0, 1.0, Conf
     end
 end)
 
--- ==========================================================
---  СТРАНИЦА: ESP
--- ==========================================================
+-- ESP
 local EspPage = Pages["ESP"]
 y = 0
-
 CreateSection(EspPage, "ESP", y); y = y + 28
 CreateToggle(EspPage, "ESP Игроков", y, false, function(v) Config.EspPlayers = v end); y = y + 46
 CreateToggle(EspPage, "Tracers", y, true, function(v) Config.ShowTracers = v end)
 
--- ==========================================================
---  СТРАНИЦА: MISC (с инструкцией по Fast Flags)
--- ==========================================================
+-- MISC
 local MiscPage = Pages["Misc"]
 y = 0
-
 CreateSection(MiscPage, "MISC", y); y = y + 28
-
-CreateToggle(MiscPage, "Невидимость", y, false, function(v)
-    if v then
-        InvisModule:Activate()
-    else
-        InvisModule:Deactivate()
-    end
-end); y = y + 46
-
 CreateToggle(MiscPage, "No Cooldown", y, false, function(v) Config.NoCooldown = v end); y = y + 46
 CreateToggle(MiscPage, "Auto Block", y, false, function(v) Config.AutoBlock = v end); y = y + 50
-
 CreateSlider(MiscPage, "Дистанция блока", y, 5, 50, Config.AutoBlockDistance, false, function(v) Config.AutoBlockDistance = v end)
 
 -- ==========================================================
---  ГОТОВО
--- ==========================================================
 print("═══════════════════════════════════════")
-print("  ◈ APEX HUB v9.1 ЗАГРУЖЕН! ◈")
-print("")
-print("  💡 ДЛЯ СЕРВЕРНОЙ НЕВИДИМОСТИ:")
-print("  Delta → Settings → Fast Flags:")
-print("    DFIntS2CMaxAcceptablePingMs = 100000")
-print("    FFlagHandleChatMoveLocalThrottling = false")
-print("    FFlagDebugSimDefaultCSGv3 = true")
-print("")
-print("  ✅ Улучшенный NoCD (расширенный поиск)")
-print("  ✅ Мощный Fling (3 метода + BodyThrust)")
+print("  ◈ APEX HUB CLEAN ЗАГРУЖЕН! ◈")
+print("  Нажми ◈ для открытия меню")
 print("═══════════════════════════════════════")
