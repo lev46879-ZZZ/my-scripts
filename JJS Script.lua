@@ -1,9 +1,9 @@
 -- ==========================================================
---     ◈ APEX HUB | JJS CLEAN EDITION ◈
---     Чистая версия без Fast Flags | 100% загрузка
+--     ◈ APEX HUB v10 | JJS PREMIUM EDITION ◈
+--     Современный GUI + Клиентские визуалы + Все функции
 -- ==========================================================
 
-print("[APEX] Загрузка...")
+print("[APEX] Загрузка Premium версии...")
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -11,25 +11,22 @@ local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Безопасное определение Drawing
+-- Безопасный Drawing
 local Drawing = drawing or Drawing
-if not Drawing then
-    pcall(function() Drawing = getgenv().drawing end)
-end
+if not Drawing then pcall(function() Drawing = getgenv().drawing end) end
 
--- Палитра
-local C = {
-    BG = Color3.fromRGB(10, 8, 18),
-    BG2 = Color3.fromRGB(16, 12, 28),
-    Panel = Color3.fromRGB(20, 16, 36),
-    PanelHover = Color3.fromRGB(35, 28, 60),
-    Accent = Color3.fromRGB(147, 30, 255),
-    AccentDark = Color3.fromRGB(90, 15, 180),
-    Red = Color3.fromRGB(255, 40, 70),
-    Green = Color3.fromRGB(40, 230, 120),
-    Text = Color3.fromRGB(225, 218, 255),
-    TextDim = Color3.fromRGB(130, 120, 165),
-    White = Color3.fromRGB(255, 255, 255),
+-- Современная палитра (как в топовых читах)
+local Theme = {
+    Background = Color3.fromRGB(15, 15, 20),
+    Secondary = Color3.fromRGB(22, 22, 30),
+    Accent = Color3.fromRGB(120, 80, 255),
+    AccentGlow = Color3.fromRGB(150, 100, 255),
+    Success = Color3.fromRGB(50, 220, 130),
+    Danger = Color3.fromRGB(255, 70, 90),
+    Warning = Color3.fromRGB(255, 180, 50),
+    Text = Color3.fromRGB(240, 240, 250),
+    TextMuted = Color3.fromRGB(140, 140, 160),
+    Border = Color3.fromRGB(40, 40, 55),
 }
 
 local Config = {
@@ -57,6 +54,7 @@ local Config = {
     ShowTracers = true,
     EspColor = Color3.fromRGB(255, 50, 50),
 
+    Invisibility = false,
     NoCooldown = false,
 }
 
@@ -65,10 +63,68 @@ local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Root = Character:WaitForChild("HumanoidRootPart")
 local Humanoid = Character:WaitForChild("Humanoid")
 
-print("[APEX] Персонаж найден!")
+-- ==========================================================
+--  НЕВИДИМОСТЬ (простая клиентская)
+-- ==========================================================
+local InvisModule = { Active = false, Clone = nil, Conn = nil }
+
+function InvisModule:Activate()
+    if self.Active then return end
+    self.Active = true
+    
+    pcall(function()
+        self.Clone = Character:Clone()
+        self.Clone.Name = "VisClone"
+        self.Clone.Parent = workspace
+        for _, obj in ipairs(self.Clone:GetDescendants()) do
+            if obj:IsA("BaseScript") then obj:Destroy() end
+            if obj:IsA("BasePart") then
+                obj.Transparency = math.clamp(obj.Transparency + 0.65, 0, 0.95)
+                obj.CanCollide = false
+                obj.CanQuery = false
+                obj.CastShadow = false
+            end
+        end
+        local hum = self.Clone:FindFirstChildOfClass("Humanoid")
+        if hum then hum:Destroy() end
+    end)
+    
+    for _, part in ipairs(Character:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            pcall(function() part.Transparency = 1; part.CastShadow = false end)
+        end
+    end
+    
+    self.Conn = RunService.Heartbeat:Connect(function()
+        if not self.Active or not self.Clone or not self.Clone.Parent then return end
+        pcall(function()
+            for _, orig in ipairs(Character:GetDescendants()) do
+                if orig:IsA("BasePart") then
+                    local cl = self.Clone:FindFirstChild(orig.Name)
+                    if cl and cl:IsA("BasePart") then cl.CFrame = orig.CFrame end
+                end
+            end
+        end)
+    end)
+    
+    Config.Invisibility = true
+end
+
+function InvisModule:Deactivate()
+    if not self.Active then return end
+    self.Active = false
+    if self.Conn then self.Conn:Disconnect(); self.Conn = nil end
+    if self.Clone and self.Clone.Parent then self.Clone:Destroy(); self.Clone = nil end
+    pcall(function()
+        for _, part in ipairs(Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.Transparency = 0; part.CastShadow = true end
+        end
+    end)
+    Config.Invisibility = false
+end
 
 -- ==========================================================
---  NO COOLDOWN (простой и безопасный)
+--  NO COOLDOWN
 -- ==========================================================
 RunService.Heartbeat:Connect(function()
     if not Config.NoCooldown then return end
@@ -85,64 +141,57 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==========================================================
---  FLING (простой и безопасный)
+--  FLING (максимально мощный)
 -- ==========================================================
 local FlingActive = false
 
 local function FlingPlayer(targetPlayer)
     if FlingActive then return false end
     if not targetPlayer or targetPlayer == LocalPlayer then return false end
-
     local tChar = targetPlayer.Character
     if not tChar then return false end
     local tHrp = tChar:FindFirstChild("HumanoidRootPart")
     if not tHrp then return false end
-
     local myHrp = Character:FindFirstChild("HumanoidRootPart")
     if not myHrp then return false end
-
+    
     FlingActive = true
     local oldCF = myHrp.CFrame
-
+    
     task.spawn(function()
-        -- Отключаем коллизию
         for _, p in ipairs(Character:GetDescendants()) do
             if p:IsA("BasePart") then p.CanCollide = false end
         end
-
-        -- Спин
+        
         local spin = Instance.new("BodyAngularVelocity")
         spin.MaxTorque = Vector3.new(0, math.huge, 0)
-        spin.AngularVelocity = Vector3.new(0, 200, 0)
+        spin.AngularVelocity = Vector3.new(0, 250, 0)
         spin.Parent = myHrp
-
-        -- Телепорты вокруг цели
-        for i = 1, 20 do
+        
+        for i = 1, 30 do
             if not tHrp or not tHrp.Parent then break end
-            local angle = (i / 20) * math.pi * 2
+            local angle = (i / 30) * math.pi * 4
             pcall(function()
-                myHrp.CFrame = tHrp.CFrame * CFrame.new(math.cos(angle) * 1.5, 0, math.sin(angle) * 1.5)
+                myHrp.CFrame = tHrp.CFrame * CFrame.new(math.cos(angle) * 2, math.sin(i * 0.3) * 0.5, math.sin(angle) * 2)
             end)
-            task.wait(0.02)
+            task.wait(0.015)
         end
-
-        -- Толчок
+        
         if tHrp and tHrp.Parent then
             pcall(function()
                 myHrp.CFrame = tHrp.CFrame
-                myHrp.AssemblyLinearVelocity = Vector3.new(math.random(-150, 150), 200, math.random(-150, 150))
+                myHrp.AssemblyLinearVelocity = Vector3.new(math.random(-300, 300), 500, math.random(-300, 300))
             end)
             pcall(function()
                 local bv = Instance.new("BodyVelocity")
                 bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                bv.Velocity = Vector3.new(math.random(-200, 200), 400, math.random(-200, 200))
+                bv.Velocity = Vector3.new(math.random(-400, 400), 800, math.random(-400, 400))
                 bv.Parent = tHrp
-                task.delay(2, function() if bv and bv.Parent then bv:Destroy() end end)
+                task.delay(2.5, function() if bv and bv.Parent then bv:Destroy() end end)
             end)
         end
-
-        -- Возврат
-        task.delay(0.5, function()
+        
+        task.delay(0.8, function()
             if spin and spin.Parent then spin:Destroy() end
             for _, p in ipairs(Character:GetDescendants()) do
                 if p:IsA("BasePart") then p.CanCollide = true end
@@ -156,12 +205,12 @@ local function FlingPlayer(targetPlayer)
             FlingActive = false
         end)
     end)
-
+    
     return true
 end
 
 -- ==========================================================
---  АУРА И КРЫЛЬЯ
+--  АУРА И КРЫЛЬЯ (КЛИЕНТСКИЕ - только для тебя)
 -- ==========================================================
 local AuraRing = Instance.new("Part")
 AuraRing.Shape = Enum.PartType.Cylinder
@@ -174,6 +223,9 @@ AuraRing.Color = Config.AuraColor
 AuraRing.Material = Enum.Material.Neon
 AuraRing.Transparency = 0.3
 AuraRing.Parent = workspace
+
+-- Делаем ауру видимой только для себя
+AuraRing.LocalTransparencyModifier = 0
 
 local AuraAttachment = Instance.new("Attachment")
 AuraAttachment.Parent = Root
@@ -207,6 +259,9 @@ local function CreateWing(side)
         Seg.Material = Enum.Material.Neon
         Seg.Transparency = Config.WingsTransparency
         Seg.Parent = workspace
+        -- Клиентская видимость
+        Seg.LocalTransparencyModifier = 0
+        
         local offsetX = (i - 1) * 0.9 * side
         local offsetY = 1.5 + i * 0.3
         local baseOffset = CFrame.new(offsetX, offsetY, 0.8) * CFrame.Angles(0, math.rad(-30 * side), math.rad(20 * side))
@@ -235,12 +290,13 @@ CreateWing(-1)
 
 RunService.Heartbeat:Connect(function()
     if not Root or not Root.Parent then return end
-    if Config.AuraEnabled then
+    local showVis = not InvisModule.Active
+    if Config.AuraEnabled and showVis then
         AuraRing.CFrame = Root.CFrame * CFrame.new(0, -2.5, 0) * CFrame.Angles(0, 0, math.rad(90))
     else
         AuraRing.CFrame = CFrame.new(0, -10000, 0)
     end
-    if Config.WingsEnabled then
+    if Config.WingsEnabled and showVis then
         for _, w in ipairs(WingParts) do w.Part.CFrame = Root.CFrame * w.BaseOffset end
     else
         for _, w in ipairs(WingParts) do w.Part.CFrame = CFrame.new(0, -10000, 0) end
@@ -248,7 +304,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==========================================================
---  FOV CIRCLE
+--  FOV + ESP + AIMBOT
 -- ==========================================================
 local FovCircle = nil
 if Drawing then
@@ -258,7 +314,7 @@ if Drawing then
         FovCircle.NumSides = 100
         FovCircle.Radius = Config.FOV
         FovCircle.Filled = false
-        FovCircle.Color = C.Accent
+        FovCircle.Color = Theme.Accent
         FovCircle.Transparency = 0.6
         FovCircle.Visible = false
     end)
@@ -272,11 +328,7 @@ if FovCircle then
     end)
 end
 
--- ==========================================================
---  ESP
--- ==========================================================
 local EspTable = {}
-
 if Drawing then
     RunService.RenderStepped:Connect(function()
         for _, player in pairs(Players:GetPlayers()) do
@@ -301,11 +353,11 @@ if Drawing then
                                 EspTable[player].Name.Size = 14
                                 EspTable[player].Name.Center = true
                                 EspTable[player].Name.Outline = true
-                                EspTable[player].Name.Color = C.White
+                                EspTable[player].Name.Color = Theme.Text
                                 EspTable[player].Hp.Size = 12
                                 EspTable[player].Hp.Center = true
                                 EspTable[player].Hp.Outline = true
-                                EspTable[player].Hp.Color = C.Green
+                                EspTable[player].Hp.Color = Theme.Success
                                 EspTable[player].Tracer.Thickness = 2
                                 EspTable[player].Tracer.Color = Config.EspColor
                                 EspTable[player].Tracer.Transparency = 0.7
@@ -359,9 +411,6 @@ if Drawing then
     end)
 end
 
--- ==========================================================
---  AIMBOT (с WallCheck)
--- ==========================================================
 local function GetAlivePlayers()
     local list = {}
     for _, p in pairs(Players:GetPlayers()) do
@@ -386,9 +435,7 @@ local function IsVisible(targetPart)
     params.FilterDescendantsInstances = {LocalPlayer.Character}
     params.IgnoreWater = true
     local result = workspace:Raycast(origin, direction.Unit * distance, params)
-    if result then
-        return result.Instance:IsDescendantOf(targetPart.Parent)
-    end
+    if result then return result.Instance:IsDescendantOf(targetPart.Parent) end
     return true
 end
 
@@ -407,9 +454,7 @@ local function PickTarget()
                 elseif Config.TargetMode == "HighestHP" then score = -info.Hum.Health
                 elseif Config.TargetMode == "Distance" then score = (Camera.CFrame.Position - part.Position).Magnitude
                 else score = fovDist end
-                if bestScore == nil or score < bestScore then
-                    best, bestScore = { part = part }, score
-                end
+                if bestScore == nil or score < bestScore then best, bestScore = { part = part }, score end
             end
         end
     end
@@ -434,7 +479,6 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
--- AUTO BLOCK
 RunService.Heartbeat:Connect(function()
     if Config.AutoBlock then
         for _, info in ipairs(GetAlivePlayers()) do
@@ -450,135 +494,126 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==========================================================
---  GUI (ШИРОКИЙ + НИЗКИЙ + ВСЁ ТОГГЛЫ)
+--  СОВРЕМЕННЫЙ GUI (как в топовых читах 2024-2026)
 -- ==========================================================
-print("[APEX] Создание GUI...")
+print("[APEX] Создание современного GUI...")
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ApexClean"
+ScreenGui.Name = "ApexPremium"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Кнопка
+-- Современная кнопка (круглая с градиентом и свечением)
 local FloatBtn = Instance.new("TextButton")
-FloatBtn.Size = UDim2.new(0, 65, 0, 65)
-FloatBtn.Position = UDim2.new(0, 12, 0.45, -32)
-FloatBtn.BackgroundColor3 = C.BG
+FloatBtn.Size = UDim2.new(0, 60, 0, 60)
+FloatBtn.Position = UDim2.new(0, 15, 0.5, -30)
+FloatBtn.BackgroundColor3 = Theme.Background
 FloatBtn.Text = "◈"
-FloatBtn.TextColor3 = C.Accent
+FloatBtn.TextColor3 = Theme.Accent
 FloatBtn.Font = Enum.Font.GothamBlack
-FloatBtn.TextSize = 28
+FloatBtn.TextSize = 26
 FloatBtn.Active = true
 FloatBtn.Draggable = true
 FloatBtn.Parent = ScreenGui
 Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(1, 0)
-local FloatStroke = Instance.new("UIStroke", FloatBtn)
-FloatStroke.Color = C.Accent
-FloatStroke.Thickness = 2.5
 
+local FloatStroke = Instance.new("UIStroke", FloatBtn)
+FloatStroke.Color = Theme.Accent
+FloatStroke.Thickness = 2
+
+local FloatGrad = Instance.new("UIGradient", FloatBtn)
+FloatGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Theme.Accent),
+    ColorSequenceKeypoint.new(1, Theme.Background),
+})
+FloatGrad.Rotation = 45
+
+-- Анимация пульсации
 task.spawn(function()
     while FloatBtn.Parent do
         TweenService:Create(FloatStroke, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Thickness = 4}):Play()
         task.wait(1.5)
-        TweenService:Create(FloatStroke, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Thickness = 2.5}):Play()
+        TweenService:Create(FloatStroke, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Thickness = 2}):Play()
         task.wait(1.5)
     end
 end)
 
--- Меню
+-- Вращение градиента
+task.spawn(function()
+    local rot = 45
+    while FloatBtn.Parent do
+        rot = rot + 0.5
+        FloatGrad.Rotation = rot
+        task.wait(0.03)
+    end
+end)
+
+-- Главное меню (современный стиль)
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 550, 0, 380)
-MainFrame.Position = UDim2.new(0.5, -275, 0.5, -190)
-MainFrame.BackgroundColor3 = C.BG
-MainFrame.BackgroundTransparency = 0.02
+MainFrame.Size = UDim2.new(0, 520, 0, 360)
+MainFrame.Position = UDim2.new(0.5, -260, 0.5, -180)
+MainFrame.BackgroundColor3 = Theme.Background
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Visible = false
 MainFrame.Parent = ScreenGui
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 16)
-local mainStroke = Instance.new("UIStroke", MainFrame)
-mainStroke.Color = C.Accent
-mainStroke.Thickness = 2
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 14)
+
+local MainStroke = Instance.new("UIStroke", MainFrame)
+MainStroke.Color = Theme.Border
+MainStroke.Thickness = 1
+
+-- Заголовок с градиентом
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 50)
+TitleBar.BackgroundColor3 = Theme.Secondary
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 14)
+
+-- Исправляем углы снизу у заголовка
+local TitleFix = Instance.new("Frame")
+TitleFix.Size = UDim2.new(1, 0, 0, 20)
+TitleFix.Position = UDim2.new(0, 0, 0, 30)
+TitleFix.BackgroundColor3 = Theme.Secondary
+TitleFix.BorderSizePixel = 0
+TitleFix.Parent = TitleBar
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -100, 0, 45)
-Title.Position = UDim2.new(0, 15, 0, 5)
+Title.Size = UDim2.new(1, -80, 1, 0)
+Title.Position = UDim2.new(0, 20, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "◈ APEX HUB"
-Title.TextColor3 = C.Text
+Title.Text = "APEX HUB"
+Title.TextColor3 = Theme.Text
 Title.Font = Enum.Font.GothamBlack
-Title.TextSize = 20
+Title.TextSize = 18
 Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = MainFrame
+Title.Parent = TitleBar
 
-local SubTitle = Instance.new("TextLabel")
-SubTitle.Size = UDim2.new(1, -100, 0, 14)
-SubTitle.Position = UDim2.new(0, 15, 0, 35)
-SubTitle.BackgroundTransparency = 1
-SubTitle.Text = "JUJUTSU SHENANIGANS | CLEAN"
-SubTitle.TextColor3 = C.TextDim
-SubTitle.Font = Enum.Font.GothamBold
-SubTitle.TextSize = 9
-SubTitle.TextXAlignment = Enum.TextXAlignment.Left
-SubTitle.Parent = MainFrame
-
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 34, 0, 34)
-CloseBtn.Position = UDim2.new(1, -42, 0, 8)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(160, 20, 40)
-CloseBtn.Text = "✕"
-CloseBtn.TextColor3 = C.White
-CloseBtn.Font = Enum.Font.GothamBlack
-CloseBtn.TextSize = 16
-CloseBtn.Parent = MainFrame
-Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 9)
-
-local HeaderLine = Instance.new("Frame")
-HeaderLine.Size = UDim2.new(1, -30, 0, 2)
-HeaderLine.Position = UDim2.new(0, 15, 0, 52)
-HeaderLine.BorderSizePixel = 0
-HeaderLine.Parent = MainFrame
-local hlGrad = Instance.new("UIGradient", HeaderLine)
-hlGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, C.Accent),
-    ColorSequenceKeypoint.new(0.5, C.Red),
-    ColorSequenceKeypoint.new(1, C.Accent),
+local TitleGrad = Instance.new("UIGradient", Title)
+TitleGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Theme.Accent),
+    ColorSequenceKeypoint.new(1, Theme.AccentGlow),
 })
 
-local MenuOpen = false
-local function ToggleMenu()
-    if MenuOpen then
-        MenuOpen = false
-        local tw = TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-            Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1
-        })
-        tw:Play()
-        tw.Completed:Connect(function()
-            MainFrame.Visible = false
-            MainFrame.Size = UDim2.new(0, 550, 0, 380)
-            MainFrame.BackgroundTransparency = 0.02
-        end)
-    else
-        MenuOpen = true
-        MainFrame.Visible = true
-        MainFrame.Size = UDim2.new(0, 0, 0, 0)
-        MainFrame.BackgroundTransparency = 1
-        TweenService:Create(MainFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = UDim2.new(0, 550, 0, 380), BackgroundTransparency = 0.02
-        }):Play()
-    end
-end
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 32, 0, 32)
+CloseBtn.Position = UDim2.new(1, -42, 0, 9)
+CloseBtn.BackgroundColor3 = Theme.Danger
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Theme.Text
+CloseBtn.Font = Enum.Font.GothamBlack
+CloseBtn.TextSize = 14
+CloseBtn.Parent = TitleBar
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 8)
 
-CloseBtn.MouseButton1Click:Connect(ToggleMenu)
-FloatBtn.MouseButton1Click:Connect(ToggleMenu)
-
--- Вкладки
+-- Вкладки (современный стиль)
 local TabBar = Instance.new("Frame")
-TabBar.Size = UDim2.new(1, -30, 0, 36)
-TabBar.Position = UDim2.new(0, 15, 0, 58)
+TabBar.Size = UDim2.new(1, -40, 0, 38)
+TabBar.Position = UDim2.new(0, 20, 0, 60)
 TabBar.BackgroundTransparency = 1
 TabBar.Parent = MainFrame
 
@@ -589,110 +624,111 @@ local tabIcons = { "⊕", "◎", "✦", "◉", "" }
 
 for i, name in ipairs(tabNames) do
     local TabBtn = Instance.new("TextButton")
-    TabBtn.Size = UDim2.new(1/#tabNames, -6, 1, 0)
-    TabBtn.Position = UDim2.new((i-1)/#tabNames, 3, 0, 0)
-    TabBtn.BackgroundColor3 = C.Panel
+    TabBtn.Size = UDim2.new(1/#tabNames, -8, 1, 0)
+    TabBtn.Position = UDim2.new((i-1)/#tabNames, 4, 0, 0)
+    TabBtn.BackgroundColor3 = Theme.Secondary
     TabBtn.Text = tabIcons[i] .. " " .. name
-    TabBtn.TextColor3 = C.TextDim
+    TabBtn.TextColor3 = Theme.TextMuted
     TabBtn.Font = Enum.Font.GothamBold
     TabBtn.TextSize = 11
     TabBtn.Parent = TabBar
     Instance.new("UICorner", TabBtn).CornerRadius = UDim.new(0, 8)
+    
     local tabStroke = Instance.new("UIStroke", TabBtn)
-    tabStroke.Color = C.Accent
-    tabStroke.Thickness = 0
+    tabStroke.Color = Theme.Border
+    tabStroke.Thickness = 1
     Tabs[name] = { Btn = TabBtn, Stroke = tabStroke }
-
+    
     local Page = Instance.new("ScrollingFrame")
-    Page.Size = UDim2.new(1, -30, 1, -105)
-    Page.Position = UDim2.new(0, 15, 0, 100)
+    Page.Size = UDim2.new(1, -40, 1, -110)
+    Page.Position = UDim2.new(0, 20, 0, 105)
     Page.BackgroundTransparency = 1
     Page.BorderSizePixel = 0
     Page.ScrollBarThickness = 4
-    Page.ScrollBarImageColor3 = C.Accent
+    Page.ScrollBarImageColor3 = Theme.Accent
     Page.Visible = false
     Page.CanvasSize = UDim2.new(0, 0, 0, 800)
     Page.Parent = MainFrame
     Pages[name] = Page
-
+    
     TabBtn.MouseEnter:Connect(function()
         if not Pages[name].Visible then
-            TweenService:Create(TabBtn, TweenInfo.new(0.15), {BackgroundColor3 = C.PanelHover}):Play()
+            TweenService:Create(TabBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(30, 30, 42)}):Play()
         end
     end)
     TabBtn.MouseLeave:Connect(function()
         if not Pages[name].Visible then
-            TweenService:Create(TabBtn, TweenInfo.new(0.15), {BackgroundColor3 = C.Panel}):Play()
+            TweenService:Create(TabBtn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.Secondary}):Play()
         end
     end)
 end
 
 Pages["Aimbot"].Visible = true
-Tabs["Aimbot"].Btn.BackgroundColor3 = C.AccentDark
-Tabs["Aimbot"].Btn.TextColor3 = C.Text
-Tabs["Aimbot"].Stroke.Thickness = 1.5
+Tabs["Aimbot"].Btn.BackgroundColor3 = Theme.Accent
+Tabs["Aimbot"].Btn.TextColor3 = Theme.Text
+Tabs["Aimbot"].Stroke.Color = Theme.Accent
 
 for name, data in pairs(Tabs) do
     data.Btn.MouseButton1Click:Connect(function()
         for n, p in pairs(Pages) do
             p.Visible = false
-            TweenService:Create(Tabs[n].Btn, TweenInfo.new(0.15), {BackgroundColor3 = C.Panel}):Play()
-            Tabs[n].Btn.TextColor3 = C.TextDim
-            Tabs[n].Stroke.Thickness = 0
+            TweenService:Create(Tabs[n].Btn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.Secondary}):Play()
+            Tabs[n].Btn.TextColor3 = Theme.TextMuted
+            Tabs[n].Stroke.Color = Theme.Border
         end
         Pages[name].Visible = true
-        TweenService:Create(data.Btn, TweenInfo.new(0.2, Enum.EasingStyle.Back), {BackgroundColor3 = C.AccentDark}):Play()
-        data.Btn.TextColor3 = C.Text
-        data.Stroke.Thickness = 1.5
+        TweenService:Create(data.Btn, TweenInfo.new(0.2, Enum.EasingStyle.Back), {BackgroundColor3 = Theme.Accent}):Play()
+        data.Btn.TextColor3 = Theme.Text
+        data.Stroke.Color = Theme.Accent
     end)
 end
 
--- Утилиты
+-- Утилиты UI (современный стиль)
 local function CreateToggle(parent, text, y, default, callback)
     local Container = Instance.new("Frame")
-    Container.Size = UDim2.new(1, -10, 0, 40)
+    Container.Size = UDim2.new(1, -10, 0, 42)
     Container.Position = UDim2.new(0, 5, 0, y)
-    Container.BackgroundColor3 = C.Panel
+    Container.BackgroundColor3 = Theme.Secondary
     Container.BorderSizePixel = 0
     Container.Parent = parent
-    Instance.new("UICorner", Container).CornerRadius = UDim.new(0, 9)
-
+    Instance.new("UICorner", Container).CornerRadius = UDim.new(0, 10)
+    
     local Label = Instance.new("TextLabel")
     Label.Size = UDim2.new(1, -65, 1, 0)
-    Label.Position = UDim2.new(0, 12, 0, 0)
+    Label.Position = UDim2.new(0, 14, 0, 0)
     Label.BackgroundTransparency = 1
     Label.Text = text
-    Label.TextColor3 = C.Text
+    Label.TextColor3 = Theme.Text
     Label.Font = Enum.Font.GothamBold
     Label.TextSize = 12
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Container
-
+    
     local ToggleBg = Instance.new("Frame")
-    ToggleBg.Size = UDim2.new(0, 44, 0, 22)
-    ToggleBg.Position = UDim2.new(1, -54, 0.5, -11)
-    ToggleBg.BackgroundColor3 = default and C.Green or Color3.fromRGB(60, 60, 70)
+    ToggleBg.Size = UDim2.new(0, 46, 0, 24)
+    ToggleBg.Position = UDim2.new(1, -56, 0.5, -12)
+    ToggleBg.BackgroundColor3 = default and Theme.Success or Color3.fromRGB(50, 50, 65)
     ToggleBg.BorderSizePixel = 0
     ToggleBg.Parent = Container
     Instance.new("UICorner", ToggleBg).CornerRadius = UDim.new(1, 0)
-
+    
     local ToggleKnob = Instance.new("Frame")
-    ToggleKnob.Size = UDim2.new(0, 18, 0, 18)
+    ToggleKnob.Size = UDim2.new(0, 20, 0, 20)
     ToggleKnob.Position = default and UDim2.new(0, 24, 0, 2) or UDim2.new(0, 2, 0, 2)
-    ToggleKnob.BackgroundColor3 = C.White
+    ToggleKnob.BackgroundColor3 = Theme.Text
     ToggleKnob.BorderSizePixel = 0
     ToggleKnob.Parent = ToggleBg
     Instance.new("UICorner", ToggleKnob).CornerRadius = UDim.new(1, 0)
-
+    
     local state = default
     Container.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             state = not state
             if state then
-                TweenService:Create(ToggleBg, TweenInfo.new(0.2), {BackgroundColor3 = C.Green}):Play()
+                TweenService:Create(ToggleBg, TweenInfo.new(0.2), {BackgroundColor3 = Theme.Success}):Play()
                 TweenService:Create(ToggleKnob, TweenInfo.new(0.2, Enum.EasingStyle.Back), {Position = UDim2.new(0, 24, 0, 2)}):Play()
             else
-                TweenService:Create(ToggleBg, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 60, 70)}):Play()
+                TweenService:Create(ToggleBg, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 65)}):Play()
                 TweenService:Create(ToggleKnob, TweenInfo.new(0.2, Enum.EasingStyle.Back), {Position = UDim2.new(0, 2, 0, 2)}):Play()
             end
             pcall(callback, state)
@@ -703,57 +739,54 @@ end
 
 local function CreateSlider(parent, text, y, min, max, default, isFloat, callback)
     local Container = Instance.new("Frame")
-    Container.Size = UDim2.new(1, -10, 0, 50)
+    Container.Size = UDim2.new(1, -10, 0, 52)
     Container.Position = UDim2.new(0, 5, 0, y)
     Container.BackgroundTransparency = 1
     Container.Parent = parent
-
+    
     local Label = Instance.new("TextLabel")
     Label.Size = UDim2.new(1, 0, 0, 16)
     Label.BackgroundTransparency = 1
     Label.Text = text .. ": " .. tostring(default)
-    Label.TextColor3 = C.Text
+    Label.TextColor3 = Theme.Text
     Label.Font = Enum.Font.GothamBold
     Label.TextSize = 11
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Container
-
+    
     local Track = Instance.new("Frame")
     Track.Size = UDim2.new(1, -10, 0, 8)
-    Track.Position = UDim2.new(0, 5, 0, 30)
-    Track.BackgroundColor3 = C.BG2
+    Track.Position = UDim2.new(0, 5, 0, 32)
+    Track.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
     Track.BorderSizePixel = 0
     Track.Parent = Container
     Instance.new("UICorner", Track).CornerRadius = UDim.new(1, 0)
-
+    
     local Fill = Instance.new("Frame")
     Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    Fill.BackgroundColor3 = C.Accent
+    Fill.BackgroundColor3 = Theme.Accent
     Fill.BorderSizePixel = 0
     Fill.Parent = Track
     Instance.new("UICorner", Fill).CornerRadius = UDim.new(1, 0)
-
+    
     local Knob = Instance.new("Frame")
-    Knob.Size = UDim2.new(0, 20, 0, 20)
-    Knob.Position = UDim2.new((default - min) / (max - min), -10, 0.5, -10)
-    Knob.BackgroundColor3 = C.White
+    Knob.Size = UDim2.new(0, 22, 0, 22)
+    Knob.Position = UDim2.new((default - min) / (max - min), -11, 0.5, -11)
+    Knob.BackgroundColor3 = Theme.Text
     Knob.BorderSizePixel = 0
     Knob.Parent = Track
     Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
-    local KnobStroke = Instance.new("UIStroke", Knob)
-    KnobStroke.Color = C.Accent
-    KnobStroke.Thickness = 2
-
+    
     local function Update(inputX)
         local rel = math.clamp((inputX - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
         local val = min + (max - min) * rel
         if not isFloat then val = math.floor(val + 0.5) end
         TweenService:Create(Fill, TweenInfo.new(0.05), {Size = UDim2.new(rel, 0, 1, 0)}):Play()
-        TweenService:Create(Knob, TweenInfo.new(0.05), {Position = UDim2.new(rel, -10, 0.5, -10)}):Play()
+        TweenService:Create(Knob, TweenInfo.new(0.05), {Position = UDim2.new(rel, -11, 0.5, -11)}):Play()
         Label.Text = text .. ": " .. (isFloat and string.format("%.2f", val) or tostring(val))
         pcall(callback, val)
     end
-
+    
     local dragging = false
     Track.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -775,33 +808,33 @@ end
 
 local function CreateSelector(parent, text, y, options, default, callback)
     local Container = Instance.new("Frame")
-    Container.Size = UDim2.new(1, -10, 0, 54)
+    Container.Size = UDim2.new(1, -10, 0, 56)
     Container.Position = UDim2.new(0, 5, 0, y)
     Container.BackgroundTransparency = 1
     Container.Parent = parent
-
+    
     local Label = Instance.new("TextLabel")
     Label.Size = UDim2.new(1, 0, 0, 14)
     Label.BackgroundTransparency = 1
     Label.Text = text
-    Label.TextColor3 = C.TextDim
+    Label.TextColor3 = Theme.TextMuted
     Label.Font = Enum.Font.GothamBold
     Label.TextSize = 10
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Container
-
+    
     local current = default
     local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(1, 0, 0, 34)
+    Btn.Size = UDim2.new(1, 0, 0, 36)
     Btn.Position = UDim2.new(0, 0, 0, 18)
-    Btn.BackgroundColor3 = C.Panel
+    Btn.BackgroundColor3 = Theme.Secondary
     Btn.Text = "▸ " .. current
-    Btn.TextColor3 = C.Text
+    Btn.TextColor3 = Theme.Text
     Btn.Font = Enum.Font.GothamBold
     Btn.TextSize = 12
     Btn.Parent = Container
     Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 8)
-
+    
     Btn.MouseButton1Click:Connect(function()
         local idx = 1
         for i, v in ipairs(options) do if v == current then idx = i break end end
@@ -815,19 +848,19 @@ end
 
 local function CreateButton(parent, text, y, color, callback)
     local B = Instance.new("TextButton")
-    B.Size = UDim2.new(1, -10, 0, 40)
+    B.Size = UDim2.new(1, -10, 0, 42)
     B.Position = UDim2.new(0, 5, 0, y)
-    B.BackgroundColor3 = color or C.Panel
+    B.BackgroundColor3 = color or Theme.Secondary
     B.Text = text
-    B.TextColor3 = C.Text
+    B.TextColor3 = Theme.Text
     B.Font = Enum.Font.GothamBold
     B.TextSize = 13
     B.Parent = parent
-    Instance.new("UICorner", B).CornerRadius = UDim.new(0, 9)
+    Instance.new("UICorner", B).CornerRadius = UDim.new(0, 10)
     B.MouseButton1Click:Connect(function()
-        TweenService:Create(B, TweenInfo.new(0.06), {Size = UDim2.new(1, -16, 0, 38)}):Play()
+        TweenService:Create(B, TweenInfo.new(0.06), {Size = UDim2.new(1, -16, 0, 40)}):Play()
         task.wait(0.06)
-        TweenService:Create(B, TweenInfo.new(0.1, Enum.EasingStyle.Back), {Size = UDim2.new(1, -10, 0, 40)}):Play()
+        TweenService:Create(B, TweenInfo.new(0.1, Enum.EasingStyle.Back), {Size = UDim2.new(1, -10, 0, 42)}):Play()
         pcall(callback, B)
     end)
     return B
@@ -838,13 +871,41 @@ local function CreateSection(parent, text, y)
     L.Size = UDim2.new(1, -10, 0, 24)
     L.Position = UDim2.new(0, 5, 0, y)
     L.BackgroundTransparency = 1
-    L.Text = "◈ " .. text
-    L.TextColor3 = C.Accent
+    L.Text = "◆ " .. text
+    L.TextColor3 = Theme.Accent
     L.Font = Enum.Font.GothamBlack
     L.TextSize = 12
     L.TextXAlignment = Enum.TextXAlignment.Left
     L.Parent = parent
 end
+
+-- Открытие/закрытие меню
+local MenuOpen = false
+local function ToggleMenu()
+    if MenuOpen then
+        MenuOpen = false
+        local tw = TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+            Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1
+        })
+        tw:Play()
+        tw.Completed:Connect(function()
+            MainFrame.Visible = false
+            MainFrame.Size = UDim2.new(0, 520, 0, 360)
+            MainFrame.BackgroundTransparency = 0
+        end)
+    else
+        MenuOpen = true
+        MainFrame.Visible = true
+        MainFrame.Size = UDim2.new(0, 0, 0, 0)
+        MainFrame.BackgroundTransparency = 1
+        TweenService:Create(MainFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 520, 0, 360), BackgroundTransparency = 0
+        }):Play()
+    end
+end
+
+CloseBtn.MouseButton1Click:Connect(ToggleMenu)
+FloatBtn.MouseButton1Click:Connect(ToggleMenu)
 
 -- ==========================================================
 --  СТРАНИЦЫ
@@ -854,13 +915,13 @@ end
 local AimbotPage = Pages["Aimbot"]
 local y = 0
 CreateSection(AimbotPage, "AIMBOT", y); y = y + 28
-CreateToggle(AimbotPage, "Aimbot", y, false, function(v) Config.AimbotEnabled = v end); y = y + 46
-CreateToggle(AimbotPage, "WallCheck", y, true, function(v) Config.WallCheck = v end); y = y + 46
-CreateToggle(AimbotPage, "Поворот персонажа", y, true, function(v) Config.RotateCharacter = v end); y = y + 46
-CreateToggle(AimbotPage, "Показать FOV", y, true, function(v) Config.ShowFOV = v end); y = y + 50
-CreateSlider(AimbotPage, "FOV", y, 50, 1000, Config.FOV, false, function(v) Config.FOV = v end); y = y + 54
-CreateSlider(AimbotPage, "Плавность", y, 0.01, 1.0, Config.Smoothness, true, function(v) Config.Smoothness = v end); y = y + 54
-CreateSelector(AimbotPage, "Режим цели", y, {"FOV", "LowestHP", "HighestHP", "Distance"}, Config.TargetMode, function(v) Config.TargetMode = v end); y = y + 58
+CreateToggle(AimbotPage, "Aimbot", y, false, function(v) Config.AimbotEnabled = v end); y = y + 48
+CreateToggle(AimbotPage, "WallCheck", y, true, function(v) Config.WallCheck = v end); y = y + 48
+CreateToggle(AimbotPage, "Поворот персонажа", y, true, function(v) Config.RotateCharacter = v end); y = y + 48
+CreateToggle(AimbotPage, "Показать FOV", y, true, function(v) Config.ShowFOV = v end); y = y + 52
+CreateSlider(AimbotPage, "FOV", y, 50, 1000, Config.FOV, false, function(v) Config.FOV = v end); y = y + 56
+CreateSlider(AimbotPage, "Плавность", y, 0.01, 1.0, Config.Smoothness, true, function(v) Config.Smoothness = v end); y = y + 56
+CreateSelector(AimbotPage, "Режим цели", y, {"FOV", "LowestHP", "HighestHP", "Distance"}, Config.TargetMode, function(v) Config.TargetMode = v end); y = y + 60
 CreateSelector(AimbotPage, "Часть тела", y, {"Head", "HumanoidRootPart", "UpperTorso"}, Config.TargetPart, function(v) Config.TargetPart = v end)
 
 -- FLING
@@ -875,7 +936,7 @@ PlayerListFrame.Position = UDim2.new(0, 5, 0, y)
 PlayerListFrame.BackgroundTransparency = 1
 PlayerListFrame.BorderSizePixel = 0
 PlayerListFrame.ScrollBarThickness = 3
-PlayerListFrame.ScrollBarImageColor3 = C.Accent
+PlayerListFrame.ScrollBarImageColor3 = Theme.Accent
 PlayerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 PlayerListFrame.Parent = FlingPage
 
@@ -890,23 +951,23 @@ local function RefreshPlayerList()
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             local PB = Instance.new("TextButton")
-            PB.Size = UDim2.new(1, -5, 0, 32)
-            PB.BackgroundColor3 = C.Panel
+            PB.Size = UDim2.new(1, -5, 0, 34)
+            PB.BackgroundColor3 = Theme.Secondary
             PB.Text = "  ⊕ " .. player.Name
-            PB.TextColor3 = C.Text
+            PB.TextColor3 = Theme.Text
             PB.Font = Enum.Font.GothamBold
             PB.TextSize = 12
             PB.TextXAlignment = Enum.TextXAlignment.Left
             PB.Parent = PlayerListFrame
-            Instance.new("UICorner", PB).CornerRadius = UDim.new(0, 7)
+            Instance.new("UICorner", PB).CornerRadius = UDim.new(0, 8)
             PB.MouseButton1Click:Connect(function()
                 selectedFlingTarget = player
                 for _, btn in ipairs(PlayerListFrame:GetChildren()) do
                     if btn:IsA("TextButton") then
-                        TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = C.Panel}):Play()
+                        TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = Theme.Secondary}):Play()
                     end
                 end
-                TweenService:Create(PB, TweenInfo.new(0.12), {BackgroundColor3 = C.AccentDark}):Play()
+                TweenService:Create(PB, TweenInfo.new(0.12), {BackgroundColor3 = Theme.Accent}):Play()
             end)
         end
     end
@@ -919,7 +980,7 @@ Players.PlayerRemoving:Connect(function() task.wait(1) RefreshPlayerList() end)
 
 y = y + 170
 
-local FlingBtn = CreateButton(FlingPage, "◎ ЗАПУСТИТЬ В КОСМОС", y, Color3.fromRGB(160, 20, 40), function(self)
+local FlingBtn = CreateButton(FlingPage, "◎ ЗАПУСТИТЬ В КОСМОС", y, Theme.Danger, function(self)
     if FlingActive then
         self.Text = "⚠ ВЫПОЛНЯЕТСЯ..."
         task.delay(2, function() self.Text = "◎ ЗАПУСТИТЬ В КОСМОС" end)
@@ -938,9 +999,9 @@ local FlingBtn = CreateButton(FlingPage, "◎ ЗАПУСТИТЬ В КОСМОС
         self.Text = "⚠ ВЫБЕРИ ИГРОКА"
         task.delay(2, function() self.Text = "◎ ЗАПУСТИТЬ В КОСМОС" end)
     end
-end); y = y + 48
+end); y = y + 50
 
-CreateButton(FlingPage, "↻ ОБНОВИТЬ СПИСОК", y, C.Panel, function(self)
+CreateButton(FlingPage, "↻ ОБНОВИТЬ СПИСОК", y, Theme.Secondary, function(self)
     RefreshPlayerList()
     self.Text = "✅ ОБНОВЛЕНО"
     task.delay(1, function() self.Text = "↻ ОБНОВИТЬ СПИСОК" end)
@@ -950,18 +1011,18 @@ end)
 local VisPage = Pages["Visuals"]
 y = 0
 CreateSection(VisPage, "VISUALS", y); y = y + 28
-CreateToggle(VisPage, "Аура", y, true, function(v)
+CreateToggle(VisPage, "Аура (только для тебя)", y, true, function(v)
     Config.AuraEnabled = v
     AuraRing.Transparency = v and 0.3 or 1
     AuraParticles.Enabled = v
-end); y = y + 46
-CreateToggle(VisPage, "Крылья", y, true, function(v)
+end); y = y + 48
+CreateToggle(VisPage, "Крылья (только для тебя)", y, true, function(v)
     Config.WingsEnabled = v
     for _, w in ipairs(WingParts) do w.Part.Transparency = v and Config.WingsTransparency or 1 end
     for _, b in ipairs(WingBeams) do b.Transparency = NumberSequence.new(v and Config.WingsTransparency or 1) end
-end); y = y + 50
-CreateSlider(VisPage, "Размер ауры", y, 2, 15, Config.AuraSize, false, function(v) Config.AuraSize = v; AuraRing.Size = Vector3.new(0.15, v, v) end); y = y + 54
-CreateSlider(VisPage, "Частицы ауры", y, 0, 100, Config.AuraRate, false, function(v) Config.AuraRate = v; AuraParticles.Rate = v end); y = y + 54
+end); y = y + 52
+CreateSlider(VisPage, "Размер ауры", y, 2, 15, Config.AuraSize, false, function(v) Config.AuraSize = v; AuraRing.Size = Vector3.new(0.15, v, v) end); y = y + 56
+CreateSlider(VisPage, "Частицы ауры", y, 0, 100, Config.AuraRate, false, function(v) Config.AuraRate = v; AuraParticles.Rate = v end); y = y + 56
 CreateSlider(VisPage, "Прозрачность крыльев", y, 0, 1.0, Config.WingsTransparency, true, function(v)
     Config.WingsTransparency = v
     if Config.WingsEnabled then
@@ -974,19 +1035,23 @@ end)
 local EspPage = Pages["ESP"]
 y = 0
 CreateSection(EspPage, "ESP", y); y = y + 28
-CreateToggle(EspPage, "ESP Игроков", y, false, function(v) Config.EspPlayers = v end); y = y + 46
+CreateToggle(EspPage, "ESP Игроков", y, false, function(v) Config.EspPlayers = v end); y = y + 48
 CreateToggle(EspPage, "Tracers", y, true, function(v) Config.ShowTracers = v end)
 
 -- MISC
 local MiscPage = Pages["Misc"]
 y = 0
 CreateSection(MiscPage, "MISC", y); y = y + 28
-CreateToggle(MiscPage, "No Cooldown", y, false, function(v) Config.NoCooldown = v end); y = y + 46
-CreateToggle(MiscPage, "Auto Block", y, false, function(v) Config.AutoBlock = v end); y = y + 50
+CreateToggle(MiscPage, "Невидимость", y, false, function(v)
+    if v then InvisModule:Activate() else InvisModule:Deactivate() end
+end); y = y + 48
+CreateToggle(MiscPage, "No Cooldown", y, false, function(v) Config.NoCooldown = v end); y = y + 48
+CreateToggle(MiscPage, "Auto Block", y, false, function(v) Config.AutoBlock = v end); y = y + 52
 CreateSlider(MiscPage, "Дистанция блока", y, 5, 50, Config.AutoBlockDistance, false, function(v) Config.AutoBlockDistance = v end)
 
 -- ==========================================================
 print("═══════════════════════════════════════")
-print("  ◈ APEX HUB CLEAN ЗАГРУЖЕН! ◈")
+print("  ◈ APEX HUB v10 PREMIUM ЗАГРУЖЕН! ◈")
+print("  Современный GUI + Клиентские визуалы")
 print("  Нажми ◈ для открытия меню")
 print("═══════════════════════════════════════")
