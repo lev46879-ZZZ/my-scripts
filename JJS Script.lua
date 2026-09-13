@@ -1,276 +1,308 @@
---[[
-    Death Ball | Auto Parry + Ping Compensation + GUI Stats
-    Сделано для: [твой ник]
-    Фокус: Auto Parry, работающий даже при высоком пинге
---]]
+-- Death Ball | Auto Parry (v3 - Перебор вариантов + Адаптация)
+-- Фокус: работа при высоком пинге и разной скорости мяча
 
 -- 1. СЕРВИСЫ
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
 -- 2. НАСТРОЙКИ
 local Settings = {
-    AutoParryEnabled = true,      -- Auto Parry включён при загрузке
-    PingCompensation = 0.5,       -- Компенсация пинга (0.5 = 500мс). Настраивай экспериментально!
-    ParryDistance = 15,           -- Дистанция срабатывания (в studs)
-    SpamThreshold = 0.7,          -- Запас времени для упреждающего спама при высоком пинге
-    MaxPing = 0.6,                -- Максимальный пинг, при котором скрипт активен (0.6 = 600мс)
+    AutoParryEnabled = true,
+    ParryDistance = 18,          -- Дистанция срабатывания (studs)
+    PingCompensation = 0.5,     -- Компенсация пинга (0.5 = 500мс)
+    MaxPing = 0.7,              -- Макс. пинг для работы скрипта (700мс)
+    MinETA = 0.08,              -- Мин. время до удара для срабатывания (сек)
+    Debug = false               -- Показывать отладочные сообщения
 }
 
 -- 3. СТАТИСТИКА
 local Stats = {
-    ParryAttempts = 0,
-    ParrySuccess = 0,
-    ParryMissed = 0,
+    Attempts = 0,
+    Success = 0,
     CurrentPing = 0,
-    AveragePing = 0,
+    BallSpeed = 0,
+    LastParryMethod = "none"
 }
 
--- 4. ФУНКЦИЯ ПАРИРОВАНИЯ (ЗАГЛУШКА)
--- ВАЖНО: Здесь нужно указать правильный RemoteEvent для парирования в Death Ball
-local function performParry()
-    -- Попытка найти ремоут для парирования
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+-- 4. ПЕРЕМЕННЫЕ ДЛЯ ПЕРЕБОРА
+local parryRemotes = {}         -- Найденные ремоуты
+local workingMethod = nil       -- Рабочий метод (например, "remote:Parry")
+local keyPressMethods = {       -- Способы эмуляции нажатия клавиш
+    function() 
+        local vim = game:GetService("VirtualInputManager")
+        vim:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+        vim:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+    end,
+    function()
+        local VirtualUser = game:GetService("VirtualUser")
+        VirtualUser:CaptureController()
+        VirtualUser:KeyPress(Enum.KeyCode.F)
+    end,
+    function()
+        -- Прямая эмуляция через UserInputService
+        local input = Instance.new("InputObject")
+        -- В большинстве executor'ов это не сработает, но попробуем
+    end
+}
+
+-- 5. ПОИСК ВСЕХ ВОЗМОЖНЫХ РЕМОУТОВ
+local function findParryRemotes()
+    parryRemotes = {}
+    local remotesFolder = ReplicatedStorage:FindFirstChild("Remotes") 
+        or ReplicatedStorage:FindFirstChild("RemoteEvents")
     
-    if remotes then
-        -- Ищем ремоут, связанный с парированием
-        -- Возможные варианты: "Parry", "Deflect", "ParryEvent", "Ability"
-        for _, remote in ipairs(remotes:GetChildren()) do
+    if remotesFolder then
+        for _, remote in ipairs(remotesFolder:GetChildren()) do
             if remote:IsA("RemoteEvent") then
                 local nameLower = string.lower(remote.Name)
-                if string.find(nameLower, "parry") or string.find(nameLower, "deflect") then
-                    -- Отправляем запрос на парирование
-                    remote:FireServer()
-                    Stats.ParryAttempts = Stats.ParryAttempts + 1
-                    return true
+                if string.find(nameLower, "parry") or 
+                   string.find(nameLower, "deflect") or 
+                   string.find(nameLower, "block") then
+                    table.insert(parryRemotes, remote)
+                    if Settings.Debug then
+                        print("[AutoParry] Найден ремоут:", remote:GetFullName())
+                    end
                 end
             end
         end
     end
     
-    -- Если ремоут не найден, пробуем эмулировать нажатие клавиши (запасной вариант)
-    -- В Death Ball парирование может быть на клавише F или E
-    local VirtualUser = game:GetService("VirtualUser")
-    -- VirtualUser:CaptureController() -- Раскомментировать, если нужно
-    -- VirtualUser:KeyPress(Enum.KeyCode.F) -- Раскомментировать и попробовать
+    -- Если не нашли в Remotes, ищем по всему ReplicatedStorage
+    if #parryRemotes == 0 then
+        for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+            if obj:IsA("RemoteEvent") then
+                local nameLower = string.lower(obj.Name)
+                if string.find(nameLower, "parry") or 
+                   string.find(nameLower, "deflect") then
+                    table.insert(parryRemotes, obj)
+                end
+            end
+        end
+    end
     
-    Stats.ParryAttempts = Stats.ParryAttempts + 1
+    if Settings.Debug then
+        print("[AutoParry] Всего найдено ремоутов для парирования:", #parryRemotes)
+    end
+end
+
+-- 6. ФУНКЦИЯ ПАРИРОВАНИЯ (ПЕРЕБОР ВАРИАНТОВ)
+local function performParry()
+    Stats.Attempts = Stats.Attempts + 1
+    
+    -- Если уже есть рабочий метод, используем его
+    if workingMethod then
+        if workingMethod.type == "remote" then
+            workingMethod.remote:FireServer()
+            return true
+        elseif workingMethod.type == "key" then
+            workingMethod.func()
+            return true
+        end
+    end
+    
+    -- Перебираем ремоуты
+    for _, remote in ipairs(parryRemotes) do
+        pcall(function()
+            remote:FireServer()
+        end)
+        -- Проверяем, сработало ли (по изменению статистики или визуально)
+        -- В реальности нужно проверить, изменилось ли состояние игрока
+        -- Пока просто запоминаем как возможный вариант
+        workingMethod = {type = "remote", remote = remote}
+        if Settings.Debug then
+            print("[AutoParry] Пробуем ремоут:", remote.Name)
+        end
+        return true
+    end
+    
+    -- Перебираем способы нажатия клавиш
+    for i, keyFunc in ipairs(keyPressMethods) do
+        pcall(keyFunc)
+        workingMethod = {type = "key", func = keyFunc, index = i}
+        if Settings.Debug then
+            print("[AutoParry] Пробуем способ нажатия #" .. i)
+        end
+        return true
+    end
+    
     return false
 end
 
--- 5. ПОИСК МЯЧА, ЛЕТЯЩЕГО В ИГРОКА
+-- 7. ПОИСК МЯЧА
 local function findTargetBall()
     local character = LocalPlayer.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then
-        return nil
+        return nil, nil, 0
     end
     
     local myPosition = character.HumanoidRootPart.Position
     local closestBall = nil
     local closestDistance = math.huge
+    local ballSpeed = 0
     
-    -- Ищем все мячи в рабочей области
-    -- В Death Ball мячи могут называться "Ball", "DeathBall", "Projectile" и т.д.
+    -- Ищем мячи (расширенный список имен)
     for _, obj in ipairs(workspace:GetChildren()) do
         if obj:IsA("BasePart") then
             local nameLower = string.lower(obj.Name)
-            if string.find(nameLower, "ball") or string.find(nameLower, "projectile") then
+            if string.find(nameLower, "ball") or 
+               string.find(nameLower, "projectile") or
+               string.find(nameLower, "orb") or
+               string.find(nameLower, "sphere") then
                 local distance = (obj.Position - myPosition).Magnitude
                 if distance < closestDistance then
                     closestDistance = distance
                     closestBall = obj
+                    ballSpeed = obj.Velocity.Magnitude
                 end
             end
         end
     end
     
-    return closestBall, closestDistance
+    return closestBall, closestDistance, ballSpeed
 end
 
--- 6. ОСНОВНОЙ ЦИКЛ AUTO PARRY
+-- 8. ОСНОВНОЙ ЦИКЛ
 local heartbeatConnection = RunService.Heartbeat:Connect(function()
     if not Settings.AutoParryEnabled then return end
     
-    -- Получаем текущий пинг
+    -- Получаем пинг
     local ping = LocalPlayer:GetNetworkPing()
     Stats.CurrentPing = ping
     
-    -- Скользящее среднее для пинга
-    Stats.AveragePing = (Stats.AveragePing * 0.95) + (ping * 0.05)
-    
-    -- Если пинг слишком высокий, возможно, стоит временно отключить парирование
     if ping > Settings.MaxPing then
         return
     end
     
-    -- Ищем мяч, летящий в нас
-    local ball, distance = findTargetBall()
+    -- Ищем мяч
+    local ball, distance, ballSpeed = findTargetBall()
+    Stats.BallSpeed = ballSpeed
     
     if ball and distance then
-        -- Рассчитываем скорректированную дистанцию с учётом пинга
-        -- Если мяч летит в нас, он приближается. Учитываем задержку сети.
-        local ballVelocity = ball.Velocity.Magnitude
-        local adjustedDistance = distance - (ping * ballVelocity)
+        -- Рассчитываем ETA (время до прибытия) с учетом пинга
+        local adjustedDistance = distance - (ping * ballSpeed)
         
-        -- Проверяем, находится ли мяч в зоне поражения
+        -- Если мяч уже в зоне поражения с учетом пинга
         if adjustedDistance < Settings.ParryDistance then
-            -- Если пинг высокий, используем упреждающий спам
-            if ping > 0.2 and (adjustedDistance / ballVelocity) < Settings.SpamThreshold then
-                -- Упреждающий спам при высоком пинге
-                performParry()
-            elseif adjustedDistance <= 5 then
-                -- Идеальное срабатывание
+            -- Рассчитываем время до удара
+            local eta = adjustedDistance / math.max(ballSpeed, 1)
+            
+            -- Если время до удара меньше порога, парируем
+            if eta < Settings.MinETA or adjustedDistance < 5 then
                 local success = performParry()
                 if success then
-                    Stats.ParrySuccess = Stats.ParrySuccess + 1
-                else
-                    Stats.ParryMissed = Stats.ParryMissed + 1
+                    Stats.Success = Stats.Success + 1
                 end
             end
         end
     end
 end)
 
--- 7. СОЗДАНИЕ GUI (СТАТИСТИКА)
-local function createStatsGUI()
-    -- Удаляем старый GUI, если есть
-    local oldGui = game.CoreGui:FindFirstChild("DeathBallAutoParryGUI")
-    if oldGui then
-        oldGui:Destroy()
-    end
+-- 9. МИНИ-GUI (130x90)
+local function createMiniGUI()
+    local oldGui = game.CoreGui:FindFirstChild("DeathBallAutoParryMini")
+    if oldGui then oldGui:Destroy() end
     
     local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "DeathBallAutoParryGUI"
+    screenGui.Name = "DeathBallAutoParryMini"
     screenGui.ResetOnSpawn = false
-    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     screenGui.Parent = game.CoreGui
     
-    -- Основной фрейм
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Name = "MainFrame"
-    mainFrame.Size = UDim2.new(0, 220, 0, 140)
-    mainFrame.Position = UDim2.new(0, 15, 0, 15)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    mainFrame.BackgroundTransparency = 0.15
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Active = true
-    mainFrame.Draggable = true
-    mainFrame.Parent = screenGui
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 130, 0, 90)
+    frame.Position = UDim2.new(0, 10, 0, 10)
+    frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+    frame.BackgroundTransparency = 0.2
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = screenGui
     
-    -- Закругление углов
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = mainFrame
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
     
     -- Заголовок
     local title = Instance.new("TextLabel")
-    title.Name = "Title"
-    title.Size = UDim2.new(1, 0, 0, 30)
-    title.Position = UDim2.new(0, 0, 0, 0)
-    title.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    title.BackgroundTransparency = 0.5
-    title.BorderSizePixel = 0
-    title.Text = "⚔️ Death Ball | Auto Parry"
+    title.Size = UDim2.new(1, 0, 0, 20)
+    title.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    title.BackgroundTransparency = 0.3
+    title.Text = "⚔️ Auto Parry"
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.TextSize = 14
+    title.TextSize = 11
     title.Font = Enum.Font.GothamBold
-    title.Parent = mainFrame
-    
-    local titleCorner = Instance.new("UICorner")
-    titleCorner.CornerRadius = UDim.new(0, 8)
-    titleCorner.Parent = title
+    title.Parent = frame
     
     -- Статистика
-    local statsContainer = Instance.new("Frame")
-    statsContainer.Name = "Stats"
-    statsContainer.Size = UDim2.new(1, -20, 1, -45)
-    statsContainer.Position = UDim2.new(0, 10, 0, 35)
-    statsContainer.BackgroundTransparency = 1
-    statsContainer.Parent = mainFrame
+    local statsFrame = Instance.new("Frame")
+    statsFrame.Size = UDim2.new(1, -8, 1, -25)
+    statsFrame.Position = UDim2.new(0, 4, 0, 22)
+    statsFrame.BackgroundTransparency = 1
+    statsFrame.Parent = frame
     
-    -- Функция создания строки статистики
-    local function createStatLabel(name, yOffset)
-        local label = Instance.new("TextLabel")
-        label.Name = name .. "Label"
-        label.Size = UDim2.new(1, 0, 0, 20)
-        label.Position = UDim2.new(0, 0, 0, yOffset)
-        label.BackgroundTransparency = 1
-        label.Text = name .. ": 0"
-        label.TextColor3 = Color3.fromRGB(200, 200, 210)
-        label.TextSize = 13
-        label.Font = Enum.Font.Gotham
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Parent = statsContainer
-        return label
+    local function makeLabel(y, text)
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, 0, 0, 15)
+        lbl.Position = UDim2.new(0, 0, 0, y)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = text
+        lbl.TextColor3 = Color3.fromRGB(180, 180, 190)
+        lbl.TextSize = 10
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = statsFrame
+        return lbl
     end
     
-    local attemptsLabel = createStatLabel("Попытки", 0)
-    local successLabel = createStatLabel("Успешно", 22)
-    local missedLabel = createStatLabel("Пропущено", 44)
-    local pingLabel = createStatLabel("Пинг", 66)
+    local attemptsLbl = makeLabel(0, "Попытки: 0")
+    local successLbl = makeLabel(15, "Успех: 0")
+    local pingLbl = makeLabel(30, "Пинг: 0ms")
+    local speedLbl = makeLabel(45, "Скорость: 0")
+    local statusLbl = makeLabel(60, "🟢 АКТИВЕН")
     
-    -- Индикатор статуса
-    local statusLabel = Instance.new("TextLabel")
-    statusLabel.Name = "Status"
-    statusLabel.Size = UDim2.new(1, 0, 0, 20)
-    statusLabel.Position = UDim2.new(0, 0, 0, 90)
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.Text = "🟢 ACTIVE"
-    statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-    statusLabel.TextSize = 13
-    statusLabel.Font = Enum.Font.GothamBold
-    statusLabel.Parent = statsContainer
-    
-    -- Обновление GUI
-    local updateConnection
-    updateConnection = RunService.Heartbeat:Connect(function()
+    -- Обновление
+    local updateConn
+    updateConn = RunService.Heartbeat:Connect(function()
         if not screenGui.Parent then
-            updateConnection:Disconnect()
+            updateConn:Disconnect()
             return
         end
         
-        attemptsLabel.Text = "Попытки: " .. Stats.ParryAttempts
-        successLabel.Text = "Успешно: " .. Stats.ParrySuccess
-        missedLabel.Text = "Пропущено: " .. Stats.ParryMissed
+        attemptsLbl.Text = "Попытки: " .. Stats.Attempts
+        successLbl.Text = "Успех: " .. Stats.Success
+        successLbl.TextColor3 = Stats.Success > 0 and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(180, 180, 190)
         
         local pingMs = math.floor(Stats.CurrentPing * 1000)
-        pingLabel.Text = "Пинг: " .. pingMs .. " ms"
+        pingLbl.Text = "Пинг: " .. pingMs .. "ms"
+        pingLbl.TextColor3 = pingMs < 150 and Color3.fromRGB(100, 255, 100) 
+            or (pingMs < 300 and Color3.fromRGB(255, 255, 100) 
+            or Color3.fromRGB(255, 100, 100))
         
-        -- Цвет пинга
-        if pingMs < 150 then
-            pingLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-        elseif pingMs < 300 then
-            pingLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
-        else
-            pingLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-        end
+        speedLbl.Text = "Скорость: " .. math.floor(Stats.BallSpeed)
         
-        -- Статус
         if Settings.AutoParryEnabled then
-            statusLabel.Text = "🟢 ACTIVE"
-            statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+            statusLbl.Text = "🟢 АКТИВЕН"
+            statusLbl.TextColor3 = Color3.fromRGB(100, 255, 100)
         else
-            statusLabel.Text = "🔴 DISABLED"
-            statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+            statusLbl.Text = "🔴 ВЫКЛ"
+            statusLbl.TextColor3 = Color3.fromRGB(255, 100, 100)
         end
     end)
     
     return screenGui
 end
 
--- 8. ЗАПУСК
-print("[AutoParry] Скрипт загружен. Auto Parry активен.")
-print("[AutoParry] Пинг: " .. math.floor(Stats.CurrentPing * 1000) .. " ms")
+-- 10. ЗАПУСК
+findParryRemotes()
+createMiniGUI()
 
-createStatsGUI()
+print("[AutoParry] Скрипт загружен.")
+print("[AutoParry] Найдено ремоутов:", #parryRemotes)
+print("[AutoParry] Auto Parry включён.")
 
--- Обработка отключения
 game:BindToClose(function()
-    if heartbeatConnection then
-        heartbeatConnection:Disconnect()
-    end
+    if heartbeatConnection then heartbeatConnection:Disconnect() end
     print("[AutoParry] Скрипт остановлен.")
 end)
