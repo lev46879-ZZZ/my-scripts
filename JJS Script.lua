@@ -1,5 +1,5 @@
--- Death Ball | Auto Parry (Delta Mobile - v4)
--- Фокус: поиск мяча по скорости, эмуляция тапа, адаптация под пинг
+-- Death Ball | Auto Parry (Delta Mobile - v5)
+-- Фильтр мечей/игроков, раннее парирование, клик мышью
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -9,10 +9,11 @@ local LocalPlayer = Players.LocalPlayer
 
 local Settings = {
     AutoParryEnabled = true,
-    ParryDistance = 20,
+    ParryDistance = 45,         -- Увеличен радиус (было 20)
     PingCompensation = 0.5,
     MaxPing = 0.7,
-    MinETA = 0.1,
+    MinETA = 0.25,              -- Парируем заранее (было 0.1)
+    MinBallSpeed = 25,          -- Мин. скорость, чтобы считать объект мячом
     Debug = false
 }
 
@@ -24,36 +25,54 @@ local Stats = {
     TargetName = "Нет"
 }
 
--- ЭМУЛЯЦИЯ ТАПА (ДЛЯ DELTA)
+-- ЭМУЛЯЦИЯ ТАПА (ДЛЯ DELTA - клик мышью)
 local function tapScreen()
     local screenSize = GuiService:GetScreenResolution()
     local tapX = screenSize.X / 2
     local tapY = screenSize.Y / 2
 
-    -- Способ 1: SendTouchEvent (основной для мобильных)
-    pcall(function()
-        VirtualInputManager:SendTouchEvent(99, 1, tapX, tapY)
-        task.wait(0.02)
-        VirtualInputManager:SendTouchEvent(99, 2, tapX, tapY)
-    end)
-
-    -- Способ 2: SendMouseButtonEvent (запасной)
+    -- Основной способ: клик мышью (работает как тап на мобильном)
     pcall(function()
         VirtualInputManager:SendMouseButtonEvent(tapX, tapY, 0, true, game, 0)
         task.wait(0.02)
         VirtualInputManager:SendMouseButtonEvent(tapX, tapY, 0, false, game, 0)
     end)
+
+    -- Запасной: SendTouchEvent
+    pcall(function()
+        VirtualInputManager:SendTouchEvent(99, 1, tapX, tapY)
+        task.wait(0.02)
+        VirtualInputManager:SendTouchEvent(99, 2, tapX, tapY)
+    end)
     return true
 end
 
--- ФУНКЦИЯ ПАРИРОВАНИЯ
 local function performParry()
     Stats.Attempts = Stats.Attempts + 1
     tapScreen()
     return true
 end
 
--- 🎯 НОВЫЙ ПОИСК МЯЧА (Игнорирует имя, ищет по скорости)
+-- Проверка: принадлежит ли объект персонажу (игроку)
+local function isCharacterPart(part)
+    -- Проверяем родителя и всех предков до workspace
+    local parent = part
+    while parent and parent ~= workspace do
+        if parent:IsA("Model") then
+            -- Если это модель персонажа (содержит Humanoid)
+            local humanoid = parent:FindFirstChildOfClass("Humanoid")
+            if humanoid then return true end
+            -- Если это Tool (меч, оружие)
+            if parent:IsA("Tool") then return true end
+        end
+        -- Если объект лежит внутри Backpack или Character игрока
+        if parent:IsA("Tool") then return true end
+        parent = parent.Parent
+    end
+    return false
+end
+
+-- 🎯 ПОИСК МЯЧА (только свободно летящие объекты, летящие В НАС)
 local function findTargetBall()
     local character = LocalPlayer.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then
@@ -65,9 +84,174 @@ local function findTargetBall()
     local closestDistance = math.huge
     local ballSpeed = 0
     
-    -- Ищем по всей рабочей области
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        local part = nil
+    for _, part in ipairs(workspace:GetDescendants()) do
+        if part:IsA("BasePart") and not part.Anchored then
+            -- 1. Пропускаем части, принадлежащие персонажам/инструментам
+            if isCharacterPart(part) then continue end
+            if part:IsDescendantOf(character) then continue end
+            
+            -- 2. Проверяем скорость
+            local speed = part.Velocity.Magnitude
+            if speed < Settings.MinBallSpeed then continue end
+            
+            -- 3. Проверяем расстояние
+            local directionToMe = (myPosition - part.Position)
+            local distance = directionToMe.Magnitude
+            if distance > 150 then continue end
+            
+            -- 4. Проверяем, летит ли объект В НАШУ сторону
+            -- Нормализуем векторы и берём скалярное произведение
+            local velocityDir = part.Velocity.Unit
+            local toMeDir = directionToMe.Unit
+            local dotProduct = velocityDir:Dot(toMeDir)
+            
+            -- Если dotProduct > 0.3, объект летит примерно в нашу сторону
+            if dotProduct > 0.3 then
+                if distance < closestDistance then
+                    closestDistance = distance
+                    closestBall = part
+                    ballSpeed = speed
+                end
+            end
+        end
+    end
+    
+    return closestBall, closestDistance, ballSpeed
+end
+
+-- ОСНОВНОЙ ЦИКЛ
+local heartbeatConnection = RunService.Heartbeat:Connect(function()
+    if not Settings.AutoParryEnabled then return end
+
+    local ping = LocalPlayer:GetNetworkPing()
+    Stats.CurrentPing = ping
+
+    if ping > Settings.MaxPing then return end
+
+    local ball, distance, ballSpeed = findTargetBall()
+    
+    if ball then
+        Stats.TargetName = ball.Name
+        Stats.BallSpeed = ballSpeed
+    else
+        Stats.TargetName = "Нет"
+        Stats.BallSpeed = 0
+    end
+
+    if ball and distance then
+        -- Учитываем пинг: за время задержки мяч пролетит ping * speed studs
+        local adjustedDistance = distance - (ping * ballSpeed)
+        
+        -- Парируем, когда скорректированное расстояние в радиусе
+        if adjustedDistance < Settings.ParryDistance then
+            -- ETA: время до удара
+            local eta = math.max(adjustedDistance, 0) / math.max(ballSpeed, 1)
+            
+            -- Парируем заранее (при eta < MinETA или очень близко)
+            if eta < Settings.MinETA or adjustedDistance < 10 then
+                performParry()
+                Stats.Success = Stats.Success + 1
+            end
+        end
+    end
+end)
+
+-- МИНИ-GUI
+local function createMiniGUI()
+    local oldGui = game.CoreGui:FindFirstChild("DeathBallAutoParryMini")
+    if oldGui then oldGui:Destroy() end
+
+    local guiParent = game.CoreGui
+    pcall(function() if gethui then guiParent = gethui() end end)
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "DeathBallAutoParryMini"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = guiParent
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 140, 0, 110)
+    frame.Position = UDim2.new(0, 10, 0, 10)
+    frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = screenGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(170, 0, 255)
+    stroke.Thickness = 2
+    stroke.Parent = frame
+
+    local pulseConnection = RunService.RenderStepped:Connect(function()
+        if not screenGui.Parent then pulseConnection:Disconnect() return end
+        local pulse = (math.sin(tick() * 3) + 1) / 2
+        stroke.Thickness = 2 + pulse * 1.5
+        stroke.Color = Color3.fromRGB(170 + pulse * 40, 0, 255 - pulse * 30)
+    end)
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 18)
+    title.BackgroundTransparency = 1
+    title.Text = "⚔️ Auto Parry"
+    title.TextColor3 = Color3.fromRGB(200, 150, 255)
+    title.TextSize = 11
+    title.Font = Enum.Font.GothamBold
+    title.Parent = frame
+
+    local function makeLabel(y, text)
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -10, 0, 14)
+        lbl.Position = UDim2.new(0, 5, 0, y)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = text
+        lbl.TextColor3 = Color3.fromRGB(180, 180, 190)
+        lbl.TextSize = 10
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = frame
+        return lbl
+    end
+
+    local attemptsLbl = makeLabel(22, "Попытки: 0")
+    local successLbl = makeLabel(37, "Успех: 0")
+    local pingLbl = makeLabel(52, "Пинг: 0ms")
+    local speedLbl = makeLabel(67, "Скорость: 0")
+    local targetLbl = makeLabel(82, "Цель: Нет")
+    local statusLbl = makeLabel(97, "🟢 АКТИВЕН")
+    statusLbl.TextColor3 = Color3.fromRGB(100, 255, 100)
+    statusLbl.Font = Enum.Font.GothamBold
+
+    local updateConn
+    updateConn = RunService.Heartbeat:Connect(function()
+        if not screenGui.Parent then updateConn:Disconnect() return end
+
+        attemptsLbl.Text = "Попытки: " .. Stats.Attempts
+        successLbl.Text = "Успех: " .. Stats.Success
+        
+        local pingMs = math.floor(Stats.CurrentPing * 1000)
+        pingLbl.Text = "Пинг: " .. pingMs .. "ms"
+        pingLbl.TextColor3 = pingMs < 150 and Color3.fromRGB(100, 255, 100) 
+            or (pingMs < 300 and Color3.fromRGB(255, 255, 100) or Color3.fromRGB(255, 100, 100))
+        
+        speedLbl.Text = "Скорость: " .. math.floor(Stats.BallSpeed)
+        
+        targetLbl.Text = "Цель: " .. Stats.TargetName
+        targetLbl.TextColor3 = Stats.TargetName ~= "Нет" and Color3.fromRGB(100, 255, 255) or Color3.fromRGB(180, 180, 190)
+    end)
+end
+
+-- ЗАПУСК
+createMiniGUI()
+print("[AutoParry] v5 загружен. Только мячи, летящие в нас.")
+
+game:BindToClose(function()
+    if heartbeatConnection then heartbeatConnection:Disconnect() end
+end)        local part = nil
         -- Проверяем, это часть или модель
         if obj:IsA("BasePart") then
             part = obj
