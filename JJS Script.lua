@@ -1,14 +1,16 @@
 --[[
     JJS BATTLEGROUND — CS:GO-style Cheat Menu (Delta / Mobile)
-    Layout: top icon tabs + 3 columns (left / middle / right) with toggles, values, red highlights
-    Functions: Fly, 8 server-side Invisibility attempts, Misc
+    - GUI: как в прошлом запросе (CS:GO стиль, 3 колонки, иконки)
+    - Убраны все фейковые кнопки (Silent Mode, Auto Land, Weapon Accuracy и т.д.)
+    - Оставлены только реальные функции: Fly + Invis (8 методов)
+    - FLY: управление исправлено
 --]]
 
 --==== SERVICES ====--
-local Players      = game:GetService("Players")
-local RunService   = game:GetService("RunService")
-local UIS          = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
+local Players         = game:GetService("Players")
+local RunService      = game:GetService("RunService")
+local UIS             = game:GetService("UserInputService")
+local TweenService    = game:GetService("TweenService")
 local TeleportService = game:GetService("TeleportService")
 
 local LP     = Players.LocalPlayer
@@ -22,27 +24,31 @@ if _G.JJS_SCRIPT then
     end)
 end
 
-local S = { gui=nil, conns={}, fly=false, flySpeed=60, invis=false, invisMode=1 }
+local S = {
+    gui = nil, conns = {},
+    fly = false, flySpeed = 60,
+    invis = false, invisMode = 1,
+}
 _G.JJS_SCRIPT = S
 
---==== COLORS (CS:GO menu palette) ====--
+--==== COLORS ====--
 local C = {
-    bg         = Color3.fromRGB(20,20,22),
-    panel      = Color3.fromRGB(28,28,30),
-    row        = Color3.fromRGB(32,32,35),
-    section    = Color3.fromRGB(24,24,26),
-    tabBar     = Color3.fromRGB(18,18,20),
-    tabActive  = Color3.fromRGB(45,45,48),
-    stroke     = Color3.fromRGB(45,45,48),
-    strokeDim  = Color3.fromRGB(38,38,40),
-    text       = Color3.fromRGB(210,210,215),
-    textDim    = Color3.fromRGB(130,130,138),
-    red        = Color3.fromRGB(210,45,45),
-    toggleOn   = Color3.fromRGB(90,110,200),
-    toggleOff  = Color3.fromRGB(60,60,65),
-    knob       = Color3.fromRGB(215,215,220),
-    valueBox   = Color3.fromRGB(24,24,26),
-    line       = Color3.fromRGB(55,55,58),
+    bg        = Color3.fromRGB(20,20,22),
+    panel     = Color3.fromRGB(28,28,30),
+    row       = Color3.fromRGB(32,32,35),
+    section   = Color3.fromRGB(24,24,26),
+    tabBar    = Color3.fromRGB(18,18,20),
+    tabActive = Color3.fromRGB(45,45,48),
+    stroke    = Color3.fromRGB(45,45,48),
+    strokeDim = Color3.fromRGB(38,38,40),
+    text      = Color3.fromRGB(210,210,215),
+    textDim   = Color3.fromRGB(130,130,138),
+    red       = Color3.fromRGB(210,45,45),
+    toggleOn  = Color3.fromRGB(90,110,200),
+    toggleOff = Color3.fromRGB(60,60,65),
+    knob      = Color3.fromRGB(215,215,220),
+    valueBox  = Color3.fromRGB(24,24,26),
+    line      = Color3.fromRGB(55,55,58),
 }
 
 --==== HELPERS ====--
@@ -61,7 +67,7 @@ gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = LP:WaitForChild("PlayerGui")
 S.gui = gui
 
---== Floating open button (square dark with red dot, CS style) ==--
+-- Floating button
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0,52,0,52)
 ToggleBtn.Position = UDim2.new(0,16,0.4,0)
@@ -91,7 +97,7 @@ TBRed.BorderSizePixel = 0
 TBRed.Parent = ToggleBtn
 corner(TBRed, 1)
 
---== Main window ==--
+-- Main window
 local Main = Instance.new("Frame")
 Main.Size = UDim2.new(0,620,0,420)
 Main.Position = UDim2.new(0.5,-310,0.5,-210)
@@ -104,7 +110,7 @@ Main.Parent = gui
 corner(Main, 3)
 stroke(Main, C.line, 1)
 
---== Tab bar at very top (icon-only) ==--
+-- Tab bar
 local TabBar = Instance.new("Frame")
 TabBar.Size = UDim2.new(1,0,0,34)
 TabBar.BackgroundColor3 = C.tabBar
@@ -133,7 +139,6 @@ TabLayout.Padding = UDim.new(0,4)
 TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TabLayout.Parent = TabBar
 
---== Close button (top-right of tabbar) ==--
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0,26,0,22)
 CloseBtn.Position = UDim2.new(1,-32,0,6)
@@ -147,7 +152,7 @@ CloseBtn.Parent = TabBar
 corner(CloseBtn, 2)
 CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false end)
 
---== Content area (3 columns) ==--
+-- Content
 local Content = Instance.new("Frame")
 Content.Size = UDim2.new(1,-12,1,-46)
 Content.Position = UDim2.new(0,6,0,40)
@@ -170,7 +175,7 @@ local function makeColumn(xScale, wScale)
     return col
 end
 
-local Col1 = makeColumn(0,   0.30)
+local Col1 = makeColumn(0,    0.30)
 local Col2 = makeColumn(0.30, 0.35)
 local Col3 = makeColumn(0.65, 0.35)
 
@@ -179,12 +184,9 @@ local function clearColumn(col)
         if not ch:IsA("UIListLayout") then ch:Destroy() end
     end
 end
+local function clearAll() clearColumn(Col1); clearColumn(Col2); clearColumn(Col3) end
 
-local function clearAll()
-    clearColumn(Col1); clearColumn(Col2); clearColumn(Col3)
-end
-
---==== UI ELEMENT BUILDERS ====--
+--==== UI BUILDERS ====--
 local globalOrder = 0
 local function ord() globalOrder = globalOrder + 1; return globalOrder end
 
@@ -205,7 +207,6 @@ local function sectionHeader(col, title)
     l.TextSize = 10
     l.TextXAlignment = Enum.TextXAlignment.Left
     l.Parent = h
-    return h
 end
 
 local function toggleSwitch(parent, state, onChange)
@@ -242,7 +243,7 @@ local function toggleSwitch(parent, state, onChange)
         refresh()
         if onChange then onChange(on) end
     end)
-    return t, function() return on end
+    return t, function() return on end, function(v) on = v; refresh() end
 end
 
 local function toggleRow(col, label, default, onChange, red)
@@ -267,21 +268,6 @@ local function toggleRow(col, label, default, onChange, red)
     return toggleSwitch(r, default, onChange)
 end
 
-local function valueBox(parent, text, w, red)
-    local v = Instance.new("TextLabel")
-    v.Size = UDim2.new(0,w or 62,0,13)
-    v.Position = UDim2.new(1,-(w or 62)-6,0.5,-6.5)
-    v.BackgroundColor3 = C.valueBox
-    v.Text = text
-    v.TextColor3 = red and C.red or C.text
-    v.Font = Enum.Font.Gotham
-    v.TextSize = 10
-    v.Parent = parent
-    corner(v, 2)
-    stroke(v, C.strokeDim, 1)
-    return v
-end
-
 local function valueRow(col, label, value, w, red)
     local r = Instance.new("Frame")
     r.Size = UDim2.new(1,0,0,17)
@@ -301,7 +287,17 @@ local function valueRow(col, label, value, w, red)
     l.TextXAlignment = Enum.TextXAlignment.Left
     l.Parent = r
 
-    local v = valueBox(r, value, w, red)
+    local v = Instance.new("TextLabel")
+    v.Size = UDim2.new(0,w or 62,0,13)
+    v.Position = UDim2.new(1,-(w or 62)-6,0.5,-6.5)
+    v.BackgroundColor3 = C.valueBox
+    v.Text = tostring(value)
+    v.TextColor3 = red and C.red or C.text
+    v.Font = Enum.Font.Gotham
+    v.TextSize = 10
+    v.Parent = r
+    corner(v, 2)
+    stroke(v, C.strokeDim, 1)
     return v
 end
 
@@ -359,9 +355,7 @@ local function methodRow(col, label, onSelect)
     l.TextXAlignment = Enum.TextXAlignment.Left
     l.Parent = b
 
-    b.MouseButton1Click:Connect(function()
-        onSelect(b, dot, l)
-    end)
+    b.MouseButton1Click:Connect(function() onSelect(b, dot, l) end)
     b.MouseEnter:Connect(function()
         if dot.BackgroundColor3 ~= C.red then
             TweenService:Create(b, TweenInfo.new(0.12), {BackgroundColor3 = C.tabActive}):Play()
@@ -372,11 +366,11 @@ local function methodRow(col, label, onSelect)
             TweenService:Create(b, TweenInfo.new(0.12), {BackgroundColor3 = C.row}):Play()
         end
     end)
-    return b, dot, l
 end
 
---==== FLY ====--
+--==== FLY (исправлено) ====--
 local flyConn
+
 local function stopFly()
     S.fly = false
     if flyConn then flyConn:Disconnect(); flyConn = nil end
@@ -417,17 +411,27 @@ local function startFly()
     bg.Parent = hrp
 
     S.fly = true
+
+    -- ФИКС: MoveDirection уже мировой вектор от Roblox.
+    -- Не умножаем на camCF.LookVector/RightVector — это давало инверсию.
+    -- Вертикаль берём из наклона камеры ТОЛЬКО когда двигаемся.
     flyConn = RunService.RenderStepped:Connect(function()
         if not S.fly or not bv.Parent then return end
+
+        local md    = hum.MoveDirection
         local camCF = Camera.CFrame
-        local md = hum.MoveDirection
-        local dir = Vector3.zero
-        if md.Magnitude > 0.05 then
-            dir = (camCF.LookVector * md.Z + camCF.RightVector * md.X)
-            if dir.Magnitude > 1 then dir = dir.Unit end
+
+        local horiz = Vector3.new(md.X, 0, md.Z)
+        if horiz.Magnitude > 1 then horiz = horiz.Unit end
+
+        local vert = 0
+        if md.Magnitude > 0.1 then
+            vert = camCF.LookVector.Y
         end
-        local vert = camCF.LookVector.Y * (md.Z ~= 0 and 1 or 0)
-        dir = dir + Vector3.new(0, vert, 0)
+
+        local dir = Vector3.new(horiz.X, vert, horiz.Z)
+        if dir.Magnitude > 1 then dir = dir.Unit end
+
         bv.Velocity = dir * S.flySpeed
         bg.CFrame = CFrame.new(hrp.Position, hrp.Position + camCF.LookVector)
     end)
@@ -502,7 +506,7 @@ local function applyInvis(mode)
                 v.CanCollide = false; v.CanQuery = false; v.CanTouch = false
             elseif v:IsA("Decal") or v:IsA("Texture") then
                 saveTrans(v); v.Transparency = 1
-            elseif v:IsA("Accessory") then
+            elseif v:IsA("Accessory") or v:IsA("Hat") then
                 v:Destroy()
             end
         end
@@ -511,16 +515,6 @@ local function applyInvis(mode)
             hum.HealthDisplayDistance = 0
             hum.NameDisplayDistance = 0
         end
-        pcall(function() hrp:SetNetworkOwner(nil) end)
-        task.spawn(function()
-            local parent = char.Parent
-            char.Parent = nil
-            task.wait(0.05)
-            char.Parent = parent
-            for _, v in ipairs(char:GetDescendants()) do
-                if v:IsA("BasePart") then v.Transparency = 1 end
-            end
-        end)
         invisConn = RunService.RenderStepped:Connect(function()
             local c = LP.Character
             if not c then return end
@@ -532,6 +526,8 @@ local function applyInvis(mode)
     elseif mode == 2 then
         if hum then
             local humParent = hum.Parent
+            local ws = hum.WalkSpeed
+            local jp = hum.JumpPower or 50
             hum:Destroy()
             task.wait()
             local newHum = Instance.new("Humanoid")
@@ -539,8 +535,9 @@ local function applyInvis(mode)
             newHum.Parent = humParent
             newHum.MaxHealth = 100
             newHum.Health = 100
-            newHum.WalkSpeed = 16
-            newHum.JumpPower = 50
+            newHum.WalkSpeed = ws
+            newHum.JumpPower = jp
+            newHum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
         end
         for _, v in ipairs(char:GetDescendants()) do
             if v:IsA("BasePart") then saveTrans(v); v.Transparency = 1 end
@@ -554,26 +551,36 @@ local function applyInvis(mode)
         end)
 
     elseif mode == 3 then
-        local nan = 0/0
+        if hum then
+            pcall(function()
+                hum.PlatformStand = true
+                hum:ChangeState(Enum.HumanoidStateType.Dead)
+                hum.BreakJointsOnDeath = false
+            end)
+        end
         for _, v in ipairs(char:GetDescendants()) do
             if v:IsA("BasePart") then
                 saveTrans(v); v.Transparency = 1; v.CanCollide = false
             end
         end
-        pcall(function() hrp.CFrame = CFrame.new(Vector3.new(nan, nan, nan)) end)
-        task.wait(0.1)
-        pcall(function() hrp.CFrame = CFrame.new(0, 500, 0) end)
+        invisConn = RunService.RenderStepped:Connect(function()
+            local c = LP.Character
+            if not c then return end
+            for _, v in ipairs(c:GetDescendants()) do
+                if v:IsA("BasePart") then v.LocalTransparencyModifier = 1 end
+            end
+        end)
 
     elseif mode == 4 then
-        if hum then
-            hum:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
-            hum:ChangeState(Enum.HumanoidStateType.Dead)
-            hum.Health = math.huge
-            hum.BreakJointsOnDeath = false
-        end
         for _, v in ipairs(char:GetDescendants()) do
             if v:IsA("BasePart") then saveTrans(v); v.Transparency = 1 end
         end
+        pcall(function()
+            local oldParent = char.Parent
+            char.Parent = Camera
+            task.wait(0.5)
+            if char.Parent == Camera then char.Parent = oldParent end
+        end)
 
     elseif mode == 5 then
         pcall(function() hrp:SetNetworkOwner(nil) end)
@@ -581,7 +588,6 @@ local function applyInvis(mode)
             hrp.CustomPhysicalProperties = PhysicalProperties.new(0.001, 0.001, 0.001, 0, 0)
         end)
         hrp.Massless = true
-        hrp.Anchored = false
         for _, v in ipairs(char:GetDescendants()) do
             if v:IsA("BasePart") then
                 saveTrans(v); v.Transparency = 1; v.Massless = true
@@ -591,14 +597,14 @@ local function applyInvis(mode)
     elseif mode == 6 then
         hrp.Anchored = true
         local orig = hrp.CFrame
-        hrp.CFrame = CFrame.new(0, -5000, 0)
+        hrp.CFrame = CFrame.new(0, 50000, 0)
         for _, v in ipairs(char:GetDescendants()) do
             if v:IsA("BasePart") then
                 saveTrans(v); v.Transparency = 1; v.CanCollide = false
             end
         end
         task.spawn(function()
-            task.wait(3)
+            task.wait(0.2)
             pcall(function()
                 hrp.Anchored = false
                 hrp.CFrame = orig
@@ -615,9 +621,8 @@ local function applyInvis(mode)
                 newFocus.Size = Vector3.new(1,1,1)
                 newFocus.Position = Vector3.new(0, 100000, 0)
                 newFocus.Parent = workspace
-                task.wait(0.2)
+                task.wait(0.1)
                 LP.ReplicationFocus = newFocus
-                newFocus:Destroy()
             end
         end)
         pcall(function() hrp:SetNetworkOwner(nil) end)
@@ -643,8 +648,9 @@ local function applyInvis(mode)
         local c = LP.Character
         if not c then return end
         for _, v in ipairs(c:GetDescendants()) do
-            if v:IsA("BasePart") and v.Transparency ~= 1 then
-                if mode ~= 8 then v.Transparency = 1 end
+            if v:IsA("BasePart") then
+                v.LocalTransparencyModifier = 1
+                if mode ~= 8 and v.Transparency ~= 1 then v.Transparency = 1 end
             end
         end
     end)
@@ -658,7 +664,6 @@ local function stopInvis()
 end
 
 --==== TAB SYSTEM ====--
-local Tabs = {}
 local currentTab = 1
 local tabButtons = {}
 
@@ -687,104 +692,79 @@ local function makeTopTab(icon, idx)
             b.TextColor3 = C.textDim
         end
     end)
-
     return b
 end
 
---== TAB 1: FLY ==--
-local FlyState = { enabled = false }
+--== FLY PAGE ==--
+local FlyRefs = { setState = nil }
 
 local function buildFlyPage()
-    clearAll()
-    globalOrder = 0
+    clearAll(); globalOrder = 0
 
-    -- LEFT column
-    sectionHeader(Col1, "Fly Config")
-    local _, isOn = toggleRow(Col1, "Enabled", FlyState.enabled, function(v)
-        FlyState.enabled = v
+    sectionHeader(Col1, "Fly")
+    local _, _, setFlyState = toggleRow(Col1, "Enabled", S.fly, function(v)
+        FlyRefs.setState = setFlyState
         if v then startFly() else stopFly() end
     end)
-    valueRow(Col1, "Speed", tostring(S.flySpeed), 56)
-    toggleRow(Col1, "Silent Mode", false, nil)
-    toggleRow(Col1, "Auto Land", false, nil)
+    FlyRefs.setState = setFlyState
 
-    sectionHeader(Col1, "Keybind")
-    valueRow(Col1, "Toggle Key", "F", 40)
-    valueRow(Col1, "Up Key", "SPACE", 56)
-    valueRow(Col1, "Down Key", "CTRL", 56)
+    sectionHeader(Col1, "Speed")
+    local speedLbl = valueRow(Col1, "Current Speed", tostring(S.flySpeed), 56)
+    buttonRow(Col1, "◄ − 10", function()
+        S.flySpeed = math.max(10, S.flySpeed - 10)
+        speedLbl.Text = tostring(S.flySpeed)
+    end)
+    buttonRow(Col1, "► + 10", function()
+        S.flySpeed = math.min(500, S.flySpeed + 10)
+        speedLbl.Text = tostring(S.flySpeed)
+    end)
 
-    -- MIDDLE column
-    sectionHeader(Col2, "Fly Behavior")
-    valueRow(Col2, "Auto Stop Range", "0.00", 62)
-    valueRow(Col2, "Smooth Factor", "1.00", 62)
-    valueRow(Col2, "Max Altitude", "1000", 62)
-    valueRow(Col2, "Min Altitude", "0.00", 62)
-
-    sectionHeader(Col2, "Weapon Accuracy")
-    valueRow(Col2, "Hitchance", "0.00", 62)
-    valueRow(Col2, "Min Damage", "0.00", 62)
-    valueRow(Col2, "Min Hit Damage", "0.00", 62)
-    valueRow(Col2, "Min Hic Chance", "0.00", 62)
-
-    -- RIGHT column
-    sectionHeader(Col3, "Advanced")
-    toggleRow(Col3, "Anti-Fling", true, nil)
-    toggleRow(Col3, "Anti-Void", true, nil)
-    valueRow(Col3, "Network Owner", "Client", 62, false)
-
-    sectionHeader(Col3, "Movement Options")
-    valueRow(Col3, "Pitch", "0.00", 62)
-    valueRow(Col3, "Yaw", "0.00", 62)
-    toggleRow(Col3, "Strafe Mode", false, nil)
+    sectionHeader(Col2, "Controls")
+    valueRow(Col2, "Horizontal", "Joystick", 62)
+    valueRow(Col2, "Vertical", "Cam Pitch", 62)
+    valueRow(Col2, "Mode", "World-Space", 62)
 
     sectionHeader(Col3, "Info")
-    valueRow(Col3, "Status", "Ready", 62)
+    valueRow(Col3, "Status", S.fly and "Active" or "Idle", 62)
+    valueRow(Col3, "Version", "1.0.3", 62)
 end
 
---== TAB 2: INVIS ==--
+--== INVIS PAGE ==--
+local InvisRefs = { setState = nil }
 local methodRefs = {}
 
 local function buildInvisPage()
-    clearAll()
-    globalOrder = 0
+    clearAll(); globalOrder = 0
     methodRefs = {}
 
-    -- LEFT column
-    sectionHeader(Col1, "Invisibility Config")
-    local _, isOn = toggleRow(Col1, "Enabled", S.invis, function(v)
+    sectionHeader(Col1, "Invisibility")
+    local _, _, setInvisState = toggleRow(Col1, "Enabled", S.invis, function(v)
         if v then
             S.invis = true
             applyInvis(S.invisMode)
         else
             stopInvis()
         end
-    end, false)
+    end)
+    InvisRefs.setState = setInvisState
 
-    valueRow(Col1, "Active Method", "M" .. S.invisMode, 40, false)
+    local activeLbl = valueRow(Col1, "Active Method", "M" .. S.invisMode, 40)
 
-    sectionHeader(Col1, "Additional")
-    toggleRow(Col1, "Silent Aim Ghost", false, nil)
-    toggleRow(Col1, "Auto Reapply", true, nil)
-    toggleRow(Col1, "Persist Respawn", false, nil)
-
-    sectionHeader(Col1, "Bone Priority")
-    valueRow(Col1, "Priority", "Nearest", 62, false)
-
-    -- MIDDLE column
     sectionHeader(Col2, "Methods (1-8)")
     local methods = {
-        "Character Reparent Desync",
-        "Humanoid Destroy/Recreate",
-        "NaN CFrame Glitch",
-        "Humanoid Dead State",
-        "Massless + Network Drop",
-        "Anchor Under Map",
-        "Streaming ReplicationFocus",
-        "Accessories + Local",
+        "Local Transparency",
+        "Humanoid Recreate",
+        "Death State Fake",
+        "Parent to Camera",
+        "Massless + NetDrop",
+        "Anchor High TP",
+        "Streaming Focus",
+        "Accessories Only",
     }
     for i, name in ipairs(methods) do
         local btn, dot, lbl = methodRow(Col2, "M"..i.." · "..name, function(b, d, l)
             S.invisMode = i
+            if activeLbl then activeLbl.Text = "M" .. i end
             if S.invis then applyInvis(i) end
             for _, ref in ipairs(methodRefs) do
                 ref.dot.BackgroundColor3 = C.textDim
@@ -797,7 +777,6 @@ local function buildInvisPage()
         end)
         methodRefs[i] = { btn = btn, dot = dot, lbl = lbl }
     end
-    -- highlight active
     local act = methodRefs[S.invisMode]
     if act then
         act.dot.BackgroundColor3 = C.red
@@ -805,29 +784,16 @@ local function buildInvisPage()
         act.btn.BackgroundColor3 = C.tabActive
     end
 
-    -- RIGHT column
-    sectionHeader(Col3, "Anti-Aim")
-    toggleRow(Col3, "Enabled", false, nil)
-    valueRow(Col3, "Fire Delay", "0.00", 62)
-    valueRow(Col3, "Hitbox", "Head", 62, true)
-    valueRow(Col3, "Pitch", "0.00", 62)
-
-    sectionHeader(Col3, "Triggerbot")
-    toggleRow(Col3, "Enabled", false, nil)
-    valueRow(Col3, "Accuracy", "0.00", 62)
-    valueRow(Col3, "Hitbox", "Body", 62, true)
-
     sectionHeader(Col3, "Info")
     valueRow(Col3, "Streaming", tostring(workspace.StreamingEnabled), 62)
     valueRow(Col3, "Status", S.invis and "Active" or "Idle", 62)
+    valueRow(Col3, "Type", "Client-Side", 62, true)
 end
 
---== TAB 3: MISC ==--
+--== MISC PAGE ==--
 local function buildMiscPage()
-    clearAll()
-    globalOrder = 0
+    clearAll(); globalOrder = 0
 
-    -- LEFT column
     sectionHeader(Col1, "Actions")
     buttonRow(Col1, "Reset Character", function()
         local char = LP.Character
@@ -839,52 +805,35 @@ local function buildMiscPage()
     buttonRow(Col1, "Rejoin Server", function()
         pcall(function() TeleportService:Teleport(game.PlaceId) end)
     end)
+
+    sectionHeader(Col1, "Toggle")
     buttonRow(Col1, "Toggle Menu", function()
         Main.Visible = not Main.Visible
-    end, true)
-
-    sectionHeader(Col1, "State")
-    toggleRow(Col1, "Fly", S.fly, function(v)
-        if v then startFly() else stopFly() end
     end)
-    toggleRow(Col1, "Invis", S.invis, function(v)
-        if v then S.invis = true; applyInvis(S.invisMode) else stopInvis() end
-    end)
-
-    -- MIDDLE column
-    sectionHeader(Col2, "Shortcuts")
-    valueRow(Col2, "Open Menu", "R-Alt", 56)
-    valueRow(Col2, "Fly Key", "F", 40)
-    valueRow(Col2, "Invis Key", "G", 40)
 
     sectionHeader(Col2, "Client Info")
     valueRow(Col2, "Player", LP.Name, 90)
     valueRow(Col2, "PlaceID", tostring(game.PlaceId), 90)
-    valueRow(Col2, "Version", "1.0.0", 56)
+    valueRow(Col2, "Version", "1.0.3", 56)
     valueRow(Col2, "Build", "mobile", 56)
 
-    -- RIGHT column
-    sectionHeader(Col3, "Danger Zone")
-    buttonRow(Col3, "Disable All Functions", function()
+    sectionHeader(Col3, "Danger")
+    buttonRow(Col3, "Disable All", function()
         stopFly(); stopInvis()
-        FlyState.enabled = false
+        if FlyRefs.setState then FlyRefs.setState(false) end
+        if InvisRefs.setState then InvisRefs.setState(false) end
     end, true)
     buttonRow(Col3, "Destroy GUI", function()
         stopFly(); stopInvis()
         gui:Destroy()
     end, true)
-
-    sectionHeader(Col3, "Credits")
-    valueRow(Col3, "Author", "JJS Hub", 62)
-    valueRow(Col3, "Target", "Delta", 62)
-    valueRow(Col3, "Theme", "CS:GO", 62)
 end
 
 --== Register tabs ==--
 local tabDefs = {
-    { icon = "✈", name = "FLY",   build = buildFlyPage   },
-    { icon = "◎", name = "INVIS", build = buildInvisPage },
-    { icon = "⚙", name = "MISC",  build = buildMiscPage  },
+    { icon = "✈", build = buildFlyPage   },
+    { icon = "◎", build = buildInvisPage },
+    { icon = "⚙", build = buildMiscPage  },
 }
 
 local function switchTab(idx)
@@ -921,7 +870,6 @@ LP.CharacterAdded:Connect(function()
     else buildMiscPage() end
 end)
 
--- init
 switchTab(1)
 
-print("[JJS] CS:GO-style menu loaded. Tap JJS button to open.")
+print("[JJS] Menu loaded. Tap JJS button.")
