@@ -1,15 +1,12 @@
 --[[
     JJS BATTLEGROUND — CS:GO-style Cheat Menu (Delta / Mobile)
-    - GUI: как в прошлом запросе (CS:GO стиль, 3 колонки, иконки)
-    - Убраны все фейковые кнопки (Silent Mode, Auto Land, Weapon Accuracy и т.д.)
-    - Оставлены только реальные функции: Fly + Invis (8 методов)
-    - FLY: управление исправлено
+    Version: 2.0 (FFlag Invisibility)
+    Tabs: MAIN only (по запросу)
 --]]
 
 --==== SERVICES ====--
 local Players         = game:GetService("Players")
 local RunService      = game:GetService("RunService")
-local UIS             = game:GetService("UserInputService")
 local TweenService    = game:GetService("TweenService")
 local TeleportService = game:GetService("TeleportService")
 
@@ -67,7 +64,7 @@ gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = LP:WaitForChild("PlayerGui")
 S.gui = gui
 
--- Floating button
+-- Floating open button
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0,52,0,52)
 ToggleBtn.Position = UDim2.new(0,16,0.4,0)
@@ -110,7 +107,7 @@ Main.Parent = gui
 corner(Main, 3)
 stroke(Main, C.line, 1)
 
--- Tab bar
+-- Tab bar (одна вкладка MAIN)
 local TabBar = Instance.new("Frame")
 TabBar.Size = UDim2.new(1,0,0,34)
 TabBar.BackgroundColor3 = C.tabBar
@@ -139,6 +136,20 @@ TabLayout.Padding = UDim.new(0,4)
 TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TabLayout.Parent = TabBar
 
+-- Кнопка MAIN (активная по умолчанию)
+local MainTabBtn = Instance.new("TextButton")
+MainTabBtn.Size = UDim2.new(0,70,0,26)
+MainTabBtn.BackgroundColor3 = C.tabActive
+MainTabBtn.Text = "MAIN"
+MainTabBtn.TextColor3 = C.red
+MainTabBtn.Font = Enum.Font.GothamBold
+MainTabBtn.TextSize = 12
+MainTabBtn.AutoButtonColor = false
+MainTabBtn.LayoutOrder = 1
+MainTabBtn.Parent = TabBar
+corner(MainTabBtn, 2)
+
+-- Close button
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0,26,0,22)
 CloseBtn.Position = UDim2.new(1,-32,0,6)
@@ -412,18 +423,20 @@ local function startFly()
 
     S.fly = true
 
-    -- ФИКС: MoveDirection уже мировой вектор от Roblox.
-    -- Не умножаем на camCF.LookVector/RightVector — это давало инверсию.
-    -- Вертикаль берём из наклона камеры ТОЛЬКО когда двигаемся.
+    -- ФИКС: MoveDirection уже возвращает мировой вектор.
+    -- Раньше мы умножали его на camCF.LookVector * md.Z, что давало инверсию.
+    -- Теперь используем md напрямую для горизонтали, а вертикаль берём из наклона камеры.
     flyConn = RunService.RenderStepped:Connect(function()
         if not S.fly or not bv.Parent then return end
 
         local md    = hum.MoveDirection
         local camCF = Camera.CFrame
 
+        -- Горизонталь: берём X и Z из MoveDirection как есть
         local horiz = Vector3.new(md.X, 0, md.Z)
         if horiz.Magnitude > 1 then horiz = horiz.Unit end
 
+        -- Вертикаль: наклон камеры вверх/вниз (только когда движемся)
         local vert = 0
         if md.Magnitude > 0.1 then
             vert = camCF.LookVector.Y
@@ -437,33 +450,12 @@ local function startFly()
     end)
 end
 
---==== INVIS ====--
+--==== INVIS (FFlag + fallback) ====--
 local invisConn
-local savedHRP
-
-local function saveTrans(v)
-    if v:FindFirstChild("JJSOldTrans") then return end
-    local n = Instance.new("NumberValue")
-    n.Name = "JJSOldTrans"
-    n.Value = v.Transparency
-    n.Parent = v
-end
 
 local function restoreChar()
     local char = LP.Character
     if not char then return end
-    if savedHRP then
-        pcall(function()
-            savedHRP.Anchored = false
-            savedHRP.CanCollide = true
-            savedHRP.CanQuery = true
-            savedHRP.CanTouch = true
-            savedHRP.Transparency = 0
-            savedHRP.LocalTransparencyModifier = 0
-            savedHRP.Massless = false
-        end)
-        savedHRP = nil
-    end
     for _, v in ipairs(char:GetDescendants()) do
         if v:IsA("BasePart") then
             v.LocalTransparencyModifier = 0
@@ -492,20 +484,82 @@ local function applyInvis(mode)
 
     local char = LP.Character
     if not char then return end
-    char.Archivable = true
 
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hrp then return end
-    savedHRP = hrp
 
+    -- M1: WorldStepMax Desync (Bolong-style, самый рабочий)
     if mode == 1 then
+        if setfflag then
+            pcall(function()
+                setfflag("WorldStepMax", "-99999999999999")
+                task.wait(1)
+                setfflag("WorldStepMax", "-1")
+            end)
+        end
         for _, v in ipairs(char:GetDescendants()) do
             if v:IsA("BasePart") then
-                saveTrans(v); v.Transparency = 1
-                v.CanCollide = false; v.CanQuery = false; v.CanTouch = false
+                if not v:FindFirstChild("JJSOldTrans") then
+                    local n = Instance.new("NumberValue")
+                    n.Name = "JJSOldTrans"
+                    n.Value = v.Transparency
+                    n.Parent = v
+                end
+                v.Transparency = 1
+                v.LocalTransparencyModifier = 1
+            end
+        end
+        invisConn = RunService.RenderStepped:Connect(function()
+            local c = LP.Character
+            if not c then return end
+            for _, v in ipairs(c:GetDescendants()) do
+                if v:IsA("BasePart") then v.LocalTransparencyModifier = 1 end
+            end
+        end)
+
+    -- M2: Physics sender rate
+    elseif mode == 2 then
+        if setfflag then
+            pcall(function()
+                setfflag("DFIntS2PhysicsSenderRate", "-1")
+            end)
+        end
+        for _, v in ipairs(char:GetDescendants()) do
+            if v:IsA("BasePart") then
+                if not v:FindFirstChild("JJSOldTrans") then
+                    local n = Instance.new("NumberValue")
+                    n.Name = "JJSOldTrans"
+                    n.Value = v.Transparency
+                    n.Parent = v
+                end
+                v.Transparency = 1
+                v.LocalTransparencyModifier = 1
+            end
+        end
+        invisConn = RunService.RenderStepped:Connect(function()
+            local c = LP.Character
+            if not c then return end
+            for _, v in ipairs(c:GetDescendants()) do
+                if v:IsA("BasePart") then v.LocalTransparencyModifier = 1 end
+            end
+        end)
+
+    -- M3: Local transparency only (fallback)
+    elseif mode == 3 then
+        for _, v in ipairs(char:GetDescendants()) do
+            if v:IsA("BasePart") then
+                if not v:FindFirstChild("JJSOldTrans") then
+                    local n = Instance.new("NumberValue")
+                    n.Name = "JJSOldTrans"
+                    n.Value = v.Transparency
+                    n.Parent = v
+                end
+                v.Transparency = 1
+                v.CanCollide = false
+                v.LocalTransparencyModifier = 1
             elseif v:IsA("Decal") or v:IsA("Texture") then
-                saveTrans(v); v.Transparency = 1
+                v.Transparency = 1
             elseif v:IsA("Accessory") or v:IsA("Hat") then
                 v:Destroy()
             end
@@ -514,125 +568,6 @@ local function applyInvis(mode)
             hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
             hum.HealthDisplayDistance = 0
             hum.NameDisplayDistance = 0
-        end
-        invisConn = RunService.RenderStepped:Connect(function()
-            local c = LP.Character
-            if not c then return end
-            for _, v in ipairs(c:GetDescendants()) do
-                if v:IsA("BasePart") then v.LocalTransparencyModifier = 1 end
-            end
-        end)
-
-    elseif mode == 2 then
-        if hum then
-            local humParent = hum.Parent
-            local ws = hum.WalkSpeed
-            local jp = hum.JumpPower or 50
-            hum:Destroy()
-            task.wait()
-            local newHum = Instance.new("Humanoid")
-            newHum.Name = "Humanoid"
-            newHum.Parent = humParent
-            newHum.MaxHealth = 100
-            newHum.Health = 100
-            newHum.WalkSpeed = ws
-            newHum.JumpPower = jp
-            newHum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-        end
-        for _, v in ipairs(char:GetDescendants()) do
-            if v:IsA("BasePart") then saveTrans(v); v.Transparency = 1 end
-        end
-        invisConn = RunService.Heartbeat:Connect(function()
-            local c = LP.Character
-            if not c then return end
-            for _, v in ipairs(c:GetDescendants()) do
-                if v:IsA("BasePart") then v.Transparency = 1 end
-            end
-        end)
-
-    elseif mode == 3 then
-        if hum then
-            pcall(function()
-                hum.PlatformStand = true
-                hum:ChangeState(Enum.HumanoidStateType.Dead)
-                hum.BreakJointsOnDeath = false
-            end)
-        end
-        for _, v in ipairs(char:GetDescendants()) do
-            if v:IsA("BasePart") then
-                saveTrans(v); v.Transparency = 1; v.CanCollide = false
-            end
-        end
-        invisConn = RunService.RenderStepped:Connect(function()
-            local c = LP.Character
-            if not c then return end
-            for _, v in ipairs(c:GetDescendants()) do
-                if v:IsA("BasePart") then v.LocalTransparencyModifier = 1 end
-            end
-        end)
-
-    elseif mode == 4 then
-        for _, v in ipairs(char:GetDescendants()) do
-            if v:IsA("BasePart") then saveTrans(v); v.Transparency = 1 end
-        end
-        pcall(function()
-            local oldParent = char.Parent
-            char.Parent = Camera
-            task.wait(0.5)
-            if char.Parent == Camera then char.Parent = oldParent end
-        end)
-
-    elseif mode == 5 then
-        pcall(function() hrp:SetNetworkOwner(nil) end)
-        pcall(function()
-            hrp.CustomPhysicalProperties = PhysicalProperties.new(0.001, 0.001, 0.001, 0, 0)
-        end)
-        hrp.Massless = true
-        for _, v in ipairs(char:GetDescendants()) do
-            if v:IsA("BasePart") then
-                saveTrans(v); v.Transparency = 1; v.Massless = true
-            end
-        end
-
-    elseif mode == 6 then
-        hrp.Anchored = true
-        local orig = hrp.CFrame
-        hrp.CFrame = CFrame.new(0, 50000, 0)
-        for _, v in ipairs(char:GetDescendants()) do
-            if v:IsA("BasePart") then
-                saveTrans(v); v.Transparency = 1; v.CanCollide = false
-            end
-        end
-        task.spawn(function()
-            task.wait(0.2)
-            pcall(function()
-                hrp.Anchored = false
-                hrp.CFrame = orig
-            end)
-        end)
-
-    elseif mode == 7 then
-        pcall(function()
-            if workspace.StreamingEnabled then
-                local newFocus = Instance.new("Part")
-                newFocus.Anchored = true
-                newFocus.CanCollide = false
-                newFocus.Transparency = 1
-                newFocus.Size = Vector3.new(1,1,1)
-                newFocus.Position = Vector3.new(0, 100000, 0)
-                newFocus.Parent = workspace
-                task.wait(0.1)
-                LP.ReplicationFocus = newFocus
-            end
-        end)
-        pcall(function() hrp:SetNetworkOwner(nil) end)
-        for _, v in ipairs(char:GetDescendants()) do
-            if v:IsA("BasePart") then saveTrans(v); v.Transparency = 1 end
-        end
-
-    elseif mode == 8 then
-        for _, v in ipairs(char:GetDescendants()) do
-            if v:IsA("Accessory") or v:IsA("Hat") then v:Destroy() end
         end
         invisConn = RunService.RenderStepped:Connect(function()
             local c = LP.Character
@@ -650,7 +585,7 @@ local function applyInvis(mode)
         for _, v in ipairs(c:GetDescendants()) do
             if v:IsA("BasePart") then
                 v.LocalTransparencyModifier = 1
-                if mode ~= 8 and v.Transparency ~= 1 then v.Transparency = 1 end
+                if mode ~= 3 and v.Transparency ~= 1 then v.Transparency = 1 end
             end
         end
     end)
@@ -660,50 +595,29 @@ end
 local function stopInvis()
     S.invis = false
     if invisConn then invisConn:Disconnect(); invisConn = nil end
+    if setfflag then
+        pcall(function()
+            setfflag("WorldStepMax", "-1")
+            setfflag("DFIntS2PhysicsSenderRate", "15")
+        end)
+    end
     pcall(restoreChar)
 end
 
---==== TAB SYSTEM ====--
-local currentTab = 1
-local tabButtons = {}
-
-local function makeTopTab(icon, idx)
-    local b = Instance.new("TextButton")
-    b.Size = UDim2.new(0,42,0,26)
-    b.BackgroundColor3 = C.tabBar
-    b.Text = icon
-    b.TextColor3 = C.textDim
-    b.Font = Enum.Font.GothamBold
-    b.TextSize = 15
-    b.AutoButtonColor = false
-    b.LayoutOrder = idx
-    b.Parent = TabBar
-    corner(b, 2)
-
-    b.MouseEnter:Connect(function()
-        if currentTab ~= idx then
-            TweenService:Create(b, TweenInfo.new(0.12), {BackgroundColor3 = C.tabActive}):Play()
-            b.TextColor3 = C.text
-        end
-    end)
-    b.MouseLeave:Connect(function()
-        if currentTab ~= idx then
-            TweenService:Create(b, TweenInfo.new(0.12), {BackgroundColor3 = C.tabBar}):Play()
-            b.TextColor3 = C.textDim
-        end
-    end)
-    return b
-end
-
---== FLY PAGE ==--
+--==== BUILD MAIN PAGE ====--
 local FlyRefs = { setState = nil }
+local InvisRefs = { setState = nil }
+local methodRefs = {}
 
-local function buildFlyPage()
+local function buildMainPage()
     clearAll(); globalOrder = 0
+    methodRefs = {}
 
+    ------------------------------------------------------------
+    -- COLUMN 1: FLY
+    ------------------------------------------------------------
     sectionHeader(Col1, "Fly")
     local _, _, setFlyState = toggleRow(Col1, "Enabled", S.fly, function(v)
-        FlyRefs.setState = setFlyState
         if v then startFly() else stopFly() end
     end)
     FlyRefs.setState = setFlyState
@@ -719,26 +633,15 @@ local function buildFlyPage()
         speedLbl.Text = tostring(S.flySpeed)
     end)
 
-    sectionHeader(Col2, "Controls")
-    valueRow(Col2, "Horizontal", "Joystick", 62)
-    valueRow(Col2, "Vertical", "Cam Pitch", 62)
-    valueRow(Col2, "Mode", "World-Space", 62)
+    sectionHeader(Col1, "Controls")
+    valueRow(Col1, "Horizontal", "Joystick", 62)
+    valueRow(Col1, "Vertical", "Cam Pitch", 62)
 
-    sectionHeader(Col3, "Info")
-    valueRow(Col3, "Status", S.fly and "Active" or "Idle", 62)
-    valueRow(Col3, "Version", "1.0.3", 62)
-end
-
---== INVIS PAGE ==--
-local InvisRefs = { setState = nil }
-local methodRefs = {}
-
-local function buildInvisPage()
-    clearAll(); globalOrder = 0
-    methodRefs = {}
-
-    sectionHeader(Col1, "Invisibility")
-    local _, _, setInvisState = toggleRow(Col1, "Enabled", S.invis, function(v)
+    ------------------------------------------------------------
+    -- COLUMN 2: INVISIBILITY
+    ------------------------------------------------------------
+    sectionHeader(Col2, "Invisibility")
+    local _, _, setInvisState = toggleRow(Col2, "Enabled", S.invis, function(v)
         if v then
             S.invis = true
             applyInvis(S.invisMode)
@@ -748,21 +651,16 @@ local function buildInvisPage()
     end)
     InvisRefs.setState = setInvisState
 
-    local activeLbl = valueRow(Col1, "Active Method", "M" .. S.invisMode, 40)
+    local activeLbl = valueRow(Col2, "Active Method", "M" .. S.invisMode, 40)
 
-    sectionHeader(Col2, "Methods (1-8)")
+    sectionHeader(Col2, "Methods")
     local methods = {
-        "Local Transparency",
-        "Humanoid Recreate",
-        "Death State Fake",
-        "Parent to Camera",
-        "Massless + NetDrop",
-        "Anchor High TP",
-        "Streaming Focus",
-        "Accessories Only",
+        "M1 · WorldStepMax Desync",
+        "M2 · Physics Sender Rate",
+        "M3 · Local Transparency",
     }
     for i, name in ipairs(methods) do
-        local btn, dot, lbl = methodRow(Col2, "M"..i.." · "..name, function(b, d, l)
+        local btn, dot, lbl = methodRow(Col2, name, function(b, d, l)
             S.invisMode = i
             if activeLbl then activeLbl.Text = "M" .. i end
             if S.invis then applyInvis(i) end
@@ -784,38 +682,28 @@ local function buildInvisPage()
         act.btn.BackgroundColor3 = C.tabActive
     end
 
+    ------------------------------------------------------------
+    -- COLUMN 3: INFO + MISC
+    ------------------------------------------------------------
     sectionHeader(Col3, "Info")
     valueRow(Col3, "Streaming", tostring(workspace.StreamingEnabled), 62)
     valueRow(Col3, "Status", S.invis and "Active" or "Idle", 62)
-    valueRow(Col3, "Type", "Client-Side", 62, true)
-end
+    valueRow(Col3, "Version", "2.0", 62)
 
---== MISC PAGE ==--
-local function buildMiscPage()
-    clearAll(); globalOrder = 0
-
-    sectionHeader(Col1, "Actions")
-    buttonRow(Col1, "Reset Character", function()
-        local char = LP.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then hum.Health = 0 end
+    sectionHeader(Col3, "Actions")
+    buttonRow(Col3, "Reset Character", function()
+        local c = LP.Character
+        if c then
+            local h = c:FindFirstChildOfClass("Humanoid")
+            if h then h.Health = 0 end
         end
     end)
-    buttonRow(Col1, "Rejoin Server", function()
+    buttonRow(Col3, "Rejoin Server", function()
         pcall(function() TeleportService:Teleport(game.PlaceId) end)
     end)
-
-    sectionHeader(Col1, "Toggle")
-    buttonRow(Col1, "Toggle Menu", function()
+    buttonRow(Col3, "Toggle Menu", function()
         Main.Visible = not Main.Visible
     end)
-
-    sectionHeader(Col2, "Client Info")
-    valueRow(Col2, "Player", LP.Name, 90)
-    valueRow(Col2, "PlaceID", tostring(game.PlaceId), 90)
-    valueRow(Col2, "Version", "1.0.3", 56)
-    valueRow(Col2, "Build", "mobile", 56)
 
     sectionHeader(Col3, "Danger")
     buttonRow(Col3, "Disable All", function()
@@ -829,32 +717,8 @@ local function buildMiscPage()
     end, true)
 end
 
---== Register tabs ==--
-local tabDefs = {
-    { icon = "✈", build = buildFlyPage   },
-    { icon = "◎", build = buildInvisPage },
-    { icon = "⚙", build = buildMiscPage  },
-}
-
-local function switchTab(idx)
-    currentTab = idx
-    for i, tb in ipairs(tabButtons) do
-        if i == idx then
-            tb.BackgroundColor3 = C.tabActive
-            tb.TextColor3 = C.red
-        else
-            tb.BackgroundColor3 = C.tabBar
-            tb.TextColor3 = C.textDim
-        end
-    end
-    tabDefs[idx].build()
-end
-
-for i, def in ipairs(tabDefs) do
-    local b = makeTopTab(def.icon, i)
-    tabButtons[i] = b
-    b.MouseButton1Click:Connect(function() switchTab(i) end)
-end
+--== BUILD ON START ==--
+buildMainPage()
 
 ToggleBtn.MouseButton1Click:Connect(function()
     Main.Visible = not Main.Visible
@@ -865,11 +729,8 @@ LP.CharacterAdded:Connect(function()
     task.wait(0.5)
     if S.fly then stopFly() end
     if S.invis then stopInvis() end
-    if currentTab == 1 then buildFlyPage()
-    elseif currentTab == 2 then buildInvisPage()
-    else buildMiscPage() end
+    buildMainPage()
 end)
 
-switchTab(1)
-
-print("[JJS] Menu loaded. Tap JJS button.")
+Main.Visible = false
+print("[JJS] Menu loaded. Tap JJS button. FFlag invis ready.")
