@@ -1,7 +1,6 @@
 --[[
     JJS BATTLEGROUND — CS:GO-style Cheat Menu (Delta / Mobile)
-    Version: 2.0 (FFlag Invisibility)
-    Tabs: MAIN only (по запросу)
+    Version: 2.1 — фикс кнопки на мобиле, меню открыто по умолчанию
 --]]
 
 --==== SERVICES ====--
@@ -61,10 +60,11 @@ gui.Name = "JJSMenu"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.DisplayOrder = 999
 gui.Parent = LP:WaitForChild("PlayerGui")
 S.gui = gui
 
--- Floating open button
+-- Floating open button (БЕЗ Draggable — иначе тап не работает на мобиле)
 local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0,52,0,52)
 ToggleBtn.Position = UDim2.new(0,16,0.4,0)
@@ -72,7 +72,6 @@ ToggleBtn.BackgroundColor3 = C.bg
 ToggleBtn.Text = ""
 ToggleBtn.AutoButtonColor = false
 ToggleBtn.Active = true
-ToggleBtn.Draggable = true
 ToggleBtn.Parent = gui
 corner(ToggleBtn, 4)
 stroke(ToggleBtn, C.red, 1.5)
@@ -101,42 +100,42 @@ Main.Position = UDim2.new(0.5,-310,0.5,-210)
 Main.BackgroundColor3 = C.bg
 Main.BorderSizePixel = 0
 Main.Active = true
-Main.Draggable = true
 Main.Visible = false
 Main.Parent = gui
 corner(Main, 3)
 stroke(Main, C.line, 1)
 
--- Tab bar (одна вкладка MAIN)
-local TabBar = Instance.new("Frame")
-TabBar.Size = UDim2.new(1,0,0,34)
-TabBar.BackgroundColor3 = C.tabBar
-TabBar.BorderSizePixel = 0
-TabBar.Parent = Main
-corner(TabBar, 3)
-local TabBarFix = Instance.new("Frame")
-TabBarFix.Size = UDim2.new(1,0,0,8)
-TabBarFix.Position = UDim2.new(0,0,1,-8)
-TabBarFix.BackgroundColor3 = C.tabBar
-TabBarFix.BorderSizePixel = 0
-TabBarFix.Parent = TabBar
+-- Заголовок окна (для перетаскивания, вместо Main.Draggable)
+local DragBar = Instance.new("Frame")
+DragBar.Size = UDim2.new(1,0,0,34)
+DragBar.Position = UDim2.new(0,0,0,0)
+DragBar.BackgroundColor3 = C.tabBar
+DragBar.BorderSizePixel = 0
+DragBar.Active = true
+DragBar.Parent = Main
+corner(DragBar, 3)
+local DragBarFix = Instance.new("Frame")
+DragBarFix.Size = UDim2.new(1,0,0,8)
+DragBarFix.Position = UDim2.new(0,0,1,-8)
+DragBarFix.BackgroundColor3 = C.tabBar
+DragBarFix.BorderSizePixel = 0
+DragBarFix.Parent = DragBar
 
 local TabBarLine = Instance.new("Frame")
 TabBarLine.Size = UDim2.new(1,0,0,1)
 TabBarLine.Position = UDim2.new(0,0,1,-1)
 TabBarLine.BackgroundColor3 = C.line
 TabBarLine.BorderSizePixel = 0
-TabBarLine.Parent = TabBar
+TabBarLine.Parent = DragBar
 
 local TabLayout = Instance.new("UIListLayout")
 TabLayout.FillDirection = Enum.FillDirection.Horizontal
-TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 TabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 TabLayout.Padding = UDim.new(0,4)
 TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-TabLayout.Parent = TabBar
+TabLayout.Parent = DragBar
 
--- Кнопка MAIN (активная по умолчанию)
 local MainTabBtn = Instance.new("TextButton")
 MainTabBtn.Size = UDim2.new(0,70,0,26)
 MainTabBtn.BackgroundColor3 = C.tabActive
@@ -146,10 +145,9 @@ MainTabBtn.Font = Enum.Font.GothamBold
 MainTabBtn.TextSize = 12
 MainTabBtn.AutoButtonColor = false
 MainTabBtn.LayoutOrder = 1
-MainTabBtn.Parent = TabBar
+MainTabBtn.Parent = DragBar
 corner(MainTabBtn, 2)
 
--- Close button
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0,26,0,22)
 CloseBtn.Position = UDim2.new(1,-32,0,6)
@@ -159,9 +157,8 @@ CloseBtn.TextColor3 = Color3.new(1,1,1)
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.TextSize = 12
 CloseBtn.AutoButtonColor = false
-CloseBtn.Parent = TabBar
+CloseBtn.Parent = DragBar
 corner(CloseBtn, 2)
-CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false end)
 
 -- Content
 local Content = Instance.new("Frame")
@@ -379,7 +376,7 @@ local function methodRow(col, label, onSelect)
     end)
 end
 
---==== FLY (исправлено) ====--
+--==== FLY ====--
 local flyConn
 
 local function stopFly()
@@ -423,20 +420,15 @@ local function startFly()
 
     S.fly = true
 
-    -- ФИКС: MoveDirection уже возвращает мировой вектор.
-    -- Раньше мы умножали его на camCF.LookVector * md.Z, что давало инверсию.
-    -- Теперь используем md напрямую для горизонтали, а вертикаль берём из наклона камеры.
     flyConn = RunService.RenderStepped:Connect(function()
         if not S.fly or not bv.Parent then return end
 
         local md    = hum.MoveDirection
         local camCF = Camera.CFrame
 
-        -- Горизонталь: берём X и Z из MoveDirection как есть
         local horiz = Vector3.new(md.X, 0, md.Z)
         if horiz.Magnitude > 1 then horiz = horiz.Unit end
 
-        -- Вертикаль: наклон камеры вверх/вниз (только когда движемся)
         local vert = 0
         if md.Magnitude > 0.1 then
             vert = camCF.LookVector.Y
@@ -450,7 +442,7 @@ local function startFly()
     end)
 end
 
---==== INVIS (FFlag + fallback) ====--
+--==== INVIS ====--
 local invisConn
 
 local function restoreChar()
@@ -489,7 +481,28 @@ local function applyInvis(mode)
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hrp then return end
 
-    -- M1: WorldStepMax Desync (Bolong-style, самый рабочий)
+    local function hideLocal()
+        for _, v in ipairs(char:GetDescendants()) do
+            if v:IsA("BasePart") then
+                if not v:FindFirstChild("JJSOldTrans") then
+                    local n = Instance.new("NumberValue")
+                    n.Name = "JJSOldTrans"
+                    n.Value = v.Transparency
+                    n.Parent = v
+                end
+                v.Transparency = 1
+                v.LocalTransparencyModifier = 1
+            end
+        end
+        invisConn = RunService.RenderStepped:Connect(function()
+            local c = LP.Character
+            if not c then return end
+            for _, v in ipairs(c:GetDescendants()) do
+                if v:IsA("BasePart") then v.LocalTransparencyModifier = 1 end
+            end
+        end)
+    end
+
     if mode == 1 then
         if setfflag then
             pcall(function()
@@ -498,54 +511,16 @@ local function applyInvis(mode)
                 setfflag("WorldStepMax", "-1")
             end)
         end
-        for _, v in ipairs(char:GetDescendants()) do
-            if v:IsA("BasePart") then
-                if not v:FindFirstChild("JJSOldTrans") then
-                    local n = Instance.new("NumberValue")
-                    n.Name = "JJSOldTrans"
-                    n.Value = v.Transparency
-                    n.Parent = v
-                end
-                v.Transparency = 1
-                v.LocalTransparencyModifier = 1
-            end
-        end
-        invisConn = RunService.RenderStepped:Connect(function()
-            local c = LP.Character
-            if not c then return end
-            for _, v in ipairs(c:GetDescendants()) do
-                if v:IsA("BasePart") then v.LocalTransparencyModifier = 1 end
-            end
-        end)
+        hideLocal()
 
-    -- M2: Physics sender rate
     elseif mode == 2 then
         if setfflag then
             pcall(function()
                 setfflag("DFIntS2PhysicsSenderRate", "-1")
             end)
         end
-        for _, v in ipairs(char:GetDescendants()) do
-            if v:IsA("BasePart") then
-                if not v:FindFirstChild("JJSOldTrans") then
-                    local n = Instance.new("NumberValue")
-                    n.Name = "JJSOldTrans"
-                    n.Value = v.Transparency
-                    n.Parent = v
-                end
-                v.Transparency = 1
-                v.LocalTransparencyModifier = 1
-            end
-        end
-        invisConn = RunService.RenderStepped:Connect(function()
-            local c = LP.Character
-            if not c then return end
-            for _, v in ipairs(c:GetDescendants()) do
-                if v:IsA("BasePart") then v.LocalTransparencyModifier = 1 end
-            end
-        end)
+        hideLocal()
 
-    -- M3: Local transparency only (fallback)
     elseif mode == 3 then
         for _, v in ipairs(char:GetDescendants()) do
             if v:IsA("BasePart") then
@@ -613,9 +588,6 @@ local function buildMainPage()
     clearAll(); globalOrder = 0
     methodRefs = {}
 
-    ------------------------------------------------------------
-    -- COLUMN 1: FLY
-    ------------------------------------------------------------
     sectionHeader(Col1, "Fly")
     local _, _, setFlyState = toggleRow(Col1, "Enabled", S.fly, function(v)
         if v then startFly() else stopFly() end
@@ -637,9 +609,6 @@ local function buildMainPage()
     valueRow(Col1, "Horizontal", "Joystick", 62)
     valueRow(Col1, "Vertical", "Cam Pitch", 62)
 
-    ------------------------------------------------------------
-    -- COLUMN 2: INVISIBILITY
-    ------------------------------------------------------------
     sectionHeader(Col2, "Invisibility")
     local _, _, setInvisState = toggleRow(Col2, "Enabled", S.invis, function(v)
         if v then
@@ -682,13 +651,10 @@ local function buildMainPage()
         act.btn.BackgroundColor3 = C.tabActive
     end
 
-    ------------------------------------------------------------
-    -- COLUMN 3: INFO + MISC
-    ------------------------------------------------------------
     sectionHeader(Col3, "Info")
     valueRow(Col3, "Streaming", tostring(workspace.StreamingEnabled), 62)
     valueRow(Col3, "Status", S.invis and "Active" or "Idle", 62)
-    valueRow(Col3, "Version", "2.0", 62)
+    valueRow(Col3, "Version", "2.1", 62)
 
     sectionHeader(Col3, "Actions")
     buttonRow(Col3, "Reset Character", function()
@@ -717,14 +683,66 @@ local function buildMainPage()
     end, true)
 end
 
---== BUILD ON START ==--
+--== BUILD ==--
 buildMainPage()
 
-ToggleBtn.MouseButton1Click:Connect(function()
+--==== КЛИКИ (работают на мобиле) ====--
+-- MouseButton1Click на Delta для мобилы срабатывает на тап.
+-- Дополнительно ставим Activated как fallback.
+local function bindClick(btn, cb)
+    local lastClick = 0
+    local function fire()
+        local now = tick()
+        if now - lastClick < 0.3 then return end
+        lastClick = now
+        cb()
+    end
+    btn.MouseButton1Click:Connect(fire)
+    btn.Activated:Connect(fire)
+end
+
+bindClick(ToggleBtn, function()
     Main.Visible = not Main.Visible
 end)
 
---==== AUTOCLEANUP ====--
+bindClick(CloseBtn, function()
+    Main.Visible = false
+end)
+
+bindClick(MainTabBtn, function()
+    buildMainPage()
+end)
+
+--==== ПЕРЕТАСКИВАНИЕ ОКНА (через DragBar) ====--
+do
+    local dragging, dragStart, startPos
+    DragBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = Main.Position
+        end
+    end)
+    DragBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            Main.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+--==== АВТООЧИСТКА ====--
 LP.CharacterAdded:Connect(function()
     task.wait(0.5)
     if S.fly then stopFly() end
@@ -732,5 +750,7 @@ LP.CharacterAdded:Connect(function()
     buildMainPage()
 end)
 
-Main.Visible = false
-print("[JJS] Menu loaded. Tap JJS button. FFlag invis ready.")
+--==== ОТКРЫВАЕМ МЕНЮ СРАЗУ ПОСЛЕ ИНЖЕКТА ====--
+Main.Visible = true
+
+print("[JJS] Menu loaded. Полет: joystick + cam pitch.")
