@@ -1,371 +1,493 @@
--- Version: 1.0.6
+-- Delta UI Script for Mobile & PC (v2 — с масштабированием и drag кнопкой)
 
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
-if playerGui:FindFirstChild("CustomModMenu") then
-    playerGui.CustomModMenu:Destroy()
+if playerGui:FindFirstChild("DeltaMenu") then
+	playerGui.DeltaMenu:Destroy()
 end
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "CustomModMenu"
-screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
-screenGui.Parent = playerGui
+-- ==========================================
+-- 1. ОСНОВНЫЕ ЭЛЕМЕНТЫ + UIScale
+-- ==========================================
 
-local COL_BG = Color3.fromRGB(22, 22, 24)
-local COL_SIDEBAR = Color3.fromRGB(16, 16, 18)
-local COL_ELEM = Color3.fromRGB(34, 34, 38)
-local COL_ELEM_HOVER = Color3.fromRGB(46, 46, 50)
-local COL_ACCENT = Color3.fromRGB(0, 140, 255)
-local COL_TEXT = Color3.fromRGB(230, 230, 232)
-local COL_TEXT_DIM = Color3.fromRGB(130, 130, 138)
-local COL_STROKE = Color3.fromRGB(48, 48, 52)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DeltaMenu"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.Parent = playerGui
 
-local baseMenuW = 400
-local baseMenuH = 260
-local menuW = baseMenuW
-local menuH = baseMenuH
+-- UIScale — через него будет работать ползунок масштабирования всего меню
+local GlobalScale = Instance.new("UIScale")
+GlobalScale.Name = "GlobalScale"
+GlobalScale.Scale = 1 -- 100% по умолчанию
+GlobalScale.Parent = ScreenGui
 
-local function makeDraggable(frame)
-    local dragging = false
-    local dragInput, dragStart, startPos
-    local wasDragged = false
+-- ==========================================
+-- 2. КНОПКА С DRAG ФУНКЦИОНАЛОМ
+-- ==========================================
 
-    frame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            wasDragged = false
-            dragStart = input.Position
-            startPos = frame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                    if (input.Position - dragStart).Magnitude > 5 then
-                        wasDragged = true
-                    end
-                end
-            end)
-        end
-    end)
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Size = UDim2.new(0, 50, 0, 50)
+ToggleButton.Position = UDim2.new(0, 20, 0.5, -25)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+ToggleButton.BorderSizePixel = 0
+ToggleButton.Text = "☰"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.TextSize = 24
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.AutoButtonColor = false
 
-    frame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0, 12)
+ToggleCorner.Parent = ToggleButton
 
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            frame.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + delta.X,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y
-            )
-        end
-    end)
+local ToggleStroke = Instance.new("UIStroke")
+ToggleStroke.Color = Color3.fromRGB(60, 60, 60)
+ToggleStroke.Thickness = 2
+ToggleStroke.Parent = ToggleButton
 
-    return function() return wasDragged end
+ToggleButton.Parent = ScreenGui
+
+-- === Drag логика кнопки (с поддержкой ПК и телефона) ===
+local draggingBtn = false
+local dragStartPos = nil
+local btnStartPos = nil
+local movedDistance = 0
+local DRAG_THRESHOLD = 6 -- пикселей — порог, чтобы отличать клик от перетаскивания
+
+local function beginDrag(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+		draggingBtn = true
+		movedDistance = 0
+		dragStartPos = input.Position
+		btnStartPos = ToggleButton.AbsolutePosition
+	end
 end
 
-local menu = Instance.new("Frame")
-menu.Name = "Menu"
-menu.AnchorPoint = Vector2.new(0.5, 0.5)
-menu.Size = UDim2.new(0, menuW, 0, menuH)
-menu.Position = UDim2.new(0.5, 0, -0.5, 0)
-menu.BackgroundColor3 = COL_BG
-menu.BorderSizePixel = 0
-menu.ClipsDescendants = true
-menu.Visible = false
-menu.Parent = screenGui
+local function moveDrag(input)
+	if not draggingBtn then return end
+	if input.UserInputType ~= Enum.UserInputType.MouseMovement
+		and input.UserInputType ~= Enum.UserInputType.Touch then return end
 
-local menuCorner = Instance.new("UICorner")
-menuCorner.CornerRadius = UDim.new(0, 10)
-menuCorner.Parent = menu
+	local delta = input.Position - dragStartPos
+	movedDistance = delta.Magnitude
 
-local menuStroke = Instance.new("UIStroke")
-menuStroke.Color = COL_STROKE
-menuStroke.Thickness = 1
-menuStroke.Parent = menu
-
-local sidebar = Instance.new("Frame")
-sidebar.Name = "Sidebar"
-sidebar.Size = UDim2.new(0, 46, 1, 0)
-sidebar.BackgroundColor3 = COL_SIDEBAR
-sidebar.BorderSizePixel = 0
-sidebar.Parent = menu
-
-local sidebarCorner = Instance.new("UICorner")
-sidebarCorner.CornerRadius = UDim.new(0, 10)
-sidebarCorner.Parent = sidebar
-
-local sidebarCover = Instance.new("Frame")
-sidebarCover.Size = UDim2.new(0, 12, 1, 0)
-sidebarCover.Position = UDim2.new(1, -12, 0, 0)
-sidebarCover.BackgroundColor3 = COL_SIDEBAR
-sidebarCover.BorderSizePixel = 0
-sidebarCover.Parent = sidebar
-
-local tabList = Instance.new("UIListLayout")
-tabList.SortOrder = Enum.SortOrder.LayoutOrder
-tabList.Padding = UDim.new(0, 8)
-tabList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-tabList.VerticalAlignment = Enum.VerticalAlignment.Center
-tabList.Parent = sidebar
-
-local content = Instance.new("Frame")
-content.Name = "Content"
-content.Size = UDim2.new(1, -46, 1, 0)
-content.Position = UDim2.new(0, 46, 0, 0)
-content.BackgroundTransparency = 1
-content.Parent = menu
-
-local pages = {}
-
-local function createPage(name)
-    local page = Instance.new("Frame")
-    page.Name = name .. "Page"
-    page.Size = UDim2.new(1, 0, 1, 0)
-    page.BackgroundTransparency = 1
-    page.Visible = false
-    page.Parent = content
-
-    local pad = Instance.new("UIPadding")
-    pad.PaddingTop = UDim.new(0, 18)
-    pad.PaddingBottom = UDim.new(0, 18)
-    pad.PaddingLeft = UDim.new(0, 18)
-    pad.PaddingRight = UDim.new(0, 18)
-    pad.Parent = page
-
-    pages[name] = page
-    return page
+	local newPos = UDim2.fromOffset(
+		btnStartPos.X + delta.X,
+		btnStartPos.Y + delta.Y
+	)
+	-- Ограничиваем пределами экрана
+	local vp = workspace.CurrentCamera.ViewportSize
+	local bx = math.clamp(btnStartPos.X + delta.X, 0, vp.X - ToggleButton.AbsoluteSize.X)
+	local by = math.clamp(btnStartPos.Y + delta.Y, 0, vp.Y - ToggleButton.AbsoluteSize.Y)
+	ToggleButton.Position = UDim2.fromOffset(bx, by)
 end
 
-local activeTab = nil
-local tabButtons = {}
-
-local function selectTab(name)
-    if activeTab == name then return end
-    for tabName, btn in pairs(tabButtons) do
-        if tabName == name then
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = COL_ACCENT}):Play()
-            TweenService:Create(btn, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(255,255,255)}):Play()
-        else
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = COL_ELEM}):Play()
-            TweenService:Create(btn, TweenInfo.new(0.2), {TextColor3 = COL_TEXT_DIM}):Play()
-        end
-    end
-    for pageName, page in pairs(pages) do
-        page.Visible = (pageName == name)
-    end
-    activeTab = name
+local function endDrag(input)
+	if not draggingBtn then return end
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+		draggingBtn = false
+		-- Если палец/мышь почти не двигались — считаем это кликом и открываем меню
+		if movedDistance < DRAG_THRESHOLD then
+			toggleMenu()
+		end
+	end
 end
 
-local function createTab(name, icon)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 34, 0, 34)
-    btn.BackgroundColor3 = COL_ELEM
-    btn.Text = icon
-    btn.TextColor3 = COL_TEXT_DIM
-    btn.TextSize = 18
-    btn.Font = Enum.Font.GothamBold
-    btn.BorderSizePixel = 0
-    btn.AutoButtonColor = false
-    btn.Parent = sidebar
+ToggleButton.InputBegan:Connect(beginDrag)
+UserInputService.InputChanged:Connect(moveDrag)
+UserInputService.InputEnded:Connect(endDrag)
 
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 7)
-    c.Parent = btn
+-- ==========================================
+-- 3. ГЛАВНОЕ ОКНО МЕНЮ
+-- ==========================================
 
-    btn.MouseEnter:Connect(function()
-        if activeTab ~= name then
-            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = COL_ELEM_HOVER}):Play()
-        end
-    end)
-    btn.MouseLeave:Connect(function()
-        if activeTab ~= name then
-            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = COL_ELEM}):Play()
-        end
-    end)
-    btn.MouseButton1Click:Connect(function()
-        selectTab(name)
-    end)
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 650, 0, 420)
+MainFrame.Position = UDim2.new(0.5, -325, 0.5, -210)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Visible = false
+MainFrame.ClipsDescendants = true
 
-    tabButtons[name] = btn
-    return btn
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(45, 45, 45)
+MainStroke.Thickness = 1
+MainStroke.Parent = MainFrame
+
+MainFrame.Parent = ScreenGui
+
+-- Левая панель навигации
+local SideBar = Instance.new("Frame")
+SideBar.Name = "SideBar"
+SideBar.Size = UDim2.new(0, 60, 1, 0)
+SideBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+SideBar.BorderSizePixel = 0
+SideBar.Parent = MainFrame
+
+local SideBarCorner = Instance.new("UICorner")
+SideBarCorner.CornerRadius = UDim.new(0, 10)
+SideBarCorner.Parent = SideBar
+
+local SideBarMask = Instance.new("Frame")
+SideBarMask.Size = UDim2.new(0, 20, 1, 0)
+SideBarMask.Position = UDim2.new(1, -20, 0, 0)
+SideBarMask.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+SideBarMask.BorderSizePixel = 0
+SideBarMask.Parent = SideBar
+
+local TabList = Instance.new("ScrollingFrame")
+TabList.Name = "TabList"
+TabList.Size = UDim2.new(1, 0, 1, -60)
+TabList.Position = UDim2.new(0, 0, 0, 60)
+TabList.BackgroundTransparency = 1
+TabList.BorderSizePixel = 0
+TabList.ScrollBarThickness = 0
+TabList.CanvasSize = UDim2.new(0, 0, 0, 0)
+TabList.Parent = SideBar
+
+local TabLayout = Instance.new("UIListLayout")
+TabLayout.Padding = UDim.new(0, 15)
+TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+TabLayout.Parent = TabList
+
+-- Верхняя панель с заголовком
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, -60, 0, 60)
+TopBar.Position = UDim2.new(0, 60, 0, 0)
+TopBar.BackgroundTransparency = 1
+TopBar.Parent = MainFrame
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(0, 200, 1, 0)
+TitleLabel.Position = UDim2.new(0, 20, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "Поку"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 20
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TopBar
+
+-- Контейнер страниц
+local PagesContainer = Instance.new("Frame")
+PagesContainer.Size = UDim2.new(1, -60, 1, -60)
+PagesContainer.Position = UDim2.new(0, 60, 0, 60)
+PagesContainer.BackgroundTransparency = 1
+PagesContainer.ClipsDescendants = true
+PagesContainer.Parent = MainFrame
+
+-- ==========================================
+-- 4. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+-- ==========================================
+
+local function createTabButton(iconText, tabName, pageFrame)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0, 40, 0, 40)
+	btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+	btn.BorderSizePixel = 0
+	btn.Text = iconText
+	btn.TextColor3 = Color3.fromRGB(150, 150, 150)
+	btn.TextSize = 20
+	btn.Font = Enum.Font.Gotham
+	btn.AutoButtonColor = false
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = btn
+
+	local indicator = Instance.new("Frame")
+	indicator.Size = UDim2.new(0, 4, 0, 20)
+	indicator.Position = UDim2.new(0, -10, 0.5, -10)
+	indicator.BackgroundColor3 = Color3.fromRGB(74, 144, 226)
+	indicator.BorderSizePixel = 0
+	indicator.Visible = false
+	local indCorner = Instance.new("UICorner")
+	indCorner.CornerRadius = UDim.new(0, 2)
+	indCorner.Parent = indicator
+	indicator.Parent = btn
+
+	btn.Parent = TabList
+
+	btn.MouseButton1Click:Connect(function()
+		for _, page in pairs(PagesContainer:GetChildren()) do
+			if page:IsA("Frame") then page.Visible = false end
+		end
+		pageFrame.Visible = true
+		TitleLabel.Text = tabName
+
+		for _, otherBtn in pairs(TabList:GetChildren()) do
+			if otherBtn:IsA("TextButton") then
+				otherBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+				otherBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+				local ind = otherBtn:FindFirstChildOfClass("Frame")
+				if ind then ind.Visible = false end
+			end
+		end
+		btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+		btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		indicator.Visible = true
+	end)
+
+	return btn
 end
 
-createTab("main", "⌂")
-createTab("sitting", "⚙")
+local function createSection(parent, title, size, position)
+	local section = Instance.new("Frame")
+	section.Name = title
+	section.Size = size
+	section.Position = position
+	section.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	section.BorderSizePixel = 0
 
-local mainPage = createPage("main")
-local sittingPage = createPage("sitting")
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = section
 
-local sliderHolder = Instance.new("Frame")
-sliderHolder.Size = UDim2.new(1, 0, 0, 40)
-sliderHolder.BackgroundTransparency = 1
-sliderHolder.Parent = sittingPage
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Size = UDim2.new(1, -20, 0, 30)
+	titleLabel.Position = UDim2.new(0, 15, 0, 10)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Text = title
+	titleLabel.TextColor3 = Color3.fromRGB(120, 120, 120)
+	titleLabel.TextSize = 12
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.Parent = section
 
-local sliderLabel = Instance.new("TextLabel")
-sliderLabel.Size = UDim2.new(1, 0, 0, 16)
-sliderLabel.BackgroundTransparency = 1
-sliderLabel.Text = "UI Scale"
-sliderLabel.TextColor3 = COL_TEXT_DIM
-sliderLabel.Font = Enum.Font.Gotham
-sliderLabel.TextSize = 13
-sliderLabel.TextXAlignment = Enum.TextXAlignment.Left
-sliderLabel.Parent = sliderHolder
-
-local sliderBg = Instance.new("Frame")
-sliderBg.Name = "SliderBg"
-sliderBg.Size = UDim2.new(1, 0, 0, 6)
-sliderBg.Position = UDim2.new(0, 0, 0, 28)
-sliderBg.BackgroundColor3 = COL_ELEM
-sliderBg.BorderSizePixel = 0
-sliderBg.Parent = sliderHolder
-
-local sliderBgCorner = Instance.new("UICorner")
-sliderBgCorner.CornerRadius = UDim.new(1, 0)
-sliderBgCorner.Parent = sliderBg
-
-local sliderFill = Instance.new("Frame")
-sliderFill.Name = "SliderFill"
-sliderFill.Size = UDim2.new(0.5, 0, 1, 0)
-sliderFill.BackgroundColor3 = COL_ACCENT
-sliderFill.BorderSizePixel = 0
-sliderFill.Parent = sliderBg
-
-local sliderFillCorner = Instance.new("UICorner")
-sliderFillCorner.CornerRadius = UDim.new(1, 0)
-sliderFillCorner.Parent = sliderFill
-
-local sliderKnob = Instance.new("Frame")
-sliderKnob.Name = "SliderKnob"
-sliderKnob.Size = UDim2.new(0, 14, 0, 14)
-sliderKnob.AnchorPoint = Vector2.new(0.5, 0.5)
-sliderKnob.Position = UDim2.new(0.5, 0, 0.5, 0)
-sliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-sliderKnob.BorderSizePixel = 0
-sliderKnob.ZIndex = 2
-sliderKnob.Parent = sliderBg
-
-local sliderKnobCorner = Instance.new("UICorner")
-sliderKnobCorner.CornerRadius = UDim.new(1, 0)
-sliderKnobCorner.Parent = sliderKnob
-
-local isDraggingSlider = false
-
-local function updateSlider(input)
-    local mouseX = input.Position.X
-    local bgPos = sliderBg.AbsolutePosition.X
-    local bgSize = sliderBg.AbsoluteSize.X
-    local percent = math.clamp((mouseX - bgPos) / bgSize, 0, 1)
-
-    sliderFill.Size = UDim2.new(percent, 0, 1, 0)
-    sliderKnob.Position = UDim2.new(percent, 0, 0.5, 0)
-
-    local scaleFactor = 0.7 + (percent * 0.6)
-    menuW = math.floor(baseMenuW * scaleFactor)
-    menuH = math.floor(baseMenuH * scaleFactor)
-
-    TweenService:Create(menu, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {
-        Size = UDim2.new(0, menuW, 0, menuH)
-    }):Play()
+	return section
 end
 
-sliderBg.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        isDraggingSlider = true
-        updateSlider(input)
-    end
-end)
+-- Универсальная функция слайдера
+local function createSlider(parent, text, min, max, default, position, suffix, callback)
+	local sliderFrame = Instance.new("Frame")
+	sliderFrame.Size = UDim2.new(1, -30, 0, 40)
+	sliderFrame.Position = position
+	sliderFrame.BackgroundTransparency = 1
+	sliderFrame.Parent = parent
 
-UserInputService.InputChanged:Connect(function(input)
-    if isDraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        updateSlider(input)
-    end
-end)
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(0, 100, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = text
+	label.TextColor3 = Color3.fromRGB(200, 200, 200)
+	label.TextSize = 14
+	label.Font = Enum.Font.Gotham
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = sliderFrame
 
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        isDraggingSlider = false
-    end
-end)
+	local track = Instance.new("Frame")
+	track.Size = UDim2.new(1, -180, 0, 6)
+	track.Position = UDim2.new(0, 110, 0.5, -3)
+	track.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	track.BorderSizePixel = 0
+	local trackCorner = Instance.new("UICorner")
+	trackCorner.CornerRadius = UDim.new(1, 0)
+	trackCorner.Parent = track
 
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Name = "ToggleButton"
-toggleBtn.Size = UDim2.new(0, 46, 0, 46)
-toggleBtn.Position = UDim2.new(0, 20, 0, 20)
-toggleBtn.BackgroundColor3 = COL_BG
-toggleBtn.Text = "≡"
-toggleBtn.TextColor3 = COL_TEXT
-toggleBtn.TextSize = 24
-toggleBtn.Font = Enum.Font.GothamBold
-toggleBtn.BorderSizePixel = 0
-toggleBtn.AutoButtonColor = false
-toggleBtn.Parent = screenGui
+	local fill = Instance.new("Frame")
+	fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+	fill.BackgroundColor3 = Color3.fromRGB(74, 144, 226)
+	fill.BorderSizePixel = 0
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(1, 0)
+	fillCorner.Parent = fill
 
-local toggleCorner = Instance.new("UICorner")
-toggleCorner.CornerRadius = UDim.new(0, 9)
-toggleCorner.Parent = toggleBtn
+	local knob = Instance.new("Frame")
+	knob.Size = UDim2.new(0, 14, 0, 14)
+	knob.Position = UDim2.new((default - min) / (max - min), -7, 0.5, -7)
+	knob.BackgroundColor3 = Color3.fromRGB(74, 144, 226)
+	knob.BorderSizePixel = 0
+	local knobCorner = Instance.new("UICorner")
+	knobCorner.CornerRadius = UDim.new(1, 0)
+	knobCorner.Parent = knob
 
-local toggleStroke = Instance.new("UIStroke")
-toggleStroke.Color = COL_STROKE
-toggleStroke.Thickness = 1
-toggleStroke.Parent = toggleBtn
+	local valueBox = Instance.new("Frame")
+	valueBox.Size = UDim2.new(0, 55, 0, 24)
+	valueBox.Position = UDim2.new(1, -55, 0.5, -12)
+	valueBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	valueBox.BorderSizePixel = 0
+	local valCorner = Instance.new("UICorner")
+	valCorner.CornerRadius = UDim.new(0, 4)
+	valCorner.Parent = valueBox
 
-local checkToggleDrag = makeDraggable(toggleBtn)
+	local valueLabel = Instance.new("TextLabel")
+	valueLabel.Size = UDim2.new(1, 0, 1, 0)
+	valueLabel.BackgroundTransparency = 1
+	valueLabel.Text = tostring(default) .. (suffix or "")
+	valueLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+	valueLabel.TextSize = 12
+	valueLabel.Font = Enum.Font.Gotham
+	valueLabel.Parent = valueBox
 
-local isOpen = false
-local openPos = UDim2.new(0.5, 0, 0.5, 0)
-local closePos = UDim2.new(0.5, 0, -0.5, 0)
+	fill.Parent = track
+	knob.Parent = track
+	valueBox.Parent = sliderFrame
+	track.Parent = sliderFrame
 
-local openTween = TweenService:Create(menu, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-    Position = openPos
-})
+	local dragging = false
 
-local closeTween = TweenService:Create(menu, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
-    Position = closePos
-})
+	local function update(input)
+		local relPos = math.clamp(
+			(input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X,
+			0, 1
+		)
+		local val = math.floor(min + (max - min) * relPos)
+		fill.Size = UDim2.new(relPos, 0, 1, 0)
+		knob.Position = UDim2.new(relPos, -7, 0.5, -7)
+		valueLabel.Text = tostring(val) .. (suffix or "")
+		if callback then callback(val) end
+	end
 
-local function openMenu()
-    if isOpen then return end
-    isOpen = true
-    menu.Visible = true
-    openTween:Play()
-    toggleBtn.Text = "X"
+	knob.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+		end
+	end)
+	knob.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+			or input.UserInputType == Enum.UserInputType.Touch) then
+			update(input)
+		end
+	end)
+	track.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			update(input)
+			dragging = true
+		end
+	end)
 end
 
-local function closeMenu()
-    if not isOpen then return end
-    isOpen = false
-    closeTween:Play()
-    toggleBtn.Text = "≡"
-    task.delay(0.35, function()
-        if not isOpen then
-            menu.Visible = false
-        end
-    end)
+-- ==========================================
+-- 5. СОЗДАНИЕ ВКЛАДОК
+-- ==========================================
+
+-- Поку — пустая, открывается по умолчанию
+local Page_Poku = Instance.new("Frame")
+Page_Poku.Name = "Page_Poku"
+Page_Poku.Size = UDim2.new(1, 0, 1, 0)
+Page_Poku.BackgroundTransparency = 1
+Page_Poku.Visible = true
+Page_Poku.Parent = PagesContainer
+
+-- Main — пустая
+local Page_Main = Instance.new("Frame")
+Page_Main.Name = "Page_Main"
+Page_Main.Size = UDim2.new(1, 0, 1, 0)
+Page_Main.BackgroundTransparency = 1
+Page_Main.Visible = false
+Page_Main.Parent = PagesContainer
+
+-- Sitting — с ползунком масштаба всего меню
+local Page_Sitting = Instance.new("Frame")
+Page_Sitting.Name = "Page_Sitting"
+Page_Sitting.Size = UDim2.new(1, 0, 1, 0)
+Page_Sitting.BackgroundTransparency = 1
+Page_Sitting.Visible = false
+Page_Sitting.Parent = PagesContainer
+
+local sittingSection = createSection(
+	Page_Sitting,
+	"SITTING SETTINGS",
+	UDim2.new(1, -30, 0, 120),
+	UDim2.new(0, 15, 0, 15)
+)
+
+-- Ползунок масштаба: 1% - 200%, по умолчанию 100%
+createSlider(
+	sittingSection,
+	"Масштаб",
+	1, 200, 100,
+	UDim2.new(0, 0, 0, 45),
+	"%",
+	function(value)
+		-- Применяем масштаб ко всему меню (включая кнопку)
+		GlobalScale.Scale = value / 100
+	end
+)
+
+-- ==========================================
+-- 6. КНОПКИ ВКЛАДОК В САЙДБАРЕ
+-- ==========================================
+
+local btnMain = createTabButton("🏠", "Main", Page_Main)
+local btnPoku = createTabButton("🛒", "Поку", Page_Poku)
+local btnSitting = createTabButton("🪑", "Sitting", Page_Sitting)
+
+-- Подсвечиваем "Поку" как активную по умолчанию
+btnPoku.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+btnPoku.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnPoku:FindFirstChildOfClass("Frame").Visible = true
+
+TabList.CanvasSize = UDim2.new(0, 0, 0, TabLayout.AbsoluteContentSize.Y + 20)
+
+-- ==========================================
+-- 7. АНИМАЦИЯ ОТКРЫТИЯ / ЗАКРЫТИЯ
+-- ==========================================
+
+local isMenuOpen = false
+
+-- Начальная "скрытая" позиция
+MainFrame.Position = UDim2.new(0.5, -325, 0.5, -190)
+MainFrame.BackgroundTransparency = 1
+
+function toggleMenu()
+	isMenuOpen = not isMenuOpen
+	if isMenuOpen then
+		MainFrame.Visible = true
+		TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			Position = UDim2.new(0.5, -325, 0.5, -210),
+			BackgroundTransparency = 0
+		}):Play()
+		TweenService:Create(ToggleButton, TweenInfo.new(0.3), {Rotation = 90}):Play()
+	else
+		local t = TweenService:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+			Position = UDim2.new(0.5, -325, 0.5, -190),
+			BackgroundTransparency = 1
+		})
+		t:Play()
+		t.Completed:Wait()
+		MainFrame.Visible = false
+		TweenService:Create(ToggleButton, TweenInfo.new(0.3), {Rotation = 0}):Play()
+	end
 end
 
-local function toggleMenu()
-    if isOpen then closeMenu() else openMenu() end
+-- ==========================================
+-- 8. АДАПТАЦИЯ ПОД ТЕЛЕФОН (при первой загрузке)
+-- ==========================================
+
+local function applyInitialAdaptation()
+	local vp = workspace.CurrentCamera.ViewportSize
+	if vp.X < 700 then
+		-- На маленьких экранах делаем меню компактнее и по центру
+		MainFrame.Size = UDim2.new(0.95, 0, 0.75, 0)
+		MainFrame.Position = UDim2.new(0.025, 0, 0.12, 0)
+	end
 end
 
-toggleBtn.MouseButton1Click:Connect(function()
-    if not checkToggleDrag() then
-        toggleMenu()
-    end
-end)
+applyInitialAdaptation()
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.X then
-        toggleMenu()
-    end
-end)
-
-selectTab("main")
+print("Delta Menu v2 Loaded! (Масштаб + Drag кнопка)")
