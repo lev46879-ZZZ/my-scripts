@@ -1,9 +1,4 @@
--- Version: 1.0.5
--- Delta Executor | PC + Mobile
--- X - toggle all menus
--- M / S - toggle individual menus
--- Drag buttons anywhere
--- UI Scale slider
+-- Version: 1.0.6
 
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -21,15 +16,19 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = playerGui
 
-local baseWidth = 200
-local baseHeight = 300
-local currentWidth = baseWidth
-local currentHeight = baseHeight
+local COL_BG = Color3.fromRGB(22, 22, 24)
+local COL_SIDEBAR = Color3.fromRGB(16, 16, 18)
+local COL_ELEM = Color3.fromRGB(34, 34, 38)
+local COL_ELEM_HOVER = Color3.fromRGB(46, 46, 50)
+local COL_ACCENT = Color3.fromRGB(0, 140, 255)
+local COL_TEXT = Color3.fromRGB(230, 230, 232)
+local COL_TEXT_DIM = Color3.fromRGB(130, 130, 138)
+local COL_STROKE = Color3.fromRGB(48, 48, 52)
 
-local tweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-local sizeTweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Linear)
-
-local menus = {}
+local baseMenuW = 400
+local baseMenuH = 260
+local menuW = baseMenuW
+local menuH = baseMenuH
 
 local function makeDraggable(frame)
     local dragging = false
@@ -72,151 +71,170 @@ local function makeDraggable(frame)
     return function() return wasDragged end
 end
 
-local function createMenu(side, name)
-    local frame = Instance.new("Frame")
-    frame.Name = name .. "Menu"
-    frame.Size = UDim2.new(0, currentWidth, 0, currentHeight)
-    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    frame.BackgroundTransparency = 0.1
-    frame.BorderSizePixel = 0
-    frame.ClipsDescendants = true
-    frame.Parent = screenGui
+local menu = Instance.new("Frame")
+menu.Name = "Menu"
+menu.AnchorPoint = Vector2.new(0.5, 0.5)
+menu.Size = UDim2.new(0, menuW, 0, menuH)
+menu.Position = UDim2.new(0.5, 0, -0.5, 0)
+menu.BackgroundColor3 = COL_BG
+menu.BorderSizePixel = 0
+menu.ClipsDescendants = true
+menu.Visible = false
+menu.Parent = screenGui
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = frame
+local menuCorner = Instance.new("UICorner")
+menuCorner.CornerRadius = UDim.new(0, 10)
+menuCorner.Parent = menu
 
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(60, 60, 60)
-    stroke.Thickness = 1
-    stroke.Parent = frame
+local menuStroke = Instance.new("UIStroke")
+menuStroke.Color = COL_STROKE
+menuStroke.Thickness = 1
+menuStroke.Parent = menu
 
-    local closedPos, openPos
-    if side == "left" then
-        closedPos = UDim2.new(0, -(currentWidth + 10), 0.2, 0)
-        openPos   = UDim2.new(0, 10, 0.2, 0)
-    else
-        closedPos = UDim2.new(1, 10, 0.2, 0)
-        openPos   = UDim2.new(1, -(currentWidth + 10), 0.2, 0)
-    end
-    frame.Position = closedPos
+local sidebar = Instance.new("Frame")
+sidebar.Name = "Sidebar"
+sidebar.Size = UDim2.new(0, 46, 1, 0)
+sidebar.BackgroundColor3 = COL_SIDEBAR
+sidebar.BorderSizePixel = 0
+sidebar.Parent = menu
 
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundTransparency = 1
-    title.Text = name
-    title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 18
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = frame
+local sidebarCorner = Instance.new("UICorner")
+sidebarCorner.CornerRadius = UDim.new(0, 10)
+sidebarCorner.Parent = sidebar
 
-    local titlePad = Instance.new("UIPadding")
-    titlePad.PaddingLeft = UDim.new(0, 15)
-    titlePad.Parent = title
+local sidebarCover = Instance.new("Frame")
+sidebarCover.Size = UDim2.new(0, 12, 1, 0)
+sidebarCover.Position = UDim2.new(1, -12, 0, 0)
+sidebarCover.BackgroundColor3 = COL_SIDEBAR
+sidebarCover.BorderSizePixel = 0
+sidebarCover.Parent = sidebar
 
-    local list = Instance.new("UIListLayout")
-    list.SortOrder = Enum.SortOrder.LayoutOrder
-    list.Padding = UDim.new(0, 5)
-    list.Parent = frame
+local tabList = Instance.new("UIListLayout")
+tabList.SortOrder = Enum.SortOrder.LayoutOrder
+tabList.Padding = UDim.new(0, 8)
+tabList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+tabList.VerticalAlignment = Enum.VerticalAlignment.Center
+tabList.Parent = sidebar
 
-    local listPad = Instance.new("UIPadding")
-    listPad.PaddingTop = UDim.new(0, 45)
-    listPad.PaddingLeft = UDim.new(0, 10)
-    listPad.PaddingRight = UDim.new(0, 10)
-    listPad.PaddingBottom = UDim.new(0, 10)
-    listPad.Parent = frame
+local content = Instance.new("Frame")
+content.Name = "Content"
+content.Size = UDim2.new(1, -46, 1, 0)
+content.Position = UDim2.new(0, 46, 0, 0)
+content.BackgroundTransparency = 1
+content.Parent = menu
 
-    local menuData = {
-        frame = frame,
-        openPos = openPos,
-        closedPos = closedPos,
-        isOpen = false,
-        title = title,
-        list = list,
-        side = side
-    }
-    table.insert(menus, menuData)
+local pages = {}
 
-    return menuData
+local function createPage(name)
+    local page = Instance.new("Frame")
+    page.Name = name .. "Page"
+    page.Size = UDim2.new(1, 0, 1, 0)
+    page.BackgroundTransparency = 1
+    page.Visible = false
+    page.Parent = content
+
+    local pad = Instance.new("UIPadding")
+    pad.PaddingTop = UDim.new(0, 18)
+    pad.PaddingBottom = UDim.new(0, 18)
+    pad.PaddingLeft = UDim.new(0, 18)
+    pad.PaddingRight = UDim.new(0, 18)
+    pad.Parent = page
+
+    pages[name] = page
+    return page
 end
 
-local function addButtonToMenu(menuData, btnText, callback)
+local activeTab = nil
+local tabButtons = {}
+
+local function selectTab(name)
+    if activeTab == name then return end
+    for tabName, btn in pairs(tabButtons) do
+        if tabName == name then
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = COL_ACCENT}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(255,255,255)}):Play()
+        else
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = COL_ELEM}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.2), {TextColor3 = COL_TEXT_DIM}):Play()
+        end
+    end
+    for pageName, page in pairs(pages) do
+        page.Visible = (pageName == name)
+    end
+    activeTab = name
+end
+
+local function createTab(name, icon)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 30)
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    btn.Text = btnText
-    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 14
-    btn.TextXAlignment = Enum.TextXAlignment.Left
-    btn.Parent = menuData.frame
+    btn.Size = UDim2.new(0, 34, 0, 34)
+    btn.BackgroundColor3 = COL_ELEM
+    btn.Text = icon
+    btn.TextColor3 = COL_TEXT_DIM
+    btn.TextSize = 18
+    btn.Font = Enum.Font.GothamBold
+    btn.BorderSizePixel = 0
+    btn.AutoButtonColor = false
+    btn.Parent = sidebar
 
     local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 4)
+    c.CornerRadius = UDim.new(0, 7)
     c.Parent = btn
 
-    local p = Instance.new("UIPadding")
-    p.PaddingLeft = UDim.new(0, 10)
-    p.Parent = btn
-
     btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(60, 60, 60)}):Play()
+        if activeTab ~= name then
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = COL_ELEM_HOVER}):Play()
+        end
     end)
     btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(40, 40, 40)}):Play()
+        if activeTab ~= name then
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = COL_ELEM}):Play()
+        end
+    end)
+    btn.MouseButton1Click:Connect(function()
+        selectTab(name)
     end)
 
-    if callback then
-        btn.MouseButton1Click:Connect(callback)
-    end
-
+    tabButtons[name] = btn
     return btn
 end
 
-local mainMenu    = createMenu("left",  "main")
-local sittingMenu = createMenu("right", "sitting")
+createTab("main", "⌂")
+createTab("sitting", "⚙")
 
-addButtonToMenu(mainMenu, "Example Feature 1", function()
-    print("Feature 1")
-end)
-addButtonToMenu(mainMenu, "Example Feature 2", function()
-    print("Feature 2")
-end)
+local mainPage = createPage("main")
+local sittingPage = createPage("sitting")
 
-addButtonToMenu(sittingMenu, "Example Feature 3", function()
-    print("Feature 3")
-end)
-
-local sliderContainer = Instance.new("Frame")
-sliderContainer.Size = UDim2.new(1, 0, 0, 50)
-sliderContainer.BackgroundTransparency = 1
-sliderContainer.Parent = sittingMenu.frame
+local sliderHolder = Instance.new("Frame")
+sliderHolder.Size = UDim2.new(1, 0, 0, 40)
+sliderHolder.BackgroundTransparency = 1
+sliderHolder.Parent = sittingPage
 
 local sliderLabel = Instance.new("TextLabel")
-sliderLabel.Size = UDim2.new(1, 0, 0, 20)
+sliderLabel.Size = UDim2.new(1, 0, 0, 16)
 sliderLabel.BackgroundTransparency = 1
 sliderLabel.Text = "UI Scale"
-sliderLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+sliderLabel.TextColor3 = COL_TEXT_DIM
 sliderLabel.Font = Enum.Font.Gotham
-sliderLabel.TextSize = 12
+sliderLabel.TextSize = 13
 sliderLabel.TextXAlignment = Enum.TextXAlignment.Left
-sliderLabel.Parent = sliderContainer
+sliderLabel.Parent = sliderHolder
 
 local sliderBg = Instance.new("Frame")
-sliderBg.Size = UDim2.new(1, 0, 0, 10)
-sliderBg.Position = UDim2.new(0, 0, 0, 25)
-sliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+sliderBg.Name = "SliderBg"
+sliderBg.Size = UDim2.new(1, 0, 0, 6)
+sliderBg.Position = UDim2.new(0, 0, 0, 28)
+sliderBg.BackgroundColor3 = COL_ELEM
 sliderBg.BorderSizePixel = 0
-sliderBg.Parent = sliderContainer
+sliderBg.Parent = sliderHolder
 
 local sliderBgCorner = Instance.new("UICorner")
 sliderBgCorner.CornerRadius = UDim.new(1, 0)
 sliderBgCorner.Parent = sliderBg
 
 local sliderFill = Instance.new("Frame")
+sliderFill.Name = "SliderFill"
 sliderFill.Size = UDim2.new(0.5, 0, 1, 0)
-sliderFill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+sliderFill.BackgroundColor3 = COL_ACCENT
 sliderFill.BorderSizePixel = 0
 sliderFill.Parent = sliderBg
 
@@ -225,136 +243,37 @@ sliderFillCorner.CornerRadius = UDim.new(1, 0)
 sliderFillCorner.Parent = sliderFill
 
 local sliderKnob = Instance.new("Frame")
-sliderKnob.Size = UDim2.new(0, 16, 0, 16)
+sliderKnob.Name = "SliderKnob"
+sliderKnob.Size = UDim2.new(0, 14, 0, 14)
 sliderKnob.AnchorPoint = Vector2.new(0.5, 0.5)
 sliderKnob.Position = UDim2.new(0.5, 0, 0.5, 0)
 sliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 sliderKnob.BorderSizePixel = 0
+sliderKnob.ZIndex = 2
 sliderKnob.Parent = sliderBg
 
 local sliderKnobCorner = Instance.new("UICorner")
 sliderKnobCorner.CornerRadius = UDim.new(1, 0)
 sliderKnobCorner.Parent = sliderKnob
 
-local function createToggleButton(text, position, color)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 50, 0, 50)
-    btn.Position = position
-    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    btn.Text = text
-    btn.TextColor3 = color or Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 24
-    btn.Font = Enum.Font.GothamBold
-    btn.Parent = screenGui
-
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 8)
-    c.Parent = btn
-
-    local s = Instance.new("UIStroke")
-    s.Color = Color3.fromRGB(80, 80, 80)
-    s.Thickness = 1
-    s.Parent = btn
-
-    return btn
-end
-
-local toggleMainBtn    = createToggleButton("M", UDim2.new(0, 20, 0, 20))
-local toggleSittingBtn = createToggleButton("S", UDim2.new(1, -70, 0, 20))
-
-local checkMainDrag    = makeDraggable(toggleMainBtn)
-local checkSittingDrag = makeDraggable(toggleSittingBtn)
-
-local function openMenu(menuData)
-    if menuData.isOpen then return end
-    TweenService:Create(menuData.frame, tweenInfo, {Position = menuData.openPos}):Play()
-    menuData.isOpen = true
-end
-
-local function closeMenu(menuData)
-    if not menuData.isOpen then return end
-    TweenService:Create(menuData.frame, tweenInfo, {Position = menuData.closedPos}):Play()
-    menuData.isOpen = false
-end
-
-local function toggleMenu(menuData)
-    if menuData.isOpen then closeMenu(menuData) else openMenu(menuData) end
-end
-
-local function toggleAllMenus()
-    local anyClosed = false
-    for _, m in ipairs(menus) do
-        if not m.isOpen then
-            anyClosed = true
-            break
-        end
-    end
-
-    for _, m in ipairs(menus) do
-        if anyClosed then
-            openMenu(m)
-        else
-            closeMenu(m)
-        end
-    end
-
-    toggleMainBtn.Text    = anyClosed and "X" or "M"
-    toggleSittingBtn.Text = anyClosed and "X" or "S"
-end
-
-toggleMainBtn.MouseButton1Click:Connect(function()
-    if not checkMainDrag() then
-        toggleMenu(mainMenu)
-        toggleMainBtn.Text = mainMenu.isOpen and "X" or "M"
-    end
-end)
-
-toggleSittingBtn.MouseButton1Click:Connect(function()
-    if not checkSittingDrag() then
-        toggleMenu(sittingMenu)
-        toggleSittingBtn.Text = sittingMenu.isOpen and "X" or "S"
-    end
-end)
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.X then
-        toggleAllMenus()
-    end
-end)
-
 local isDraggingSlider = false
 
 local function updateSlider(input)
-    local mouseX  = input.Position.X
-    local bgPos   = sliderBg.AbsolutePosition.X
-    local bgSize  = sliderBg.AbsoluteSize.X
+    local mouseX = input.Position.X
+    local bgPos = sliderBg.AbsolutePosition.X
+    local bgSize = sliderBg.AbsoluteSize.X
     local percent = math.clamp((mouseX - bgPos) / bgSize, 0, 1)
 
-    sliderFill.Size     = UDim2.new(percent, 0, 1, 0)
+    sliderFill.Size = UDim2.new(percent, 0, 1, 0)
     sliderKnob.Position = UDim2.new(percent, 0, 0.5, 0)
 
-    local scaleFactor = 0.7 + (percent * 0.8)
-    currentWidth  = math.floor(baseWidth  * scaleFactor)
-    currentHeight = math.floor(baseHeight * scaleFactor)
+    local scaleFactor = 0.7 + (percent * 0.6)
+    menuW = math.floor(baseMenuW * scaleFactor)
+    menuH = math.floor(baseMenuH * scaleFactor)
 
-    for _, m in ipairs(menus) do
-        TweenService:Create(m.frame, sizeTweenInfo, {
-            Size = UDim2.new(0, currentWidth, 0, currentHeight)
-        }):Play()
-
-        if m.side == "left" then
-            m.closedPos = UDim2.new(0, -(currentWidth + 10), 0.2, 0)
-            m.openPos   = UDim2.new(0, 10, 0.2, 0)
-        else
-            m.closedPos = UDim2.new(1, 10, 0.2, 0)
-            m.openPos   = UDim2.new(1, -(currentWidth + 10), 0.2, 0)
-        end
-
-        if m.isOpen then
-            TweenService:Create(m.frame, sizeTweenInfo, {Position = m.openPos}):Play()
-        end
-    end
+    TweenService:Create(menu, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {
+        Size = UDim2.new(0, menuW, 0, menuH)
+    }):Play()
 end
 
 sliderBg.InputBegan:Connect(function(input)
@@ -375,3 +294,78 @@ UserInputService.InputEnded:Connect(function(input)
         isDraggingSlider = false
     end
 end)
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Name = "ToggleButton"
+toggleBtn.Size = UDim2.new(0, 46, 0, 46)
+toggleBtn.Position = UDim2.new(0, 20, 0, 20)
+toggleBtn.BackgroundColor3 = COL_BG
+toggleBtn.Text = "≡"
+toggleBtn.TextColor3 = COL_TEXT
+toggleBtn.TextSize = 24
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.BorderSizePixel = 0
+toggleBtn.AutoButtonColor = false
+toggleBtn.Parent = screenGui
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(0, 9)
+toggleCorner.Parent = toggleBtn
+
+local toggleStroke = Instance.new("UIStroke")
+toggleStroke.Color = COL_STROKE
+toggleStroke.Thickness = 1
+toggleStroke.Parent = toggleBtn
+
+local checkToggleDrag = makeDraggable(toggleBtn)
+
+local isOpen = false
+local openPos = UDim2.new(0.5, 0, 0.5, 0)
+local closePos = UDim2.new(0.5, 0, -0.5, 0)
+
+local openTween = TweenService:Create(menu, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+    Position = openPos
+})
+
+local closeTween = TweenService:Create(menu, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+    Position = closePos
+})
+
+local function openMenu()
+    if isOpen then return end
+    isOpen = true
+    menu.Visible = true
+    openTween:Play()
+    toggleBtn.Text = "X"
+end
+
+local function closeMenu()
+    if not isOpen then return end
+    isOpen = false
+    closeTween:Play()
+    toggleBtn.Text = "≡"
+    task.delay(0.35, function()
+        if not isOpen then
+            menu.Visible = false
+        end
+    end)
+end
+
+local function toggleMenu()
+    if isOpen then closeMenu() else openMenu() end
+end
+
+toggleBtn.MouseButton1Click:Connect(function()
+    if not checkToggleDrag() then
+        toggleMenu()
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.X then
+        toggleMenu()
+    end
+end)
+
+selectTab("main")
