@@ -1,5 +1,5 @@
 -- // JJS MENU - DELTA // --
--- // Обновленная версия: Анимации, Тогглы, Фиксы // --
+-- // Обновление: Плавающий UI, Исправлен Fly, Убрана нерабочая функция // --
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -8,7 +8,7 @@ local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- // Настройки темы (Цвета) //
+-- // Настройки темы //
 local Theme = {
     Background = Color3.fromRGB(20, 20, 20),
     Sidebar = Color3.fromRGB(15, 15, 15),
@@ -19,7 +19,7 @@ local Theme = {
     ToggleOff = Color3.fromRGB(60, 60, 60)
 }
 
--- // Функция для анимаций //
+-- // Функция анимации //
 local function Tween(obj, time, props)
     local info = TweenInfo.new(time, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     TweenService:Create(obj, info, props):Play()
@@ -32,7 +32,7 @@ ScreenGui.Parent = game.CoreGui
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.ResetOnSpawn = false
 
--- Кнопка открытия
+-- // Плавающая кнопка открытия //
 local OpenButton = Instance.new("TextButton")
 OpenButton.Name = "OpenButton"
 OpenButton.Parent = ScreenGui
@@ -43,17 +43,48 @@ OpenButton.TextColor3 = Theme.Accent
 OpenButton.Text = "JJS"
 OpenButton.Font = Enum.Font.GothamBold
 OpenButton.TextSize = 18
-OpenButton.Visible = true
-Instance.new("UICorner", OpenButton).CornerRadius = UDim.new(0, 12)
+OpenButton.Active = true
+Instance.new("UICorner", OpenButton).CornerRadius = UDim.new(0, 15)
 local stroke = Instance.new("UIStroke", OpenButton)
 stroke.Color = Theme.Accent
 stroke.Thickness = 2
 
--- Главное окно
+-- // Анимация пульсации кнопки (Плавающий эффект) //
+task.spawn(function()
+    while ScreenGui.Parent do
+        Tween(OpenButton, 1.5, {Size = UDim2.new(0, 65, 0, 65)})
+        task.wait(1.5)
+        Tween(OpenButton, 1.5, {Size = UDim2.new(0, 60, 0, 60)})
+        task.wait(1.5)
+    end
+end)
+
+-- // Перетаскивание кнопки //
+local btnDragging, btnDragStart, btnStartPos
+OpenButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        btnDragging = true
+        btnDragStart = input.Position
+        btnStartPos = OpenButton.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if btnDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - btnDragStart
+        OpenButton.Position = UDim2.new(btnStartPos.X.Scale, btnStartPos.X.Offset + delta.X, btnStartPos.Y.Scale, btnStartPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        btnDragging = false
+    end
+end)
+
+-- // Главное окно //
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.Size = UDim2.new(0, 420, 0, 340) -- Расширено
+MainFrame.Size = UDim2.new(0, 420, 0, 340)
 MainFrame.Position = UDim2.new(0.5, -210, 0.5, -170)
 MainFrame.BackgroundColor3 = Theme.Background
 MainFrame.Visible = false
@@ -63,7 +94,23 @@ local mainStroke = Instance.new("UIStroke", MainFrame)
 mainStroke.Color = Theme.ToggleOff
 mainStroke.Thickness = 2
 
--- Заголовок меню
+-- // Анимация открытия/закрытия (Плавающий эффект) //
+local UIScale = Instance.new("UIScale")
+UIScale.Parent = MainFrame
+UIScale.Scale = 0
+
+OpenButton.MouseButton1Click:Connect(function()
+    if MainFrame.Visible and UIScale.Scale > 0.5 then
+        local t = TweenService:Create(UIScale, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Scale = 0})
+        t:Play()
+        t.Completed:Connect(function() MainFrame.Visible = false end)
+    else
+        MainFrame.Visible = true
+        TweenService:Create(UIScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+    end
+end)
+
+-- Заголовок меню (для перетаскивания)
 local TitleBar = Instance.new("Frame")
 TitleBar.Parent = MainFrame
 TitleBar.Size = UDim2.new(1, 0, 0, 40)
@@ -79,6 +126,30 @@ TitleText.Text = "JJS Script | Delta"
 TitleText.TextColor3 = Theme.Text
 TitleText.Font = Enum.Font.GothamBold
 TitleText.TextSize = 14
+
+-- Перетаскивание меню
+local dragging, dragInput, dragStart, startPos
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+TitleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
 
 -- Левая панель (Вкладки)
 local Sidebar = Instance.new("Frame")
@@ -100,35 +171,6 @@ ContentArea.Parent = MainFrame
 ContentArea.Size = UDim2.new(1, -110, 1, -40)
 ContentArea.Position = UDim2.new(0, 110, 0, 40)
 ContentArea.BackgroundTransparency = 1
-
--- // Логика перетаскивания окна //
-local dragging, dragInput, dragStart, startPos
-local function updateDrag(input)
-    local delta = input.Position - dragStart
-    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-end
-TitleBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
-        end)
-    end
-end)
-TitleBar.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then updateDrag(input) end
-end)
-
-OpenButton.MouseButton1Click:Connect(function()
-    MainFrame.Visible = not MainFrame.Visible
-end)
 
 -- // Создание вкладок //
 local Tabs = {}
@@ -184,37 +226,38 @@ local function CreateTab(name, icon)
     return content
 end
 
--- Создаем вкладки: Main и Teleport
 local MainTab = CreateTab("Main", "🏠")
 local TeleportTab = CreateTab("Teleport", "✈️")
 
--- Активируем Main по умолчанию
 Tabs[1].Button.TextColor3 = Theme.Text
 Tabs[1].Content.Visible = true
 Tween(Tabs[1].Indicator, 0.2, {Size = UDim2.new(0, 4, 0, 25)})
 ActiveTab = "Main"
 
 
--- // КОМПОНЕНТЫ UI //
+-- // UI КОМПОНЕНТЫ //
 local function CreateToggle(parent, text, defaultState, callback)
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 0, 35)
-    frame.BackgroundTransparency = 1
+    frame.Size = UDim2.new(1, 0, 0, 40)
+    frame.BackgroundColor3 = Theme.ElementBg
+    frame.BorderSizePixel = 0
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
     
     local label = Instance.new("TextLabel")
     label.Parent = frame
     label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
     label.BackgroundTransparency = 1
     label.Text = text
     label.TextColor3 = Theme.Text
-    label.Font = Enum.Font.Gotham
+    label.Font = Enum.Font.GothamBold
     label.TextSize = 14
     label.TextXAlignment = Enum.TextXAlignment.Left
     
     local toggleBg = Instance.new("Frame")
     toggleBg.Parent = frame
     toggleBg.Size = UDim2.new(0, 44, 0, 22)
-    toggleBg.Position = UDim2.new(1, -44, 0.5, -11)
+    toggleBg.Position = UDim2.new(1, -54, 0.5, -11)
     toggleBg.BackgroundColor3 = defaultState and Theme.Accent or Theme.ToggleOff
     toggleBg.BorderSizePixel = 0
     Instance.new("UICorner", toggleBg).CornerRadius = UDim.new(1, 0)
@@ -238,6 +281,7 @@ local function CreateToggle(parent, text, defaultState, callback)
         state = not state
         Tween(toggleBg, 0.2, {BackgroundColor3 = state and Theme.Accent or Theme.ToggleOff})
         Tween(knob, 0.2, {Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)})
+        Tween(frame, 0.1, {BackgroundColor3 = state and Theme.Accent or Theme.ElementBg})
         callback(state)
     end)
     
@@ -246,7 +290,7 @@ end
 
 local function CreateSlider(parent, text, min, max, default, callback)
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 0, 45)
+    frame.Size = UDim2.new(1, 0, 0, 50)
     frame.BackgroundTransparency = 1
     
     local label = Instance.new("TextLabel")
@@ -255,14 +299,14 @@ local function CreateSlider(parent, text, min, max, default, callback)
     label.BackgroundTransparency = 1
     label.Text = text .. ": " .. default
     label.TextColor3 = Theme.Text
-    label.Font = Enum.Font.Gotham
+    label.Font = Enum.Font.GothamBold
     label.TextSize = 14
     label.TextXAlignment = Enum.TextXAlignment.Left
     
     local sliderBg = Instance.new("Frame")
     sliderBg.Parent = frame
     sliderBg.Size = UDim2.new(1, 0, 0, 12)
-    sliderBg.Position = UDim2.new(0, 0, 0, 28)
+    sliderBg.Position = UDim2.new(0, 0, 0, 30)
     sliderBg.BackgroundColor3 = Theme.ToggleOff
     sliderBg.BorderSizePixel = 0
     Instance.new("UICorner", sliderBg).CornerRadius = UDim.new(1, 0)
@@ -327,6 +371,7 @@ local FlyEnabled = false
 local FlySpeed = 60
 local bodyVelocity
 
+-- Создаем тоггл для Fly
 CreateToggle(MainTab, "Fly", false, function(state)
     FlyEnabled = state
     if not state and bodyVelocity then
@@ -335,11 +380,12 @@ CreateToggle(MainTab, "Fly", false, function(state)
     end
 end)
 
+-- Создаем слайдер скорости
 CreateSlider(MainTab, "Speed", 10, 300, 60, function(val)
     FlySpeed = val
 end)
 
--- Улучшенная логика полета (Куда смотрит камера)
+-- Логика полета (Куда смотрит камера)
 RunService.RenderStepped:Connect(function()
     if FlyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local hrp = LocalPlayer.Character.HumanoidRootPart
@@ -355,7 +401,6 @@ RunService.RenderStepped:Connect(function()
         local moveDir = humanoid.MoveDirection
         local camCFrame = Camera.CFrame
         
-        -- Используем направление камеры для полета
         local camForward = camCFrame.LookVector
         local camRight = camCFrame.RightVector
         
@@ -402,25 +447,24 @@ local ListLayout = Instance.new("UIListLayout", PlayerList)
 ListLayout.Padding = UDim.new(0, 4)
 ListLayout.SortOrder = Enum.SortOrder.Name
 
-local TpToMeBtn = Instance.new("TextButton")
-TpToMeBtn.Parent = TeleportTab
-TpToMeBtn.Size = UDim2.new(1, 0, 0, 35)
-TpToMeBtn.BackgroundColor3 = Theme.Accent
-TpToMeBtn.TextColor3 = Theme.Text
-TpToMeBtn.Text = "Teleport Player to Me"
-TpToMeBtn.Font = Enum.Font.Gotham
-TpToMeBtn.TextSize = 13
-Instance.new("UICorner", TpToMeBtn).CornerRadius = UDim.new(0, 6)
-
+-- Оставляем только рабочую кнопку телепорта
 local TpToPlayerBtn = Instance.new("TextButton")
 TpToPlayerBtn.Parent = TeleportTab
-TpToPlayerBtn.Size = UDim2.new(1, 0, 0, 35)
+TpToPlayerBtn.Size = UDim2.new(1, 0, 0, 40)
 TpToPlayerBtn.BackgroundColor3 = Theme.Accent
 TpToPlayerBtn.TextColor3 = Theme.Text
 TpToPlayerBtn.Text = "Teleport Me to Player"
-TpToPlayerBtn.Font = Enum.Font.Gotham
-TpToPlayerBtn.TextSize = 13
-Instance.new("UICorner", TpToPlayerBtn).CornerRadius = UDim.new(0, 6)
+TpToPlayerBtn.Font = Enum.Font.GothamBold
+TpToPlayerBtn.TextSize = 14
+Instance.new("UICorner", TpToPlayerBtn).CornerRadius = UDim.new(0, 8)
+
+-- Анимация нажатия
+TpToPlayerBtn.MouseButton1Down:Connect(function()
+    Tween(TpToPlayerBtn, 0.1, {Size = UDim2.new(0.95, 0, 0, 38)})
+end)
+TpToPlayerBtn.MouseButton1Up:Connect(function()
+    Tween(TpToPlayerBtn, 0.1, {Size = UDim2.new(1, 0, 0, 40)})
+end)
 
 local function UpdatePlayerList()
     for _, child in ipairs(PlayerList:GetChildren()) do
@@ -465,22 +509,7 @@ local function GetCharacter(plr)
     return nil
 end
 
--- ФИКС 3-Й ФУНКЦИИ (Принудительный телепорт игрока к себе)
-TpToMeBtn.MouseButton1Click:Connect(function()
-    if selectedPlayer then
-        local myHrp = GetCharacter(LocalPlayer)
-        local targetChar = selectedPlayer.Character
-        if myHrp and targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
-            local targetHrp = targetChar.HumanoidRootPart
-            -- Цикл для обхода серверных проверок анти-чита
-            for i = 1, 15 do
-                targetHrp.CFrame = myHrp.CFrame * CFrame.new(0, 0, 3)
-                task.wait()
-            end
-        end
-    end
-end)
-
+-- Оставляем только рабочий телепорт
 TpToPlayerBtn.MouseButton1Click:Connect(function()
     if selectedPlayer then
         local myHrp = GetCharacter(LocalPlayer)
@@ -492,9 +521,9 @@ TpToPlayerBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Уведомление
+-- Уведомление о загрузке
 game:GetService("StarterGui"):SetCore("SendNotification", {
     Title = "JJS Script",
-    Text = "Delta UI загружен успешно!",
+    Text = "Меню обновлено и готово к работе!",
     Duration = 3
 })
