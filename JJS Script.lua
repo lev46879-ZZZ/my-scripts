@@ -1,22 +1,29 @@
--- // СКРИПТ ДЛЯ DELTA (JJS) //
--- // Строго по ТЗ //
+-- // JJS MENU - DELTA // --
+-- // Обновленная версия: Анимации, Тогглы, Фиксы // --
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Настройки UI (Цвета как на референсе)
+-- // Настройки темы (Цвета) //
 local Theme = {
-    Background = Color3.fromRGB(25, 25, 25),
-    Sidebar = Color3.fromRGB(20, 20, 20),
+    Background = Color3.fromRGB(20, 20, 20),
+    Sidebar = Color3.fromRGB(15, 15, 15),
     Accent = Color3.fromRGB(0, 150, 255),
     Text = Color3.fromRGB(240, 240, 240),
-    TextDim = Color3.fromRGB(150, 150, 150),
-    ElementBg = Color3.fromRGB(35, 35, 35),
+    TextDim = Color3.fromRGB(130, 130, 130),
+    ElementBg = Color3.fromRGB(30, 30, 30),
     ToggleOff = Color3.fromRGB(60, 60, 60)
 }
+
+-- // Функция для анимаций //
+local function Tween(obj, time, props)
+    local info = TweenInfo.new(time, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    TweenService:Create(obj, info, props):Play()
+end
 
 -- // Создание GUI //
 local ScreenGui = Instance.new("ScreenGui")
@@ -25,55 +32,82 @@ ScreenGui.Parent = game.CoreGui
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.ResetOnSpawn = false
 
--- Главная кнопка открытия (Маленькая иконка)
+-- Кнопка открытия
 local OpenButton = Instance.new("TextButton")
 OpenButton.Name = "OpenButton"
 OpenButton.Parent = ScreenGui
-OpenButton.Size = UDim2.new(0, 50, 0, 50)
+OpenButton.Size = UDim2.new(0, 60, 0, 60)
 OpenButton.Position = UDim2.new(0.1, 0, 0.3, 0)
 OpenButton.BackgroundColor3 = Theme.Background
 OpenButton.TextColor3 = Theme.Accent
 OpenButton.Text = "JJS"
 OpenButton.Font = Enum.Font.GothamBold
-OpenButton.TextSize = 16
+OpenButton.TextSize = 18
 OpenButton.Visible = true
-Instance.new("UICorner", OpenButton).CornerRadius = UDim.new(0, 10)
-Instance.new("UIStroke", OpenButton).Color = Theme.Accent
+Instance.new("UICorner", OpenButton).CornerRadius = UDim.new(0, 12)
+local stroke = Instance.new("UIStroke", OpenButton)
+stroke.Color = Theme.Accent
+stroke.Thickness = 2
 
 -- Главное окно
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.Size = UDim2.new(0, 320, 0, 240) -- Компактно для телефона
-MainFrame.Position = UDim2.new(0.5, -160, 0.5, -120)
+MainFrame.Size = UDim2.new(0, 420, 0, 340) -- Расширено
+MainFrame.Position = UDim2.new(0.5, -210, 0.5, -170)
 MainFrame.BackgroundColor3 = Theme.Background
 MainFrame.Visible = false
 MainFrame.Active = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+local mainStroke = Instance.new("UIStroke", MainFrame)
+mainStroke.Color = Theme.ToggleOff
+mainStroke.Thickness = 2
 
--- Левая панель (Вкладки, там где красный круг)
+-- Заголовок меню
+local TitleBar = Instance.new("Frame")
+TitleBar.Parent = MainFrame
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+TitleBar.BackgroundColor3 = Theme.Sidebar
+TitleBar.BorderSizePixel = 0
+Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 12)
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Parent = TitleBar
+TitleText.Size = UDim2.new(1, 0, 1, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.Text = "JJS Script | Delta"
+TitleText.TextColor3 = Theme.Text
+TitleText.Font = Enum.Font.GothamBold
+TitleText.TextSize = 14
+
+-- Левая панель (Вкладки)
 local Sidebar = Instance.new("Frame")
 Sidebar.Name = "Sidebar"
 Sidebar.Parent = MainFrame
-Sidebar.Size = UDim2.new(0, 50, 1, 0)
+Sidebar.Size = UDim2.new(0, 110, 1, -40)
+Sidebar.Position = UDim2.new(0, 0, 0, 40)
 Sidebar.BackgroundColor3 = Theme.Sidebar
 Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 12)
+
+local SideLayout = Instance.new("UIListLayout", Sidebar)
+SideLayout.SortOrder = Enum.SortOrder.LayoutOrder
+SideLayout.Padding = UDim.new(0, 5)
 
 -- Контейнер для контента
 local ContentArea = Instance.new("Frame")
 ContentArea.Name = "ContentArea"
 ContentArea.Parent = MainFrame
-ContentArea.Size = UDim2.new(1, -50, 1, 0)
-ContentArea.Position = UDim2.new(0, 50, 0, 0)
+ContentArea.Size = UDim2.new(1, -110, 1, -40)
+ContentArea.Position = UDim2.new(0, 110, 0, 40)
 ContentArea.BackgroundTransparency = 1
 
--- // Логика перетаскивания окна (для телефона) //
+-- // Логика перетаскивания окна //
 local dragging, dragInput, dragStart, startPos
 local function updateDrag(input)
     local delta = input.Position - dragStart
     MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
-MainFrame.InputBegan:Connect(function(input)
+TitleBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         dragStart = input.Position
@@ -83,7 +117,7 @@ MainFrame.InputBegan:Connect(function(input)
         end)
     end
 end)
-MainFrame.InputChanged:Connect(function(input)
+TitleBar.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
         dragInput = input
     end
@@ -92,174 +126,220 @@ UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then updateDrag(input) end
 end)
 
--- Открытие/Закрытие меню
 OpenButton.MouseButton1Click:Connect(function()
     MainFrame.Visible = not MainFrame.Visible
 end)
 
--- // Создание вкладок (Строго 2 штуки) //
+-- // Создание вкладок //
 local Tabs = {}
 local ActiveTab = nil
 
-local function CreateTab(name, iconText)
-    local TabButton = Instance.new("TextButton")
-    TabButton.Name = name .. "Tab"
-    TabButton.Parent = Sidebar
-    TabButton.Size = UDim2.new(0, 40, 0, 40)
-    TabButton.Position = UDim2.new(0, 5, 0, 10 + (#Tabs * 45)) -- Автоматическое позиционирование
-    TabButton.BackgroundColor3 = Theme.Background
-    TabButton.TextColor3 = Theme.TextDim
-    TabButton.Text = iconText
-    TabButton.Font = Enum.Font.GothamBold
-    TabButton.TextSize = 18
-    Instance.new("UICorner", TabButton).CornerRadius = UDim.new(0, 8)
+local function CreateTab(name, icon)
+    local btn = Instance.new("TextButton")
+    btn.Parent = Sidebar
+    btn.Size = UDim2.new(1, 0, 0, 45)
+    btn.BackgroundTransparency = 1
+    btn.Text = "  " .. icon .. "  " .. name
+    btn.TextColor3 = Theme.TextDim
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.TextXAlignment = Enum.TextXAlignment.Left
     
-    local TabContent = Instance.new("ScrollingFrame")
-    TabContent.Name = name .. "Content"
-    TabContent.Parent = ContentArea
-    TabContent.Size = UDim2.new(1, -20, 1, -20)
-    TabContent.Position = UDim2.new(0, 10, 0, 10)
-    TabContent.BackgroundTransparency = 1
-    TabContent.Visible = false
-    TabContent.ScrollBarThickness = 2
-    TabContent.CanvasSize = UDim2.new(0, 0, 0, 0)
-    TabContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    local indicator = Instance.new("Frame")
+    indicator.Parent = btn
+    indicator.Size = UDim2.new(0, 4, 0, 0)
+    indicator.Position = UDim2.new(0, 0, 0.5, 0)
+    indicator.BackgroundColor3 = Theme.Accent
+    indicator.BorderSizePixel = 0
+    Instance.new("UICorner", indicator).CornerRadius = UDim.new(1, 0)
     
-    local Layout = Instance.new("UIListLayout", TabContent)
-    Layout.SortOrder = Enum.SortOrder.LayoutOrder
-    Layout.Padding = UDim.new(0, 10)
+    local content = Instance.new("ScrollingFrame")
+    content.Parent = ContentArea
+    content.Size = UDim2.new(1, -20, 1, -20)
+    content.Position = UDim2.new(0, 10, 0, 10)
+    content.BackgroundTransparency = 1
+    content.Visible = false
+    content.ScrollBarThickness = 2
+    content.CanvasSize = UDim2.new(0, 0, 0, 0)
+    content.AutomaticCanvasSize = Enum.AutomaticSize.Y
     
-    table.insert(Tabs, {Button = TabButton, Content = TabContent})
+    local layout = Instance.new("UIListLayout", content)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 10)
     
-    TabButton.MouseButton1Click:Connect(function()
+    table.insert(Tabs, {Button = btn, Content = content, Indicator = indicator})
+    
+    btn.MouseButton1Click:Connect(function()
         for _, tab in ipairs(Tabs) do
             tab.Content.Visible = false
-            tab.Button.BackgroundColor3 = Theme.Background
             tab.Button.TextColor3 = Theme.TextDim
+            Tween(tab.Indicator, 0.2, {Size = UDim2.new(0, 4, 0, 0)})
         end
-        TabContent.Visible = true
-        TabButton.BackgroundColor3 = Theme.Accent
-        TabButton.TextColor3 = Theme.Text
+        content.Visible = true
+        btn.TextColor3 = Theme.Text
+        Tween(indicator, 0.2, {Size = UDim2.new(0, 4, 0, 25)})
         ActiveTab = name
     end)
     
-    return TabContent
+    return content
 end
 
 -- Создаем вкладки: Main и Teleport
-local MainTab = CreateTab("Main", "M")
-local TeleportTab = CreateTab("Teleport", "T")
+local MainTab = CreateTab("Main", "🏠")
+local TeleportTab = CreateTab("Teleport", "✈️")
 
 -- Активируем Main по умолчанию
-Tabs[1].Button.BackgroundColor3 = Theme.Accent
 Tabs[1].Button.TextColor3 = Theme.Text
 Tabs[1].Content.Visible = true
+Tween(Tabs[1].Indicator, 0.2, {Size = UDim2.new(0, 4, 0, 25)})
 ActiveTab = "Main"
+
+
+-- // КОМПОНЕНТЫ UI //
+local function CreateToggle(parent, text, defaultState, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 35)
+    frame.BackgroundTransparency = 1
+    
+    local label = Instance.new("TextLabel")
+    label.Parent = frame
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Theme.Text
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local toggleBg = Instance.new("Frame")
+    toggleBg.Parent = frame
+    toggleBg.Size = UDim2.new(0, 44, 0, 22)
+    toggleBg.Position = UDim2.new(1, -44, 0.5, -11)
+    toggleBg.BackgroundColor3 = defaultState and Theme.Accent or Theme.ToggleOff
+    toggleBg.BorderSizePixel = 0
+    Instance.new("UICorner", toggleBg).CornerRadius = UDim.new(1, 0)
+    
+    local knob = Instance.new("Frame")
+    knob.Parent = toggleBg
+    knob.Size = UDim2.new(0, 16, 0, 16)
+    knob.Position = defaultState and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+    knob.BackgroundColor3 = Theme.Text
+    knob.BorderSizePixel = 0
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+    
+    local state = defaultState
+    local btn = Instance.new("TextButton")
+    btn.Parent = frame
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        Tween(toggleBg, 0.2, {BackgroundColor3 = state and Theme.Accent or Theme.ToggleOff})
+        Tween(knob, 0.2, {Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)})
+        callback(state)
+    end)
+    
+    return frame
+end
+
+local function CreateSlider(parent, text, min, max, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 45)
+    frame.BackgroundTransparency = 1
+    
+    local label = Instance.new("TextLabel")
+    label.Parent = frame
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.BackgroundTransparency = 1
+    label.Text = text .. ": " .. default
+    label.TextColor3 = Theme.Text
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local sliderBg = Instance.new("Frame")
+    sliderBg.Parent = frame
+    sliderBg.Size = UDim2.new(1, 0, 0, 12)
+    sliderBg.Position = UDim2.new(0, 0, 0, 28)
+    sliderBg.BackgroundColor3 = Theme.ToggleOff
+    sliderBg.BorderSizePixel = 0
+    Instance.new("UICorner", sliderBg).CornerRadius = UDim.new(1, 0)
+    
+    local fill = Instance.new("Frame")
+    fill.Parent = sliderBg
+    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    fill.BackgroundColor3 = Theme.Accent
+    fill.BorderSizePixel = 0
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+    
+    local knob = Instance.new("Frame")
+    knob.Parent = sliderBg
+    knob.Size = UDim2.new(0, 20, 0, 20)
+    knob.Position = UDim2.new((default - min) / (max - min), -10, 0.5, -10)
+    knob.BackgroundColor3 = Theme.Text
+    knob.BorderSizePixel = 0
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+    local kStroke = Instance.new("UIStroke", knob)
+    kStroke.Color = Theme.Accent
+    kStroke.Thickness = 2
+    
+    local dragging = false
+    local function update(input)
+        local mouseX = input.Position.X
+        local pos = sliderBg.AbsolutePosition.X
+        local size = sliderBg.AbsoluteSize.X
+        local pct = math.clamp((mouseX - pos) / size, 0, 1)
+        local val = math.floor(min + (max - min) * pct)
+        
+        label.Text = text .. ": " .. val
+        fill.Size = UDim2.new(pct, 0, 1, 0)
+        knob.Position = UDim2.new(pct, -10, 0.5, -10)
+        callback(val)
+    end
+    
+    sliderBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            Tween(knob, 0.1, {Size = UDim2.new(0, 24, 0, 24), Position = UDim2.new(knob.Position.X.Scale, -12, 0.5, -12)})
+            update(input)
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            update(input)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+            Tween(knob, 0.1, {Size = UDim2.new(0, 20, 0, 20), Position = UDim2.new(knob.Position.X.Scale, -10, 0.5, -10)})
+        end
+    end)
+    
+    return frame
+end
 
 
 -- // ФУНКЦИИ MAIN (FLY) //
 local FlyEnabled = false
-local FlySpeed = 60 -- По умолчанию 60
-
--- Создание элементов для Main
-local FlyToggleBtn = Instance.new("TextButton")
-FlyToggleBtn.Parent = MainTab
-FlyToggleBtn.Size = UDim2.new(1, 0, 0, 35)
-FlyToggleBtn.BackgroundColor3 = Theme.ElementBg
-FlyToggleBtn.TextColor3 = Theme.Text
-FlyToggleBtn.Text = "Fly: OFF"
-FlyToggleBtn.Font = Enum.Font.Gotham
-FlyToggleBtn.TextSize = 14
-Instance.new("UICorner", FlyToggleBtn).CornerRadius = UDim.new(0, 6)
-
--- Ползунок скорости
-local SpeedFrame = Instance.new("Frame")
-SpeedFrame.Parent = MainTab
-SpeedFrame.Size = UDim2.new(1, 0, 0, 40)
-SpeedFrame.BackgroundColor3 = Theme.ElementBg
-SpeedFrame.BackgroundTransparency = 1
-Instance.new("UICorner", SpeedFrame).CornerRadius = UDim.new(0, 6)
-
-local SpeedLabel = Instance.new("TextLabel")
-SpeedLabel.Parent = SpeedFrame
-SpeedLabel.Size = UDim2.new(1, 0, 0, 20)
-SpeedLabel.BackgroundTransparency = 1
-SpeedLabel.Text = "Speed: " .. FlySpeed
-SpeedLabel.TextColor3 = Theme.Text
-SpeedLabel.Font = Enum.Font.Gotham
-SpeedLabel.TextSize = 12
-SpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-local SliderBg = Instance.new("Frame")
-SliderBg.Parent = SpeedFrame
-SliderBg.Size = UDim2.new(1, 0, 0, 8)
-SliderBg.Position = UDim2.new(0, 0, 0, 25)
-SliderBg.BackgroundColor3 = Theme.ToggleOff
-SliderBg.BorderSizePixel = 0
-Instance.new("UICorner", SliderBg).CornerRadius = UDim.new(1, 0)
-
-local SliderFill = Instance.new("Frame")
-SliderFill.Parent = SliderBg
-SliderFill.Size = UDim2.new((FlySpeed - 10) / 290, 0, 1, 0) -- 10 to 300 range
-SliderFill.BackgroundColor3 = Theme.Accent
-SliderFill.BorderSizePixel = 0
-Instance.new("UICorner", SliderFill).CornerRadius = UDim.new(1, 0)
-
-local SliderKnob = Instance.new("Frame")
-SliderKnob.Parent = SliderBg
-SliderKnob.Size = UDim2.new(0, 16, 0, 16)
-SliderKnob.Position = UDim2.new((FlySpeed - 10) / 290, -8, 0.5, -8)
-SliderKnob.BackgroundColor3 = Theme.Text
-SliderKnob.BorderSizePixel = 0
-Instance.new("UICorner", SliderKnob).CornerRadius = UDim.new(1, 0)
-
--- Логика ползунка (Mobile friendly)
-local draggingSlider = false
-local function updateSlider(input)
-    local mouseX = input.Position.X
-    local sliderPos = SliderBg.AbsolutePosition.X
-    local sliderSize = SliderBg.AbsoluteSize.X
-    
-    local percentage = math.clamp((mouseX - sliderPos) / sliderSize, 0, 1)
-    local value = math.floor(10 + (290 * percentage))
-    
-    FlySpeed = value
-    SpeedLabel.Text = "Speed: " .. FlySpeed
-    SliderFill.Size = UDim2.new(percentage, 0, 1, 0)
-    SliderKnob.Position = UDim2.new(percentage, -8, 0.5, -8)
-end
-
-SliderBg.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingSlider = true
-        updateSlider(input)
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if draggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        updateSlider(input)
-    end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingSlider = false
-    end
-end)
-
--- Логика Fly (Delta / Mobile)
+local FlySpeed = 60
 local bodyVelocity
-FlyToggleBtn.MouseButton1Click:Connect(function()
-    FlyEnabled = not FlyEnabled
-    if FlyEnabled then
-        FlyToggleBtn.Text = "Fly: ON"
-        FlyToggleBtn.BackgroundColor3 = Theme.Accent
-    else
-        FlyToggleBtn.Text = "Fly: OFF"
-        FlyToggleBtn.BackgroundColor3 = Theme.ElementBg
-        if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
+
+CreateToggle(MainTab, "Fly", false, function(state)
+    FlyEnabled = state
+    if not state and bodyVelocity then
+        bodyVelocity:Destroy()
+        bodyVelocity = nil
     end
 end)
 
+CreateSlider(MainTab, "Speed", 10, 300, 60, function(val)
+    FlySpeed = val
+end)
+
+-- Улучшенная логика полета (Куда смотрит камера)
 RunService.RenderStepped:Connect(function()
     if FlyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local hrp = LocalPlayer.Character.HumanoidRootPart
@@ -272,21 +352,28 @@ RunService.RenderStepped:Connect(function()
             bodyVelocity.Parent = hrp
         end
         
-        -- Управление на мобилке через джойстик (MoveDirection)
         local moveDir = humanoid.MoveDirection
         local camCFrame = Camera.CFrame
         
-        local direction = (camCFrame.LookVector * moveDir.Z + camCFrame.RightVector * moveDir.X).Unit
-        if moveDir.Magnitude < 0.1 then direction = Vector3.new(0,0,0) end
+        -- Используем направление камеры для полета
+        local camForward = camCFrame.LookVector
+        local camRight = camCFrame.RightVector
         
-        -- Подъем и спуск (используем кнопки прыжка/приседа, если джойстик не двигает вверх/вниз)
+        local direction = Vector3.new(0,0,0)
+        if moveDir.Magnitude > 0.1 then
+            direction = (camForward * moveDir.Z + camRight * moveDir.X).Unit
+        end
+        
         local vertical = Vector3.new(0,0,0)
         if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vertical = Vector3.new(0, 1, 0) end
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then vertical = Vector3.new(0, -1, 0) end
         
         bodyVelocity.Velocity = (direction * FlySpeed) + (vertical * FlySpeed)
     else
-        if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
+        if bodyVelocity then
+            bodyVelocity:Destroy()
+            bodyVelocity = nil
+        end
     end
 end)
 
@@ -300,13 +387,13 @@ PlayerListLabel.Size = UDim2.new(1, 0, 0, 20)
 PlayerListLabel.BackgroundTransparency = 1
 PlayerListLabel.Text = "Select Player:"
 PlayerListLabel.TextColor3 = Theme.Text
-PlayerListLabel.Font = Enum.Font.Gotham
-PlayerListLabel.TextSize = 12
+PlayerListLabel.Font = Enum.Font.GothamBold
+PlayerListLabel.TextSize = 14
 PlayerListLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 local PlayerList = Instance.new("ScrollingFrame")
 PlayerList.Parent = TeleportTab
-PlayerList.Size = UDim2.new(1, 0, 0, 80)
+PlayerList.Size = UDim2.new(1, 0, 0, 100)
 PlayerList.BackgroundColor3 = Theme.ElementBg
 PlayerList.BorderSizePixel = 0
 PlayerList.ScrollBarThickness = 2
@@ -315,28 +402,26 @@ local ListLayout = Instance.new("UIListLayout", PlayerList)
 ListLayout.Padding = UDim.new(0, 4)
 ListLayout.SortOrder = Enum.SortOrder.Name
 
--- Кнопки действий
 local TpToMeBtn = Instance.new("TextButton")
 TpToMeBtn.Parent = TeleportTab
-TpToMeBtn.Size = UDim2.new(1, 0, 0, 30)
+TpToMeBtn.Size = UDim2.new(1, 0, 0, 35)
 TpToMeBtn.BackgroundColor3 = Theme.Accent
 TpToMeBtn.TextColor3 = Theme.Text
 TpToMeBtn.Text = "Teleport Player to Me"
 TpToMeBtn.Font = Enum.Font.Gotham
-TpToMeBtn.TextSize = 12
+TpToMeBtn.TextSize = 13
 Instance.new("UICorner", TpToMeBtn).CornerRadius = UDim.new(0, 6)
 
 local TpToPlayerBtn = Instance.new("TextButton")
 TpToPlayerBtn.Parent = TeleportTab
-TpToPlayerBtn.Size = UDim2.new(1, 0, 0, 30)
+TpToPlayerBtn.Size = UDim2.new(1, 0, 0, 35)
 TpToPlayerBtn.BackgroundColor3 = Theme.Accent
 TpToPlayerBtn.TextColor3 = Theme.Text
 TpToPlayerBtn.Text = "Teleport Me to Player"
 TpToPlayerBtn.Font = Enum.Font.Gotham
-TpToPlayerBtn.TextSize = 12
+TpToPlayerBtn.TextSize = 13
 Instance.new("UICorner", TpToPlayerBtn).CornerRadius = UDim.new(0, 6)
 
--- Обновление списка игроков
 local function UpdatePlayerList()
     for _, child in ipairs(PlayerList:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
@@ -346,17 +431,16 @@ local function UpdatePlayerList()
         if plr ~= LocalPlayer then
             local btn = Instance.new("TextButton")
             btn.Parent = PlayerList
-            btn.Size = UDim2.new(1, -4, 0, 25)
+            btn.Size = UDim2.new(1, -4, 0, 28)
             btn.BackgroundColor3 = Theme.Background
             btn.TextColor3 = Theme.TextDim
             btn.Text = plr.Name
             btn.Font = Enum.Font.Gotham
-            btn.TextSize = 11
+            btn.TextSize = 12
             Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
             
             btn.MouseButton1Click:Connect(function()
                 selectedPlayer = plr
-                -- Визуальное выделение
                 for _, otherBtn in ipairs(PlayerList:GetChildren()) do
                     if otherBtn:IsA("TextButton") then
                         otherBtn.BackgroundColor3 = Theme.Background
@@ -372,9 +456,8 @@ end
 
 Players.PlayerAdded:Connect(UpdatePlayerList)
 Players.PlayerRemoving:Connect(UpdatePlayerList)
-UpdatePlayerList() -- Первичная загрузка
+UpdatePlayerList()
 
--- Логика телепортов
 local function GetCharacter(plr)
     if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
         return plr.Character.HumanoidRootPart
@@ -382,14 +465,18 @@ local function GetCharacter(plr)
     return nil
 end
 
+-- ФИКС 3-Й ФУНКЦИИ (Принудительный телепорт игрока к себе)
 TpToMeBtn.MouseButton1Click:Connect(function()
     if selectedPlayer then
         local myHrp = GetCharacter(LocalPlayer)
-        local targetHrp = GetCharacter(selectedPlayer)
-        
-        if myHrp and targetHrp then
-            -- Телепорт игрока ко мне (может не работать в некоторых играх из-за анти-чита)
-            targetHrp.CFrame = myHrp.CFrame * CFrame.new(0, 0, 2) -- Смещаем немного, чтобы не застрять
+        local targetChar = selectedPlayer.Character
+        if myHrp and targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
+            local targetHrp = targetChar.HumanoidRootPart
+            -- Цикл для обхода серверных проверок анти-чита
+            for i = 1, 15 do
+                targetHrp.CFrame = myHrp.CFrame * CFrame.new(0, 0, 3)
+                task.wait()
+            end
         end
     end
 end)
@@ -400,15 +487,14 @@ TpToPlayerBtn.MouseButton1Click:Connect(function()
         local targetHrp = GetCharacter(selectedPlayer)
         
         if myHrp and targetHrp then
-            -- Телепорт меня к игроку
-            myHrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 2)
+            myHrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 3)
         end
     end
 end)
 
--- Уведомление о загрузке
+-- Уведомление
 game:GetService("StarterGui"):SetCore("SendNotification", {
     Title = "JJS Script",
-    Text = "Delta UI Loaded!",
+    Text = "Delta UI загружен успешно!",
     Duration = 3
 })
