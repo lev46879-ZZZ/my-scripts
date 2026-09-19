@@ -1,4 +1,4 @@
--- // MERCEDES STYLE MENU UI // --
+
 -- // Полный каркас: 6 вкладок, 17+ функций каждая // --
 
 local Players           = game:GetService("Players")
@@ -951,7 +951,4 @@ Button(TabConfig, "Delete All Configs", function() end)
 
 -- // УВЕДОМЛЕНИЕ //
 game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "Mercedes Menu",
-    Text = "UI загружен. Открой кнопкой «M».",
-    Duration = 3
-})
+    Title = "
