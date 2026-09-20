@@ -1,5 +1,5 @@
 -- // MERCEDES STYLE MENU // --
--- // Финальная сборка v1.4 // --
+-- // Финальная сборка v1.6 // --
 
 local Players           = game:GetService("Players")
 local RunService        = game:GetService("RunService")
@@ -213,7 +213,7 @@ VersionText.Parent = TopBar
 VersionText.Position = UDim2.new(1, -130, 0, 0)
 VersionText.Size = UDim2.new(0, 80, 1, 0)
 VersionText.BackgroundTransparency = 1
-VersionText.Text = "v1.4"
+VersionText.Text = "v1.6"
 VersionText.TextColor3 = Theme.TextDim
 VersionText.Font = Enum.Font.Gotham
 VersionText.TextSize = 12
@@ -724,20 +724,16 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
--- // NO CLIP (агрессивный — пишем CanCollide каждый Stepped) //
+-- // NO CLIP //
 local NoclipEnabled = false
 local noclipConns = {}
-local noclipExtra = {}
 
 local function setupNoclipForChar(char)
-    -- Отключаем связь частей через Motor6D может помочь против телепорта
-    -- (это может быть визуально глючно, но работает)
     for _, d in ipairs(noclipConns) do d:Disconnect() end
     noclipConns = {}
 
     local hum = char:WaitForChild("Humanoid", 5)
     if hum then
-        -- Сохраняем оригинальные CollisionGroups
         hum:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
         hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
         hum:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false)
@@ -805,7 +801,10 @@ local function GetHRP(plr)
     end
 end
 
+-- ============================== //
 -- // AUTO UTILS //
+-- ============================== //
+
 local function FindButtonByNames(names)
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
     if not pg then return nil end
@@ -813,7 +812,7 @@ local function FindButtonByNames(names)
         if g:IsA("TextButton") or g:IsA("ImageButton") then
             local n = g.Name:lower()
             for _, key in ipairs(names) do
-                if n:find(key) then
+                if n:find(key:lower()) then
                     return g
                 end
             end
@@ -831,6 +830,12 @@ local function FireButton(btn)
             btn.MouseButton1Click:Fire()
         end
     end)
+    pcall(function()
+        if firesignal then
+            firesignal(btn.MouseButton1Down)
+            firesignal(btn.MouseButton1Up)
+        end
+    end)
 end
 
 local function SimulateKey(keyCode)
@@ -840,6 +845,88 @@ local function SimulateKey(keyCode)
         task.wait(0.05)
         vim:SendKeyEvent(false, keyCode, false, game)
     end)
+end
+
+-- Поиск кнопок скиллов Yuji
+local function GetYujiButtons()
+    return {
+        CursedStrike  = FindButtonByNames({"cursed strike", "cursedstrike", "cursed_strike"}),
+        CrushingBlow  = FindButtonByNames({"crushing blow", "crushingblow", "crushing_blow"}),
+        DivergentFist = FindButtonByNames({"divergent fist", "divergentfist", "divergent_fist"}),
+        ManjiKick     = FindButtonByNames({"manji kick", "manjikick", "manji_kick"}),
+        Dash          = FindButtonByNames({"dash"})
+    }
+end
+
+-- Поиск ближайшего игрока/НПС
+local function GetNearestTarget(maxDistance)
+    maxDistance = maxDistance or 30
+    local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return nil end
+    local nearest, nearestDist = nil, maxDistance
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local dist = (hrp.Position - myHRP.Position).Magnitude
+                if dist < nearestDist then
+                    nearest, nearestDist = plr, dist
+                end
+            end
+        end
+    end
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") then
+            if not Players:GetPlayerFromCharacter(obj) then
+                local dist = (obj.HumanoidRootPart.Position - myHRP.Position).Magnitude
+                if dist < nearestDist then
+                    nearest, nearestDist = obj, dist
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+-- Проверка, что цель стоит спиной (Dot product)
+local function IsTargetBehind(target)
+    if not target or not target:FindFirstChild("HumanoidRootPart") then return false end
+    local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return false end
+    local dirToMe = (myHRP.Position - target.HumanoidRootPart.Position)
+    if dirToMe.Magnitude < 0.01 then return false end
+    dirToMe = dirToMe.Unit
+    local targetLook = target.HumanoidRootPart.CFrame.LookVector
+    -- Dot > 0.3 = цель смотрит на нас (то есть мы спереди)
+    -- Если цель смотрит на нас, значит она стоит лицом к нам
+    return targetLook:Dot(dirToMe) > 0.3
+end
+
+-- // ДЕТЕКТ КУЛДАУНА //
+local function IsSkillReady(btn)
+    if not btn then return false end
+    for _, child in ipairs(btn:GetDescendants()) do
+        if child:IsA("Frame") or child:IsA("ImageLabel") then
+            local sy = child.Size.Y.Scale
+            local sx = child.Size.X.Scale
+            -- Если заливка меньше 95% но больше 5% — идёт КД
+            if (sy > 0.05 and sy < 0.95) or (sx > 0.05 and sx < 0.95) then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+-- Ожидание готовности скилла
+local function WaitForSkill(btn, maxWait)
+    maxWait = maxWait or 5
+    local t = tick()
+    while tick() - t < maxWait do
+        if IsSkillReady(btn) then return true end
+        task.wait(0.05)
+    end
+    return false
 end
 
 
@@ -932,40 +1019,34 @@ Toggle(TabCombat, "Auto Counter", false, function(v)
     AutoCounterEnabled = v
 end)
 
--- // Логика Auto Attack //
 task.spawn(function()
     while task.wait(0.1) do
         if not AutoAttackEnabled then continue end
         if not LocalPlayer.Character then continue end
         local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if not humanoid or humanoid.Health <= 0 then continue end
-
         local atkBtn = FindButtonByNames({"attack", "m1", "punch", "combat", "hit"})
         FireButton(atkBtn)
     end
 end)
 
--- // Логика Auto Block //
 task.spawn(function()
     while task.wait(0.1) do
         if not AutoBlockEnabled then continue end
         if not LocalPlayer.Character then continue end
         local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if not humanoid or humanoid.Health <= 0 then continue end
-
         local blockBtn = FindButtonByNames({"block", "guard", "parry", "shield"})
         FireButton(blockBtn)
     end
 end)
 
--- // Логика Auto Counter //
 task.spawn(function()
     while task.wait(0.15) do
         if not AutoCounterEnabled then continue end
         if not LocalPlayer.Character then continue end
         local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if not humanoid or humanoid.Health <= 0 then continue end
-
         local counterBtn = FindButtonByNames({"counter", "riposte", "repel", "reflect"})
         FireButton(counterBtn)
     end
@@ -995,6 +1076,7 @@ task.spawn(function()
         if not humanoid or humanoid.Health <= 0 then continue end
 
         local variant = tonumber(ComboVariant:match("Variant%s+(%d+)")) or 1
+        local btns = GetYujiButtons()
         local atkBtn = FindButtonByNames({"attack", "m1", "punch", "combat", "hit"})
 
         if variant == 1 then
@@ -1002,9 +1084,11 @@ task.spawn(function()
                 FireButton(atkBtn)
                 task.wait(ComboDelay / 1000)
             end
-            SimulateKey(Enum.KeyCode.Three)
-            task.wait(ComboDelay / 1000)
-            SimulateKey(Enum.KeyCode.Q)
+            if WaitForSkill(btns.DivergentFist) then
+                FireButton(btns.DivergentFist)
+                task.wait(ComboDelay / 1000)
+            end
+            FireButton(btns.Dash)
             task.wait(ComboDelay / 1000)
             for i = 1, 3 do
                 FireButton(atkBtn)
@@ -1015,48 +1099,63 @@ task.spawn(function()
                 FireButton(atkBtn)
                 task.wait(ComboDelay / 1000)
             end
-            SimulateKey(Enum.KeyCode.Two)
-            task.wait(ComboDelay / 1000)
+            if WaitForSkill(btns.CrushingBlow) then
+                FireButton(btns.CrushingBlow)
+                task.wait(ComboDelay / 1000)
+            end
             for i = 1, 3 do
                 FireButton(atkBtn)
                 task.wait(ComboDelay / 1000)
             end
-            SimulateKey(Enum.KeyCode.Three)
-            task.wait(ComboDelay / 1000)
-            SimulateKey(Enum.KeyCode.R)
-            task.wait(ComboDelay / 1000)
+            if WaitForSkill(btns.DivergentFist) then
+                FireButton(btns.DivergentFist)
+                task.wait(ComboDelay / 1000)
+            end
+            if WaitForSkill(btns.ManjiKick) then
+                FireButton(btns.ManjiKick)
+                task.wait(ComboDelay / 1000)
+            end
         elseif variant == 3 then
             for i = 1, 3 do
                 FireButton(atkBtn)
                 task.wait(ComboDelay / 1000)
             end
-            SimulateKey(Enum.KeyCode.Two)
-            task.wait(ComboDelay / 1000)
+            if WaitForSkill(btns.CrushingBlow) then
+                FireButton(btns.CrushingBlow)
+                task.wait(ComboDelay / 1000)
+            end
             for i = 1, 3 do
                 FireButton(atkBtn)
                 task.wait(ComboDelay / 1000)
             end
-            SimulateKey(Enum.KeyCode.One)
-            task.wait(ComboDelay / 1000)
-            SimulateKey(Enum.KeyCode.Three)
-            task.wait(ComboDelay / 1000)
-            SimulateKey(Enum.KeyCode.R)
-            task.wait(ComboDelay / 1000)
+            if WaitForSkill(btns.CursedStrike) then
+                FireButton(btns.CursedStrike)
+                task.wait(ComboDelay / 1000)
+            end
+            if WaitForSkill(btns.DivergentFist) then
+                FireButton(btns.DivergentFist)
+                task.wait(ComboDelay / 1000)
+            end
+            if WaitForSkill(btns.ManjiKick) then
+                FireButton(btns.ManjiKick)
+                task.wait(ComboDelay / 1000)
+            end
         end
 
         task.wait(0.5)
     end
 end)
 
--- // Логика Auto Black Flash (приблизительная) //
+Section(TabCombat, "Black Flash")
+
 local AutoBlackFlashEnabled = false
-local AutoBlackFlashDelay = 150
+local BlackFlashTiming = 350
 
 Toggle(TabCombat, "Auto Black Flash", false, function(v)
     AutoBlackFlashEnabled = v
 end)
-Slider(TabCombat, "Black Flash Delay (ms)", 50, 500, 150, function(v)
-    AutoBlackFlashDelay = v
+Slider(TabCombat, "Black Flash Timing (ms)", 250, 450, 350, function(v)
+    BlackFlashTiming = v
 end)
 
 task.spawn(function()
@@ -1066,29 +1165,58 @@ task.spawn(function()
         local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if not humanoid or humanoid.Health <= 0 then continue end
 
-        local atkBtn = FindButtonByNames({"attack", "m1", "punch", "combat", "hit"})
+        local target = GetNearestTarget(30)
+        if not target then continue end
 
-        -- Шаг 1: даш (Q)
-        SimulateKey(Enum.KeyCode.Q)
-        task.wait(AutoBlackFlashDelay / 1000)
+        local btns = GetYujiButtons()
+        if not btns.DivergentFist then continue end
 
-        -- Шаг 2: первый M1 для тайминга
-        FireButton(atkBtn)
-        task.wait(AutoBlackFlashDelay / 1000)
+        -- Ждём пока Divergent Fist не будет готов
+        if not IsSkillReady(btns.DivergentFist) then
+            continue
+        end
 
-        -- Шаг 3: второй M1 (должен дать Black Flash при совпадении тайминга)
-        FireButton(atkBtn)
-        task.wait(AutoBlackFlashDelay / 1000)
+        local behind = IsTargetBehind(target)
 
-        -- Шаг 4: скилл 3 (Divergent Fist)
-        SimulateKey(Enum.KeyCode.Three)
-        task.wait(AutoBlackFlashDelay / 1000)
+        if behind then
+            -- Враг спиной: Black Flash combo
+            FireButton(btns.Dash)
+            task.wait(0.15)
 
-        -- Шаг 5: ещё пара M1
-        FireButton(atkBtn)
-        task.wait(AutoBlackFlashDelay / 1000)
-        FireButton(atkBtn)
-        task.wait(AutoBlackFlashDelay / 1000)
+            if not IsTargetBehind(target) then
+                continue
+            end
+
+            -- Первое нажатие Divergent Fist
+            FireButton(btns.DivergentFist)
+            task.wait(BlackFlashTiming / 1000)
+
+            -- Второе нажатие = Black Flash
+            FireButton(btns.DivergentFist)
+            task.wait(0.6)
+
+            -- Если враг всё ещё спиной и скилл готов — повторяем
+            for i = 1, 3 do
+                if not AutoBlackFlashEnabled then break end
+                if not IsSkillReady(btns.DivergentFist) then break end
+                if not IsTargetBehind(target) then break end
+
+                FireButton(btns.Dash)
+                task.wait(0.15)
+                FireButton(btns.DivergentFist)
+                task.wait(BlackFlashTiming / 1000)
+                FireButton(btns.DivergentFist)
+                task.wait(0.6)
+            end
+        else
+            -- Враг спереди: обычная атака
+            FireButton(btns.Dash)
+            task.wait(0.15)
+            FireButton(btns.DivergentFist)
+            task.wait(0.5)
+        end
+
+        task.wait(0.3)
     end
 end)
 
@@ -1121,6 +1249,6 @@ Toggle(TabScript, "No Knockback M1", false, function(v) end)
 -- // УВЕДОМЛЕНИЕ //
 StarterGui:SetCore("SendNotification", {
     Title = "Mercedes Menu",
-    Text = "Скрипт v1.4 загружен.",
+    Text = "Скрипт v1.6 загружен.",
     Duration = 3
 })
