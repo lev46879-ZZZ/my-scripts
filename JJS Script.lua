@@ -1,5 +1,5 @@
 -- // MERCEDES STYLE MENU // --
--- // Финальная сборка: main + combat + script + пустые visuals/settings/cfg // --
+-- // Финальная сборка v1.2 // --
 
 local Players           = game:GetService("Players")
 local RunService        = game:GetService("RunService")
@@ -129,7 +129,6 @@ local function ToggleMenu()
     end
 end
 
--- Клик + перетаскивание кнопки
 local btnDragging, btnDragStart, btnStartPos, btnMoved = false, nil, nil, false
 OpenButton.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -154,7 +153,6 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- Перетаскивание окна
 local function Drag(frame, handle)
     local drag, startP, startPos
     handle.InputBegan:Connect(function(i)
@@ -215,7 +213,7 @@ VersionText.Parent = TopBar
 VersionText.Position = UDim2.new(1, -130, 0, 0)
 VersionText.Size = UDim2.new(0, 80, 1, 0)
 VersionText.BackgroundTransparency = 1
-VersionText.Text = "v1.0.0"
+VersionText.Text = "v1.2"
 VersionText.TextColor3 = Theme.TextDim
 VersionText.Font = Enum.Font.Gotham
 VersionText.TextSize = 12
@@ -519,10 +517,7 @@ local function Slider(parent, text, min, max, default, callback)
         end
     end)
 
-    return {Frame = box, Get = function()
-        local pct = (knob.Position.X.Scale)
-        return math.floor(min + (max - min) * pct + 0.5)
-    end}
+    return {Frame = box, Get = function() return math.floor(min + (max - min) * knob.Position.X.Scale + 0.5) end}
 end
 
 local function Button(parent, text, callback)
@@ -673,6 +668,7 @@ end
 local FlyEnabled = false
 local FlySpeed = 60
 local flyBodyVelocity = nil
+local flyBodyGyro = nil
 
 RunService.RenderStepped:Connect(function()
     if FlyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -685,24 +681,39 @@ RunService.RenderStepped:Connect(function()
             flyBodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
             flyBodyVelocity.Parent = hrp
         end
-
-        local moveDir = humanoid.MoveDirection
-        local camCFrame = Camera.CFrame
-        local direction = Vector3.new(0,0,0)
-        if moveDir.Magnitude > 0.1 then
-            direction = (camCFrame.LookVector * moveDir.Z + camCFrame.RightVector * moveDir.X).Unit
+        if not flyBodyGyro or not flyBodyGyro.Parent then
+            flyBodyGyro = Instance.new("BodyGyro")
+            flyBodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+            flyBodyGyro.P = 10000
+            flyBodyGyro.D = 500
+            flyBodyGyro.Parent = hrp
         end
 
-        local vertical = Vector3.new(0,0,0)
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vertical = Vector3.new(0, 1, 0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then vertical = Vector3.new(0, -1, 0) end
+        local camCF = Camera.CFrame
+        local camLook = camCF.LookVector
+        local camRight = camCF.RightVector
+
+        local moveVector = humanoid.MoveDirection
+
+        local direction = Vector3.new(0, 0, 0)
+        if moveVector.Magnitude > 0.05 then
+            direction = (camLook * moveVector.Z + camRight * moveVector.X)
+            if direction.Magnitude > 1 then direction = direction.Unit end
+        end
+
+        local vertical = Vector3.new(0, 0, 0)
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            vertical = Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            vertical = Vector3.new(0, -1, 0)
+        end
 
         flyBodyVelocity.Velocity = (direction * FlySpeed) + (vertical * FlySpeed)
+        flyBodyGyro.CFrame = camCF
     else
-        if flyBodyVelocity then
-            flyBodyVelocity:Destroy()
-            flyBodyVelocity = nil
-        end
+        if flyBodyVelocity then flyBodyVelocity:Destroy(); flyBodyVelocity = nil end
+        if flyBodyGyro then flyBodyGyro:Destroy(); flyBodyGyro = nil end
     end
 end)
 
@@ -719,25 +730,26 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
--- // NOCLIP //
-local NoclipEnabled = false
-RunService.Stepped:Connect(function()
-    if NoclipEnabled and LocalPlayer.Character then
-        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
-            if part:IsA("BasePart") and part.CanCollide then
-                part.CanCollide = false
-            end
-        end
-    end
-end)
-
 -- // ANTI-RAGDOLL //
 local AntiRagdollEnabled = false
 RunService.Heartbeat:Connect(function()
     if AntiRagdollEnabled and LocalPlayer.Character then
         local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid:GetState() == Enum.HumanoidStateType.Physics then
-            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+        if humanoid then
+            local state = humanoid:GetState()
+            if state == Enum.HumanoidStateType.Physics 
+               or state == Enum.HumanoidStateType.FallingDown 
+               or state == Enum.HumanoidStateType.PlatformStanding then
+                humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+                humanoid:ChangeState(Enum.HumanoidStateType.Running)
+            end
+        end
+        local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local rot = hrp.CFrame - hrp.Position
+            local _, y, _ = rot:ToEulerAnglesYXZ()
+            hrp.CFrame = CFrame.new(hrp.Position) * CFrame.Angles(0, y, 0)
+            hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
         end
     end
 end)
@@ -765,6 +777,25 @@ local function GetHRP(plr)
     end
 end
 
+-- // AUTO COMBO UTILS //
+local function SimulateKey(keyCode)
+    pcall(function()
+        local vim = game:GetService("VirtualInputManager")
+        vim:SendKeyEvent(true, keyCode, false, game)
+        task.wait(0.03)
+        vim:SendKeyEvent(false, keyCode, false, game)
+    end)
+end
+
+local function SimulateM1()
+    pcall(function()
+        local vim = game:GetService("VirtualInputManager")
+        vim:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+        task.wait(0.03)
+        vim:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+    end)
+end
+
 
 -- ============================== //
 -- // ВКЛАДКА: MAIN //
@@ -787,9 +818,6 @@ Toggle(TabMain, "Anti-Ragdoll", false, function(v)
 end)
 Toggle(TabMain, "Anti-Fling", false, function(v)
     AntiFlingEnabled = v
-end)
-Toggle(TabMain, "Noclip", false, function(v)
-    NoclipEnabled = v
 end)
 
 Section(TabMain, "Teleport")
@@ -842,8 +870,81 @@ Toggle(TabCombat, "Auto Block",    false, function(v) end)
 Toggle(TabCombat, "Auto Counter",  false, function(v) end)
 
 Section(TabCombat, "Yuji Combo")
-Toggle(TabCombat, "Auto Combo (Yuji)", false, function(v) end)
-Slider(TabCombat, "Combo Delay (ms)", 1, 500, 100, function(v) end)
+
+local AutoComboEnabled = false
+local ComboDelay = 100
+local ComboVariant = "Variant 1 (Safe)"
+
+Toggle(TabCombat, "Auto Combo (Yuji)", false, function(v)
+    AutoComboEnabled = v
+end)
+Slider(TabCombat, "Combo Delay (ms)", 1, 500, 100, function(v)
+    ComboDelay = v
+end)
+Dropdown(TabCombat, "Combo Variant", {"Variant 1 (Safe)", "Variant 2 (Black Flash)", "Variant 3 (Full)"}, "Variant 1 (Safe)", function(v)
+    ComboVariant = v
+end)
+
+-- Логика Auto Combo с тремя вариантами
+task.spawn(function()
+    while task.wait(0.05) do
+        if not AutoComboEnabled then continue end
+        if not LocalPlayer.Character then continue end
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if not humanoid or humanoid.Health <= 0 then continue end
+
+        local variant = tonumber(ComboVariant:match("Variant%s+(%d+)")) or 1
+
+        if variant == 1 then
+            for i = 1, 3 do
+                SimulateM1()
+                task.wait(ComboDelay / 1000)
+            end
+            SimulateKey(Enum.KeyCode.Three)
+            task.wait(ComboDelay / 1000)
+            SimulateKey(Enum.KeyCode.Q)
+            task.wait(ComboDelay / 1000)
+            for i = 1, 3 do
+                SimulateM1()
+                task.wait(ComboDelay / 1000)
+            end
+        elseif variant == 2 then
+            for i = 1, 3 do
+                SimulateM1()
+                task.wait(ComboDelay / 1000)
+            end
+            SimulateKey(Enum.KeyCode.Two)
+            task.wait(ComboDelay / 1000)
+            for i = 1, 3 do
+                SimulateM1()
+                task.wait(ComboDelay / 1000)
+            end
+            SimulateKey(Enum.KeyCode.Three)
+            task.wait(ComboDelay / 1000)
+            SimulateKey(Enum.KeyCode.R)
+            task.wait(ComboDelay / 1000)
+        elseif variant == 3 then
+            for i = 1, 3 do
+                SimulateM1()
+                task.wait(ComboDelay / 1000)
+            end
+            SimulateKey(Enum.KeyCode.Two)
+            task.wait(ComboDelay / 1000)
+            for i = 1, 3 do
+                SimulateM1()
+                task.wait(ComboDelay / 1000)
+            end
+            SimulateKey(Enum.KeyCode.One)
+            task.wait(ComboDelay / 1000)
+            SimulateKey(Enum.KeyCode.Three)
+            task.wait(ComboDelay / 1000)
+            SimulateKey(Enum.KeyCode.R)
+            task.wait(ComboDelay / 1000)
+        end
+
+        task.wait(0.5)
+    end
+end)
 
 Section(TabCombat, "Black Flash")
 Toggle(TabCombat, "Auto Black Flash", false, function(v) end)
@@ -877,6 +978,6 @@ Toggle(TabScript, "No Knockback M1", false, function(v) end)
 -- // УВЕДОМЛЕНИЕ //
 StarterGui:SetCore("SendNotification", {
     Title = "Mercedes Menu",
-    Text = "Скрипт загружен. Тапни по аватарке.",
+    Text = "Скрипт v1.2 загружен.",
     Duration = 3
 })
