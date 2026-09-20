@@ -1,5 +1,5 @@
 -- // MERCEDES STYLE MENU // --
--- // Финальная сборка v1.2 // --
+-- // Финальная сборка v1.3 // --
 
 local Players           = game:GetService("Players")
 local RunService        = game:GetService("RunService")
@@ -213,7 +213,7 @@ VersionText.Parent = TopBar
 VersionText.Position = UDim2.new(1, -130, 0, 0)
 VersionText.Size = UDim2.new(0, 80, 1, 0)
 VersionText.BackgroundTransparency = 1
-VersionText.Text = "v1.2"
+VersionText.Text = "v1.3"
 VersionText.TextColor3 = Theme.TextDim
 VersionText.Font = Enum.Font.Gotham
 VersionText.TextSize = 12
@@ -664,7 +664,7 @@ end
 -- // РАБОЧАЯ ЛОГИКА //
 -- ============================== //
 
--- // FLY //
+-- // FLY (исправлен: летит туда, куда идёт MoveDirection — это уже мировой вектор) //
 local FlyEnabled = false
 local FlySpeed = 60
 local flyBodyVelocity = nil
@@ -689,18 +689,15 @@ RunService.RenderStepped:Connect(function()
             flyBodyGyro.Parent = hrp
         end
 
-        local camCF = Camera.CFrame
-        local camLook = camCF.LookVector
-        local camRight = camCF.RightVector
-
-        local moveVector = humanoid.MoveDirection
-
+        -- MoveDirection уже мировой вектор направления движения (с учётом камеры).
+        -- Просто используем его напрямую — БЕЗ умножения на камеру.
+        local moveDir = humanoid.MoveDirection
         local direction = Vector3.new(0, 0, 0)
-        if moveVector.Magnitude > 0.05 then
-            direction = (camLook * moveVector.Z + camRight * moveVector.X)
-            if direction.Magnitude > 1 then direction = direction.Unit end
+        if moveDir.Magnitude > 0.05 then
+            direction = moveDir
         end
 
+        -- Вертикаль (Space/LCtrl для ПК)
         local vertical = Vector3.new(0, 0, 0)
         if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
             vertical = Vector3.new(0, 1, 0)
@@ -710,7 +707,7 @@ RunService.RenderStepped:Connect(function()
         end
 
         flyBodyVelocity.Velocity = (direction * FlySpeed) + (vertical * FlySpeed)
-        flyBodyGyro.CFrame = camCF
+        flyBodyGyro.CFrame = Camera.CFrame
     else
         if flyBodyVelocity then flyBodyVelocity:Destroy(); flyBodyVelocity = nil end
         if flyBodyGyro then flyBodyGyro:Destroy(); flyBodyGyro = nil end
@@ -777,22 +774,71 @@ local function GetHRP(plr)
     end
 end
 
--- // AUTO COMBO UTILS //
+-- // AUTO COMBO UTILS (без VirtualInputManager — ищем кнопки в UI игры) //
+local function FindAttackButton()
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if not pg then return nil end
+
+    local names = {"attack", "m1", "punch", "combat", "hit"}
+    for _, g in ipairs(pg:GetDescendants()) do
+        if g:IsA("TextButton") or g:IsA("ImageButton") then
+            local n = g.Name:lower()
+            for _, key in ipairs(names) do
+                if n:find(key) then
+                    return g
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function FindSkillButton(index)
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if not pg then return nil end
+
+    -- Ищем кнопки скиллов по типичным именам: Skill1, Move1, Ability1 и т.п.
+    local patterns = {
+        "skill" .. index, "move" .. index, "ability" .. index, 
+        "button" .. index, tostring(index)
+    }
+    for _, g in ipairs(pg:GetDescendants()) do
+        if g:IsA("TextButton") or g:IsA("ImageButton") then
+            local n = g.Name:lower()
+            for _, p in ipairs(patterns) do
+                if n == p or n:find(p) then
+                    return g
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function FireButton(btn)
+    if not btn then return end
+    pcall(function()
+        if firesignal then
+            firesignal(btn.MouseButton1Click)
+        else
+            btn.MouseButton1Click:Fire()
+        end
+    end)
+    pcall(function()
+        if firesignal then
+            firesignal(btn.MouseButton1Down)
+            firesignal(btn.MouseButton1Up)
+        end
+    end)
+end
+
+-- Альтернатива через VirtualInputManager для скиллов (клавиши 1,2,3,Q,R)
 local function SimulateKey(keyCode)
     pcall(function()
         local vim = game:GetService("VirtualInputManager")
         vim:SendKeyEvent(true, keyCode, false, game)
-        task.wait(0.03)
+        task.wait(0.05)
         vim:SendKeyEvent(false, keyCode, false, game)
-    end)
-end
-
-local function SimulateM1()
-    pcall(function()
-        local vim = game:GetService("VirtualInputManager")
-        vim:SendMouseButtonEvent(0, 0, 0, true, game, 1)
-        task.wait(0.03)
-        vim:SendMouseButtonEvent(0, 0, 0, false, game, 1)
     end)
 end
 
@@ -885,7 +931,7 @@ Dropdown(TabCombat, "Combo Variant", {"Variant 1 (Safe)", "Variant 2 (Black Flas
     ComboVariant = v
 end)
 
--- Логика Auto Combo с тремя вариантами
+-- Логика Auto Combo (не блокирует движение)
 task.spawn(function()
     while task.wait(0.05) do
         if not AutoComboEnabled then continue end
@@ -895,9 +941,13 @@ task.spawn(function()
 
         local variant = tonumber(ComboVariant:match("Variant%s+(%d+)")) or 1
 
+        -- Ищем кнопку атаки один раз
+        local atkBtn = FindAttackButton()
+
+        -- Скиллы через VirtualInputManager (это не блокирует touch input)
         if variant == 1 then
             for i = 1, 3 do
-                SimulateM1()
+                FireButton(atkBtn)
                 task.wait(ComboDelay / 1000)
             end
             SimulateKey(Enum.KeyCode.Three)
@@ -905,18 +955,18 @@ task.spawn(function()
             SimulateKey(Enum.KeyCode.Q)
             task.wait(ComboDelay / 1000)
             for i = 1, 3 do
-                SimulateM1()
+                FireButton(atkBtn)
                 task.wait(ComboDelay / 1000)
             end
         elseif variant == 2 then
             for i = 1, 3 do
-                SimulateM1()
+                FireButton(atkBtn)
                 task.wait(ComboDelay / 1000)
             end
             SimulateKey(Enum.KeyCode.Two)
             task.wait(ComboDelay / 1000)
             for i = 1, 3 do
-                SimulateM1()
+                FireButton(atkBtn)
                 task.wait(ComboDelay / 1000)
             end
             SimulateKey(Enum.KeyCode.Three)
@@ -925,13 +975,13 @@ task.spawn(function()
             task.wait(ComboDelay / 1000)
         elseif variant == 3 then
             for i = 1, 3 do
-                SimulateM1()
+                FireButton(atkBtn)
                 task.wait(ComboDelay / 1000)
             end
             SimulateKey(Enum.KeyCode.Two)
             task.wait(ComboDelay / 1000)
             for i = 1, 3 do
-                SimulateM1()
+                FireButton(atkBtn)
                 task.wait(ComboDelay / 1000)
             end
             SimulateKey(Enum.KeyCode.One)
@@ -978,6 +1028,6 @@ Toggle(TabScript, "No Knockback M1", false, function(v) end)
 -- // УВЕДОМЛЕНИЕ //
 StarterGui:SetCore("SendNotification", {
     Title = "Mercedes Menu",
-    Text = "Скрипт v1.2 загружен.",
+    Text = "Скрипт v1.3 загружен.",
     Duration = 3
 })
