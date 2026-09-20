@@ -1,5 +1,5 @@
 -- // MERCEDES STYLE MENU // --
--- // Финальная сборка v1.3 // --
+-- // Финальная сборка v1.4 // --
 
 local Players           = game:GetService("Players")
 local RunService        = game:GetService("RunService")
@@ -213,7 +213,7 @@ VersionText.Parent = TopBar
 VersionText.Position = UDim2.new(1, -130, 0, 0)
 VersionText.Size = UDim2.new(0, 80, 1, 0)
 VersionText.BackgroundTransparency = 1
-VersionText.Text = "v1.3"
+VersionText.Text = "v1.4"
 VersionText.TextColor3 = Theme.TextDim
 VersionText.Font = Enum.Font.Gotham
 VersionText.TextSize = 12
@@ -664,7 +664,7 @@ end
 -- // РАБОЧАЯ ЛОГИКА //
 -- ============================== //
 
--- // FLY (исправлен: летит туда, куда идёт MoveDirection — это уже мировой вектор) //
+-- // FLY //
 local FlyEnabled = false
 local FlySpeed = 60
 local flyBodyVelocity = nil
@@ -689,15 +689,12 @@ RunService.RenderStepped:Connect(function()
             flyBodyGyro.Parent = hrp
         end
 
-        -- MoveDirection уже мировой вектор направления движения (с учётом камеры).
-        -- Просто используем его напрямую — БЕЗ умножения на камеру.
         local moveDir = humanoid.MoveDirection
         local direction = Vector3.new(0, 0, 0)
         if moveDir.Magnitude > 0.05 then
             direction = moveDir
         end
 
-        -- Вертикаль (Space/LCtrl для ПК)
         local vertical = Vector3.new(0, 0, 0)
         if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
             vertical = Vector3.new(0, 1, 0)
@@ -725,6 +722,40 @@ UserInputService.JumpRequest:Connect(function()
             humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
         end
     end
+end)
+
+-- // NO CLIP (агрессивный — пишем CanCollide каждый Stepped) //
+local NoclipEnabled = false
+local noclipConns = {}
+local noclipExtra = {}
+
+local function setupNoclipForChar(char)
+    -- Отключаем связь частей через Motor6D может помочь против телепорта
+    -- (это может быть визуально глючно, но работает)
+    for _, d in ipairs(noclipConns) do d:Disconnect() end
+    noclipConns = {}
+
+    local hum = char:WaitForChild("Humanoid", 5)
+    if hum then
+        -- Сохраняем оригинальные CollisionGroups
+        hum:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
+        hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+        hum:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false)
+    end
+
+    table.insert(noclipConns, RunService.Stepped:Connect(function()
+        if not NoclipEnabled then return end
+        if not char.Parent then return end
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide then
+                part.CanCollide = false
+            end
+        end
+    end))
+end
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    if NoclipEnabled then setupNoclipForChar(char) end
 end)
 
 -- // ANTI-RAGDOLL //
@@ -774,39 +805,15 @@ local function GetHRP(plr)
     end
 end
 
--- // AUTO COMBO UTILS (без VirtualInputManager — ищем кнопки в UI игры) //
-local function FindAttackButton()
+-- // AUTO UTILS //
+local function FindButtonByNames(names)
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
     if not pg then return nil end
-
-    local names = {"attack", "m1", "punch", "combat", "hit"}
     for _, g in ipairs(pg:GetDescendants()) do
         if g:IsA("TextButton") or g:IsA("ImageButton") then
             local n = g.Name:lower()
             for _, key in ipairs(names) do
                 if n:find(key) then
-                    return g
-                end
-            end
-        end
-    end
-    return nil
-end
-
-local function FindSkillButton(index)
-    local pg = LocalPlayer:FindFirstChild("PlayerGui")
-    if not pg then return nil end
-
-    -- Ищем кнопки скиллов по типичным именам: Skill1, Move1, Ability1 и т.п.
-    local patterns = {
-        "skill" .. index, "move" .. index, "ability" .. index, 
-        "button" .. index, tostring(index)
-    }
-    for _, g in ipairs(pg:GetDescendants()) do
-        if g:IsA("TextButton") or g:IsA("ImageButton") then
-            local n = g.Name:lower()
-            for _, p in ipairs(patterns) do
-                if n == p or n:find(p) then
                     return g
                 end
             end
@@ -824,15 +831,8 @@ local function FireButton(btn)
             btn.MouseButton1Click:Fire()
         end
     end)
-    pcall(function()
-        if firesignal then
-            firesignal(btn.MouseButton1Down)
-            firesignal(btn.MouseButton1Up)
-        end
-    end)
 end
 
--- Альтернатива через VirtualInputManager для скиллов (клавиши 1,2,3,Q,R)
 local function SimulateKey(keyCode)
     pcall(function()
         local vim = game:GetService("VirtualInputManager")
@@ -864,6 +864,12 @@ Toggle(TabMain, "Anti-Ragdoll", false, function(v)
 end)
 Toggle(TabMain, "Anti-Fling", false, function(v)
     AntiFlingEnabled = v
+end)
+Toggle(TabMain, "No Clip", false, function(v)
+    NoclipEnabled = v
+    if v and LocalPlayer.Character then
+        setupNoclipForChar(LocalPlayer.Character)
+    end
 end)
 
 Section(TabMain, "Teleport")
@@ -911,9 +917,59 @@ end)
 -- // ВКЛАДКА: COMBAT //
 -- ============================== //
 Section(TabCombat, "Auto Actions")
-Toggle(TabCombat, "Auto Attack",   false, function(v) end)
-Toggle(TabCombat, "Auto Block",    false, function(v) end)
-Toggle(TabCombat, "Auto Counter",  false, function(v) end)
+
+local AutoAttackEnabled = false
+local AutoBlockEnabled = false
+local AutoCounterEnabled = false
+
+Toggle(TabCombat, "Auto Attack", false, function(v)
+    AutoAttackEnabled = v
+end)
+Toggle(TabCombat, "Auto Block", false, function(v)
+    AutoBlockEnabled = v
+end)
+Toggle(TabCombat, "Auto Counter", false, function(v)
+    AutoCounterEnabled = v
+end)
+
+-- // Логика Auto Attack //
+task.spawn(function()
+    while task.wait(0.1) do
+        if not AutoAttackEnabled then continue end
+        if not LocalPlayer.Character then continue end
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if not humanoid or humanoid.Health <= 0 then continue end
+
+        local atkBtn = FindButtonByNames({"attack", "m1", "punch", "combat", "hit"})
+        FireButton(atkBtn)
+    end
+end)
+
+-- // Логика Auto Block //
+task.spawn(function()
+    while task.wait(0.1) do
+        if not AutoBlockEnabled then continue end
+        if not LocalPlayer.Character then continue end
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if not humanoid or humanoid.Health <= 0 then continue end
+
+        local blockBtn = FindButtonByNames({"block", "guard", "parry", "shield"})
+        FireButton(blockBtn)
+    end
+end)
+
+-- // Логика Auto Counter //
+task.spawn(function()
+    while task.wait(0.15) do
+        if not AutoCounterEnabled then continue end
+        if not LocalPlayer.Character then continue end
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if not humanoid or humanoid.Health <= 0 then continue end
+
+        local counterBtn = FindButtonByNames({"counter", "riposte", "repel", "reflect"})
+        FireButton(counterBtn)
+    end
+end)
 
 Section(TabCombat, "Yuji Combo")
 
@@ -931,7 +987,6 @@ Dropdown(TabCombat, "Combo Variant", {"Variant 1 (Safe)", "Variant 2 (Black Flas
     ComboVariant = v
 end)
 
--- Логика Auto Combo (не блокирует движение)
 task.spawn(function()
     while task.wait(0.05) do
         if not AutoComboEnabled then continue end
@@ -940,11 +995,8 @@ task.spawn(function()
         if not humanoid or humanoid.Health <= 0 then continue end
 
         local variant = tonumber(ComboVariant:match("Variant%s+(%d+)")) or 1
+        local atkBtn = FindButtonByNames({"attack", "m1", "punch", "combat", "hit"})
 
-        -- Ищем кнопку атаки один раз
-        local atkBtn = FindAttackButton()
-
-        -- Скиллы через VirtualInputManager (это не блокирует touch input)
         if variant == 1 then
             for i = 1, 3 do
                 FireButton(atkBtn)
@@ -996,8 +1048,49 @@ task.spawn(function()
     end
 end)
 
-Section(TabCombat, "Black Flash")
-Toggle(TabCombat, "Auto Black Flash", false, function(v) end)
+-- // Логика Auto Black Flash (приблизительная) //
+local AutoBlackFlashEnabled = false
+local AutoBlackFlashDelay = 150
+
+Toggle(TabCombat, "Auto Black Flash", false, function(v)
+    AutoBlackFlashEnabled = v
+end)
+Slider(TabCombat, "Black Flash Delay (ms)", 50, 500, 150, function(v)
+    AutoBlackFlashDelay = v
+end)
+
+task.spawn(function()
+    while task.wait(0.1) do
+        if not AutoBlackFlashEnabled then continue end
+        if not LocalPlayer.Character then continue end
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if not humanoid or humanoid.Health <= 0 then continue end
+
+        local atkBtn = FindButtonByNames({"attack", "m1", "punch", "combat", "hit"})
+
+        -- Шаг 1: даш (Q)
+        SimulateKey(Enum.KeyCode.Q)
+        task.wait(AutoBlackFlashDelay / 1000)
+
+        -- Шаг 2: первый M1 для тайминга
+        FireButton(atkBtn)
+        task.wait(AutoBlackFlashDelay / 1000)
+
+        -- Шаг 3: второй M1 (должен дать Black Flash при совпадении тайминга)
+        FireButton(atkBtn)
+        task.wait(AutoBlackFlashDelay / 1000)
+
+        -- Шаг 4: скилл 3 (Divergent Fist)
+        SimulateKey(Enum.KeyCode.Three)
+        task.wait(AutoBlackFlashDelay / 1000)
+
+        -- Шаг 5: ещё пара M1
+        FireButton(atkBtn)
+        task.wait(AutoBlackFlashDelay / 1000)
+        FireButton(atkBtn)
+        task.wait(AutoBlackFlashDelay / 1000)
+    end
+end)
 
 Section(TabCombat, "Aura")
 Toggle(TabCombat, "Aura Attack", false, function(v) end)
@@ -1028,6 +1121,6 @@ Toggle(TabScript, "No Knockback M1", false, function(v) end)
 -- // УВЕДОМЛЕНИЕ //
 StarterGui:SetCore("SendNotification", {
     Title = "Mercedes Menu",
-    Text = "Скрипт v1.3 загружен.",
+    Text = "Скрипт v1.4 загружен.",
     Duration = 3
 })
