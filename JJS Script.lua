@@ -1,5 +1,5 @@
 -- // MERCEDES STYLE MENU // --
--- // Финальная сборка v1.6 // --
+-- // v1.9.1 — Auto Counter/Black Flash только для Yuji // --
 
 local Players           = game:GetService("Players")
 local RunService        = game:GetService("RunService")
@@ -9,9 +9,6 @@ local StarterGui        = game:GetService("StarterGui")
 local LocalPlayer       = Players.LocalPlayer
 local Camera            = workspace.CurrentCamera
 
--- ============================== //
--- // ТЕМА //
--- ============================== //
 local Theme = {
     Background  = Color3.fromRGB(20, 20, 20),
     Sidebar     = Color3.fromRGB(14, 14, 14),
@@ -25,9 +22,6 @@ local Theme = {
     Input       = Color3.fromRGB(38, 38, 38)
 }
 
--- ============================== //
--- // ХЕЛПЕРЫ //
--- ============================== //
 local function Tween(obj, time, props, style, dir)
     local t = TweenService:Create(obj, TweenInfo.new(time or 0.22, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), props)
     t:Play()
@@ -52,9 +46,6 @@ local function Stroke(color, thick, transp)
     return s
 end
 
--- ============================== //
--- // SCREEN GUI //
--- ============================== //
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MercedesMenu"
 ScreenGui.IgnoreGuiInset = true
@@ -62,9 +53,7 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
 
--- ============================== //
--- // ПЛАВАЮЩАЯ КНОПКА //
--- ============================== //
+-- КНОПКА //
 local OpenButton = Instance.new("TextButton")
 OpenButton.Parent = ScreenGui
 OpenButton.Size = UDim2.new(0, 56, 0, 56)
@@ -97,9 +86,7 @@ task.spawn(function()
     end
 end)
 
--- ============================== //
--- // ГЛАВНОЕ ОКНО //
--- ============================== //
+-- ОКНО //
 local MainFrame = Instance.new("Frame")
 MainFrame.Parent = ScreenGui
 MainFrame.Size = UDim2.new(0, 720, 0, 520)
@@ -171,9 +158,7 @@ local function Drag(frame, handle)
     end)
 end
 
--- ============================== //
--- // ВЕРХНЯЯ ПАНЕЛЬ //
--- ============================== //
+-- ВЕРХ //
 local TopBar = Instance.new("Frame")
 TopBar.Parent = MainFrame
 TopBar.Size = UDim2.new(1, 0, 0, 42)
@@ -213,7 +198,7 @@ VersionText.Parent = TopBar
 VersionText.Position = UDim2.new(1, -130, 0, 0)
 VersionText.Size = UDim2.new(0, 80, 1, 0)
 VersionText.BackgroundTransparency = 1
-VersionText.Text = "v1.6"
+VersionText.Text = "v1.9.1"
 VersionText.TextColor3 = Theme.TextDim
 VersionText.Font = Enum.Font.Gotham
 VersionText.TextSize = 12
@@ -236,9 +221,7 @@ CloseBtn.MouseLeave:Connect(function() Tween(CloseBtn, 0.15, {BackgroundColor3 =
 
 Drag(MainFrame, TopBar)
 
--- ============================== //
--- // ЛЕВАЯ ПАНЕЛЬ //
--- ============================== //
+-- САЙДБАР //
 local Sidebar = Instance.new("Frame")
 Sidebar.Parent = MainFrame
 Sidebar.Size = UDim2.new(0, 150, 1, -62)
@@ -268,9 +251,7 @@ ContentArea.Size = UDim2.new(1, -170, 1, -62)
 ContentArea.Position = UDim2.new(0, 160, 0, 52)
 ContentArea.BackgroundTransparency = 1
 
--- ============================== //
--- // СИСТЕМА ВКЛАДОК //
--- ============================== //
+-- ВКЛАДКИ //
 local Tabs = {}
 local ActiveTab = nil
 
@@ -339,8 +320,8 @@ end
 local TabMain     = CreateTab("main",     "⌂")
 local TabCombat   = CreateTab("combat",   "⚔")
 local TabScript   = CreateTab("script",   "⌘")
-local TabVisuals  = CreateTab("visuals",  "◉")
 local TabSetting  = CreateTab("settings", "⚙")
+local TabVisuals  = CreateTab("visuals",  "◉")
 local TabConfig   = CreateTab("cfg",      "❒")
 
 Tabs[1].Content.Visible = true
@@ -349,9 +330,7 @@ Tabs[1].Button.TextColor3 = Theme.Text
 ActiveTab = "main"
 Tween(Tabs[1].Indicator, 0.3, {Size = UDim2.new(0, 3, 0, 18)})
 
--- ============================== //
--- // UI КОМПОНЕНТЫ //
--- ============================== //
+-- КОМПОНЕНТЫ //
 local function Section(parent, text)
     local lbl = Instance.new("TextLabel")
     lbl.Parent = parent
@@ -548,85 +527,107 @@ local function Dropdown(parent, text, options, default, callback)
     default = default or (options[1] or "None")
     callback = callback or function() end
 
+    local BASE_HEIGHT = 36
+    local ITEM_HEIGHT = 28
+    local GAP = 4
+
     local box = Instance.new("Frame")
     box.Parent = parent
-    box.Size = UDim2.new(1, 0, 0, 36)
+    box.Size = UDim2.new(1, 0, 0, BASE_HEIGHT)
     box.BackgroundColor3 = Theme.Panel
     box.BorderSizePixel = 0
     box.ClipsDescendants = false
+    box.ZIndex = 20
     Corner(8)(box)
 
     local lbl = Instance.new("TextLabel")
     lbl.Parent = box
     lbl.Position = UDim2.new(0, 12, 0, 0)
-    lbl.Size = UDim2.new(0.5, 0, 1, 0)
+    lbl.Size = UDim2.new(0.5, 0, 0, BASE_HEIGHT)
     lbl.BackgroundTransparency = 1
     lbl.Text = text
     lbl.TextColor3 = Theme.Text
     lbl.Font = Enum.Font.Gotham
     lbl.TextSize = 12
     lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.ZIndex = 21
 
     local current = Instance.new("TextLabel")
     current.Parent = box
     current.Position = UDim2.new(0.5, 0, 0, 0)
-    current.Size = UDim2.new(0.5, -30, 1, 0)
+    current.Size = UDim2.new(0.5, -30, 0, BASE_HEIGHT)
     current.BackgroundTransparency = 1
     current.Text = default .. "  ▾"
     current.TextColor3 = Theme.Accent
     current.Font = Enum.Font.Gotham
     current.TextSize = 12
     current.TextXAlignment = Enum.TextXAlignment.Right
+    current.ZIndex = 21
 
     local list = Instance.new("Frame")
     list.Parent = box
     list.Size = UDim2.new(1, 0, 0, 0)
-    list.Position = UDim2.new(0, 0, 1, 4)
+    list.Position = UDim2.new(0, 0, 0, BASE_HEIGHT + GAP)
     list.BackgroundColor3 = Theme.Input
     list.BorderSizePixel = 0
     list.Visible = false
     list.ClipsDescendants = true
-    list.ZIndex = 20
+    list.ZIndex = 22
     Corner(8)(list)
     Stroke(Theme.Border, 1, 0).Parent = list
 
     local ll = Instance.new("UIListLayout", list)
     ll.Padding = UDim.new(0, 2)
+    ll.SortOrder = Enum.SortOrder.LayoutOrder
     local lp = Instance.new("UIPadding", list)
     lp.PaddingTop = UDim.new(0, 4); lp.PaddingBottom = UDim.new(0, 4)
 
     local isOpen2 = false
     local btn = Instance.new("TextButton")
     btn.Parent = box
-    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.Size = UDim2.new(1, 0, 0, BASE_HEIGHT)
     btn.BackgroundTransparency = 1
     btn.Text = ""
-
-    local function close()
-        isOpen2 = false
-        Tween(list, 0.2, {Size = UDim2.new(1, 0, 0, 0)})
-        task.wait(0.2)
-        list.Visible = false
-    end
+    btn.ZIndex = 23
 
     local selectedValue = default
     local api = {}
+    api.Options = options
+
+    local function close()
+        isOpen2 = false
+        Tween(box, 0.2, {Size = UDim2.new(1, 0, 0, BASE_HEIGHT)})
+        Tween(list, 0.2, {Size = UDim2.new(1, 0, 0, 0)})
+        task.wait(0.2)
+        list.Visible = false
+        box.ZIndex = 1
+    end
+
+    local function open()
+        isOpen2 = true
+        box.ZIndex = 20
+        list.Visible = true
+        local listHeight = #api.Options * ITEM_HEIGHT + 8
+        Tween(box, 0.25, {Size = UDim2.new(1, 0, 0, BASE_HEIGHT + GAP + listHeight)})
+        Tween(list, 0.25, {Size = UDim2.new(1, 0, 0, listHeight)})
+    end
 
     local function rebuildItems()
         for _, c in ipairs(list:GetChildren()) do
             if c:IsA("TextButton") then c:Destroy() end
         end
-        for _, opt in ipairs(api.Options) do
+        for i, opt in ipairs(api.Options) do
             local oBtn = Instance.new("TextButton")
             oBtn.Parent = list
-            oBtn.Size = UDim2.new(1, -8, 0, 26)
+            oBtn.Size = UDim2.new(1, -8, 0, ITEM_HEIGHT - 2)
             oBtn.BackgroundColor3 = Theme.Panel
             oBtn.Text = opt
             oBtn.TextColor3 = Theme.Text
             oBtn.Font = Enum.Font.Gotham
             oBtn.TextSize = 11
             oBtn.AutoButtonColor = false
-            oBtn.ZIndex = 21
+            oBtn.LayoutOrder = i
+            oBtn.ZIndex = 24
             Corner(5)(oBtn)
             oBtn.MouseEnter:Connect(function() Tween(oBtn, 0.1, {BackgroundColor3 = Theme.Accent}) end)
             oBtn.MouseLeave:Connect(function() Tween(oBtn, 0.1, {BackgroundColor3 = Theme.Panel}) end)
@@ -639,32 +640,27 @@ local function Dropdown(parent, text, options, default, callback)
         end
     end
 
-    api.Options = options
     api.Rebuild = function(newOptions)
         api.Options = newOptions
         rebuildItems()
+        if isOpen2 then
+            local listHeight = #api.Options * ITEM_HEIGHT + 8
+            list.Size = UDim2.new(1, 0, 0, listHeight)
+            box.Size = UDim2.new(1, 0, 0, BASE_HEIGHT + GAP + listHeight)
+        end
     end
     api.Get = function() return selectedValue end
 
     rebuildItems()
 
     btn.MouseButton1Click:Connect(function()
-        if isOpen2 then close() else
-            isOpen2 = true
-            list.Visible = true
-            Tween(list, 0.25, {Size = UDim2.new(1, 0, 0, #api.Options * 28 + 8)})
-        end
+        if isOpen2 then close() else open() end
     end)
 
     return api
 end
 
-
--- ============================== //
--- // РАБОЧАЯ ЛОГИКА //
--- ============================== //
-
--- // FLY //
+-- ЛОГИКА //
 local FlyEnabled = false
 local FlySpeed = 60
 local flyBodyVelocity = nil
@@ -691,17 +687,11 @@ RunService.RenderStepped:Connect(function()
 
         local moveDir = humanoid.MoveDirection
         local direction = Vector3.new(0, 0, 0)
-        if moveDir.Magnitude > 0.05 then
-            direction = moveDir
-        end
+        if moveDir.Magnitude > 0.05 then direction = moveDir end
 
         local vertical = Vector3.new(0, 0, 0)
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            vertical = Vector3.new(0, 1, 0)
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-            vertical = Vector3.new(0, -1, 0)
-        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vertical = Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then vertical = Vector3.new(0, -1, 0) end
 
         flyBodyVelocity.Velocity = (direction * FlySpeed) + (vertical * FlySpeed)
         flyBodyGyro.CFrame = Camera.CFrame
@@ -711,7 +701,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- // INFINITE JUMPS //
 local InfiniteJumps = false
 local lastJumpTime = 0
 UserInputService.JumpRequest:Connect(function()
@@ -724,21 +713,18 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
--- // NO CLIP //
 local NoclipEnabled = false
 local noclipConns = {}
 
 local function setupNoclipForChar(char)
     for _, d in ipairs(noclipConns) do d:Disconnect() end
     noclipConns = {}
-
     local hum = char:WaitForChild("Humanoid", 5)
     if hum then
         hum:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
         hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
         hum:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false)
     end
-
     table.insert(noclipConns, RunService.Stepped:Connect(function()
         if not NoclipEnabled then return end
         if not char.Parent then return end
@@ -754,16 +740,13 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     if NoclipEnabled then setupNoclipForChar(char) end
 end)
 
--- // ANTI-RAGDOLL //
 local AntiRagdollEnabled = false
 RunService.Heartbeat:Connect(function()
     if AntiRagdollEnabled and LocalPlayer.Character then
         local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if humanoid then
             local state = humanoid:GetState()
-            if state == Enum.HumanoidStateType.Physics 
-               or state == Enum.HumanoidStateType.FallingDown 
-               or state == Enum.HumanoidStateType.PlatformStanding then
+            if state == Enum.HumanoidStateType.Physics or state == Enum.HumanoidStateType.FallingDown or state == Enum.HumanoidStateType.PlatformStanding then
                 humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
                 humanoid:ChangeState(Enum.HumanoidStateType.Running)
             end
@@ -778,7 +761,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- // ANTI-FLING //
 local AntiFlingEnabled = false
 RunService.Heartbeat:Connect(function()
     if AntiFlingEnabled and LocalPlayer.Character then
@@ -792,18 +774,12 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- // TP TO PLAYER //
 local selectedPlayer = nil
-
 local function GetHRP(plr)
     if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
         return plr.Character.HumanoidRootPart
     end
 end
-
--- ============================== //
--- // AUTO UTILS //
--- ============================== //
 
 local function FindButtonByNames(names)
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
@@ -812,9 +788,7 @@ local function FindButtonByNames(names)
         if g:IsA("TextButton") or g:IsA("ImageButton") then
             local n = g.Name:lower()
             for _, key in ipairs(names) do
-                if n:find(key:lower()) then
-                    return g
-                end
+                if n:find(key:lower()) then return g end
             end
         end
     end
@@ -824,11 +798,7 @@ end
 local function FireButton(btn)
     if not btn then return end
     pcall(function()
-        if firesignal then
-            firesignal(btn.MouseButton1Click)
-        else
-            btn.MouseButton1Click:Fire()
-        end
+        if firesignal then firesignal(btn.MouseButton1Click) else btn.MouseButton1Click:Fire() end
     end)
     pcall(function()
         if firesignal then
@@ -842,36 +812,41 @@ local function SimulateKey(keyCode)
     pcall(function()
         local vim = game:GetService("VirtualInputManager")
         vim:SendKeyEvent(true, keyCode, false, game)
-        task.wait(0.05)
+        task.wait(0.03)
         vim:SendKeyEvent(false, keyCode, false, game)
     end)
 end
 
--- Поиск кнопок скиллов Yuji
 local function GetYujiButtons()
     return {
-        CursedStrike  = FindButtonByNames({"cursed strike", "cursedstrike", "cursed_strike"}),
-        CrushingBlow  = FindButtonByNames({"crushing blow", "crushingblow", "crushing_blow"}),
-        DivergentFist = FindButtonByNames({"divergent fist", "divergentfist", "divergent_fist"}),
-        ManjiKick     = FindButtonByNames({"manji kick", "manjikick", "manji_kick"}),
+        CursedStrike  = FindButtonByNames({"punch", "combo", "cursed"}),
+        CrushingBlow  = FindButtonByNames({"lariat", "crushing"}),
+        DivergentFist = FindButtonByNames({"divergent"}),
+        ManjiKick     = FindButtonByNames({"manji"}),
+        Counter       = FindButtonByNames({"counter", "instinct"}),
         Dash          = FindButtonByNames({"dash"})
     }
 end
 
--- Поиск ближайшего игрока/НПС
+-- // ПРОВЕРКА ЧТО ИГРАЕМ ЗА YUJI //
+-- Yuji — единственный персонаж с Divergent Fist
+-- Если кнопка найдена — значит мы Yuji
+local function IsYuji()
+    local btns = GetYujiButtons()
+    return btns.DivergentFist ~= nil
+end
+
 local function GetNearestTarget(maxDistance)
     maxDistance = maxDistance or 30
     local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not myHRP then return nil end
+    if not myHRP then return nil, math.huge end
     local nearest, nearestDist = nil, maxDistance
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character then
             local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
                 local dist = (hrp.Position - myHRP.Position).Magnitude
-                if dist < nearestDist then
-                    nearest, nearestDist = plr, dist
-                end
+                if dist < nearestDist then nearest, nearestDist = plr, dist end
             end
         end
     end
@@ -879,16 +854,13 @@ local function GetNearestTarget(maxDistance)
         if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") then
             if not Players:GetPlayerFromCharacter(obj) then
                 local dist = (obj.HumanoidRootPart.Position - myHRP.Position).Magnitude
-                if dist < nearestDist then
-                    nearest, nearestDist = obj, dist
-                end
+                if dist < nearestDist then nearest, nearestDist = obj, dist end
             end
         end
     end
-    return nearest
+    return nearest, nearestDist
 end
 
--- Проверка, что цель стоит спиной (Dot product)
 local function IsTargetBehind(target)
     if not target or not target:FindFirstChild("HumanoidRootPart") then return false end
     local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -897,19 +869,15 @@ local function IsTargetBehind(target)
     if dirToMe.Magnitude < 0.01 then return false end
     dirToMe = dirToMe.Unit
     local targetLook = target.HumanoidRootPart.CFrame.LookVector
-    -- Dot > 0.3 = цель смотрит на нас (то есть мы спереди)
-    -- Если цель смотрит на нас, значит она стоит лицом к нам
     return targetLook:Dot(dirToMe) > 0.3
 end
 
--- // ДЕТЕКТ КУЛДАУНА //
 local function IsSkillReady(btn)
     if not btn then return false end
     for _, child in ipairs(btn:GetDescendants()) do
         if child:IsA("Frame") or child:IsA("ImageLabel") then
             local sy = child.Size.Y.Scale
             local sx = child.Size.X.Scale
-            -- Если заливка меньше 95% но больше 5% — идёт КД
             if (sy > 0.05 and sy < 0.95) or (sx > 0.05 and sx < 0.95) then
                 return false
             end
@@ -918,7 +886,6 @@ local function IsSkillReady(btn)
     return true
 end
 
--- Ожидание готовности скилла
 local function WaitForSkill(btn, maxWait)
     maxWait = maxWait or 5
     local t = tick()
@@ -930,37 +897,21 @@ local function WaitForSkill(btn, maxWait)
 end
 
 
--- ============================== //
--- // ВКЛАДКА: MAIN //
--- ============================== //
+-- ВКЛАДКА MAIN //
 Section(TabMain, "Movement")
-
-Toggle(TabMain, "Fly", false, function(v)
-    FlyEnabled = v
-end)
-Slider(TabMain, "Fly Speed", 10, 300, 60, function(v)
-    FlySpeed = v
-end)
-Toggle(TabMain, "Infinite Jumps", false, function(v)
-    InfiniteJumps = v
-end)
+Toggle(TabMain, "Fly", false, function(v) FlyEnabled = v end)
+Slider(TabMain, "Fly Speed", 10, 300, 60, function(v) FlySpeed = v end)
+Toggle(TabMain, "Infinite Jumps", false, function(v) InfiniteJumps = v end)
 
 Section(TabMain, "Protection")
-Toggle(TabMain, "Anti-Ragdoll", false, function(v)
-    AntiRagdollEnabled = v
-end)
-Toggle(TabMain, "Anti-Fling", false, function(v)
-    AntiFlingEnabled = v
-end)
+Toggle(TabMain, "Anti-Ragdoll", false, function(v) AntiRagdollEnabled = v end)
+Toggle(TabMain, "Anti-Fling", false, function(v) AntiFlingEnabled = v end)
 Toggle(TabMain, "No Clip", false, function(v)
     NoclipEnabled = v
-    if v and LocalPlayer.Character then
-        setupNoclipForChar(LocalPlayer.Character)
-    end
+    if v and LocalPlayer.Character then setupNoclipForChar(LocalPlayer.Character) end
 end)
 
 Section(TabMain, "Teleport")
-
 local playerDropdown
 playerDropdown = Dropdown(TabMain, "Select Player", {"..."}, "...", function(v)
     for _, p in ipairs(Players:GetPlayers()) do
@@ -971,9 +922,7 @@ end)
 local function refreshPlayerList()
     local list = {}
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            table.insert(list, p.Name)
-        end
+        if p ~= LocalPlayer then table.insert(list, p.Name) end
     end
     if #list == 0 then list = {"(нет игроков)"} end
     playerDropdown.Rebuild(list)
@@ -984,10 +933,7 @@ Players.PlayerRemoving:Connect(function(p)
     if selectedPlayer == p then selectedPlayer = nil end
     refreshPlayerList()
 end)
-task.spawn(function()
-    task.wait(1)
-    refreshPlayerList()
-end)
+task.spawn(function() task.wait(1) refreshPlayerList() end)
 
 Button(TabMain, "TP to Selected Player", function()
     if selectedPlayer then
@@ -1000,73 +946,83 @@ Button(TabMain, "TP to Selected Player", function()
 end)
 
 
--- ============================== //
--- // ВКЛАДКА: COMBAT //
--- ============================== //
+-- ВКЛАДКА COMBAT //
 Section(TabCombat, "Auto Actions")
-
 local AutoAttackEnabled = false
 local AutoBlockEnabled = false
 local AutoCounterEnabled = false
+local AttackRange = 12
 
-Toggle(TabCombat, "Auto Attack", false, function(v)
-    AutoAttackEnabled = v
-end)
-Toggle(TabCombat, "Auto Block", false, function(v)
-    AutoBlockEnabled = v
-end)
-Toggle(TabCombat, "Auto Counter", false, function(v)
-    AutoCounterEnabled = v
-end)
+Toggle(TabCombat, "Auto Attack", false, function(v) AutoAttackEnabled = v end)
+Toggle(TabCombat, "Auto Block", false, function(v) AutoBlockEnabled = v end)
+Toggle(TabCombat, "Auto Counter", false, function(v) AutoCounterEnabled = v end)
+Slider(TabCombat, "Attack Range (studs)", 5, 30, 12, function(v) AttackRange = v end)
 
+-- Auto Attack
 task.spawn(function()
     while task.wait(0.1) do
         if not AutoAttackEnabled then continue end
         if not LocalPlayer.Character then continue end
         local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if not humanoid or humanoid.Health <= 0 then continue end
-        local atkBtn = FindButtonByNames({"attack", "m1", "punch", "combat", "hit"})
-        FireButton(atkBtn)
+        local target, dist = GetNearestTarget(AttackRange)
+        if target and dist <= AttackRange then
+            local atkBtn = FindButtonByNames({"attack", "m1", "punch", "combat", "hit"})
+            FireButton(atkBtn)
+        end
     end
 end)
 
+-- Auto Block
 task.spawn(function()
     while task.wait(0.1) do
         if not AutoBlockEnabled then continue end
         if not LocalPlayer.Character then continue end
         local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if not humanoid or humanoid.Health <= 0 then continue end
-        local blockBtn = FindButtonByNames({"block", "guard", "parry", "shield"})
-        FireButton(blockBtn)
+        local target, dist = GetNearestTarget(AttackRange)
+        if target and dist <= AttackRange then
+            local blockBtn = FindButtonByNames({"block", "guard", "parry", "shield"})
+            FireButton(blockBtn)
+        end
     end
 end)
 
-task.spawn(function()
-    while task.wait(0.15) do
-        if not AutoCounterEnabled then continue end
-        if not LocalPlayer.Character then continue end
-        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if not humanoid or humanoid.Health <= 0 then continue end
-        local counterBtn = FindButtonByNames({"counter", "riposte", "repel", "reflect"})
-        FireButton(counterBtn)
+-- // AUTO COUNTER — только для Yuji //
+local lastHealth = 0
+local autoCounterCooldown = 0
+
+RunService.Heartbeat:Connect(function()
+    if not LocalPlayer.Character then return end
+    local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    local currentHealth = humanoid.Health
+
+    if AutoCounterEnabled and humanoid.Health > 0 then
+        -- Проверяем что играем за Yuji
+        if IsYuji() then
+            if currentHealth < lastHealth and lastHealth > 0 then
+                if tick() - autoCounterCooldown > 0.5 then
+                    autoCounterCooldown = tick()
+                    task.spawn(function()
+                        SimulateKey(Enum.KeyCode.Four)
+                    end)
+                end
+            end
+        end
     end
+    lastHealth = currentHealth
 end)
 
 Section(TabCombat, "Yuji Combo")
-
 local AutoComboEnabled = false
 local ComboDelay = 100
 local ComboVariant = "Variant 1 (Safe)"
 
-Toggle(TabCombat, "Auto Combo (Yuji)", false, function(v)
-    AutoComboEnabled = v
-end)
-Slider(TabCombat, "Combo Delay (ms)", 1, 500, 100, function(v)
-    ComboDelay = v
-end)
-Dropdown(TabCombat, "Combo Variant", {"Variant 1 (Safe)", "Variant 2 (Black Flash)", "Variant 3 (Full)"}, "Variant 1 (Safe)", function(v)
-    ComboVariant = v
-end)
+Toggle(TabCombat, "Auto Combo (Yuji)", false, function(v) AutoComboEnabled = v end)
+Slider(TabCombat, "Combo Delay (ms)", 1, 500, 100, function(v) ComboDelay = v end)
+Dropdown(TabCombat, "Combo Variant", {"Variant 1 (Safe)", "Variant 2 (Black Flash)", "Variant 3 (Full)"}, "Variant 1 (Safe)", function(v) ComboVariant = v end)
 
 task.spawn(function()
     while task.wait(0.05) do
@@ -1080,66 +1036,23 @@ task.spawn(function()
         local atkBtn = FindButtonByNames({"attack", "m1", "punch", "combat", "hit"})
 
         if variant == 1 then
-            for i = 1, 3 do
-                FireButton(atkBtn)
-                task.wait(ComboDelay / 1000)
-            end
-            if WaitForSkill(btns.DivergentFist) then
-                FireButton(btns.DivergentFist)
-                task.wait(ComboDelay / 1000)
-            end
-            FireButton(btns.Dash)
-            task.wait(ComboDelay / 1000)
-            for i = 1, 3 do
-                FireButton(atkBtn)
-                task.wait(ComboDelay / 1000)
-            end
+            for i = 1, 3 do FireButton(atkBtn); task.wait(ComboDelay / 1000) end
+            if WaitForSkill(btns.DivergentFist) then FireButton(btns.DivergentFist); task.wait(ComboDelay / 1000) end
+            FireButton(btns.Dash); task.wait(ComboDelay / 1000)
+            for i = 1, 3 do FireButton(atkBtn); task.wait(ComboDelay / 1000) end
         elseif variant == 2 then
-            for i = 1, 3 do
-                FireButton(atkBtn)
-                task.wait(ComboDelay / 1000)
-            end
-            if WaitForSkill(btns.CrushingBlow) then
-                FireButton(btns.CrushingBlow)
-                task.wait(ComboDelay / 1000)
-            end
-            for i = 1, 3 do
-                FireButton(atkBtn)
-                task.wait(ComboDelay / 1000)
-            end
-            if WaitForSkill(btns.DivergentFist) then
-                FireButton(btns.DivergentFist)
-                task.wait(ComboDelay / 1000)
-            end
-            if WaitForSkill(btns.ManjiKick) then
-                FireButton(btns.ManjiKick)
-                task.wait(ComboDelay / 1000)
-            end
+            for i = 1, 3 do FireButton(atkBtn); task.wait(ComboDelay / 1000) end
+            if WaitForSkill(btns.CrushingBlow) then FireButton(btns.CrushingBlow); task.wait(ComboDelay / 1000) end
+            for i = 1, 3 do FireButton(atkBtn); task.wait(ComboDelay / 1000) end
+            if WaitForSkill(btns.DivergentFist) then FireButton(btns.DivergentFist); task.wait(ComboDelay / 1000) end
+            if WaitForSkill(btns.ManjiKick) then FireButton(btns.ManjiKick); task.wait(ComboDelay / 1000) end
         elseif variant == 3 then
-            for i = 1, 3 do
-                FireButton(atkBtn)
-                task.wait(ComboDelay / 1000)
-            end
-            if WaitForSkill(btns.CrushingBlow) then
-                FireButton(btns.CrushingBlow)
-                task.wait(ComboDelay / 1000)
-            end
-            for i = 1, 3 do
-                FireButton(atkBtn)
-                task.wait(ComboDelay / 1000)
-            end
-            if WaitForSkill(btns.CursedStrike) then
-                FireButton(btns.CursedStrike)
-                task.wait(ComboDelay / 1000)
-            end
-            if WaitForSkill(btns.DivergentFist) then
-                FireButton(btns.DivergentFist)
-                task.wait(ComboDelay / 1000)
-            end
-            if WaitForSkill(btns.ManjiKick) then
-                FireButton(btns.ManjiKick)
-                task.wait(ComboDelay / 1000)
-            end
+            for i = 1, 3 do FireButton(atkBtn); task.wait(ComboDelay / 1000) end
+            if WaitForSkill(btns.CrushingBlow) then FireButton(btns.CrushingBlow); task.wait(ComboDelay / 1000) end
+            for i = 1, 3 do FireButton(atkBtn); task.wait(ComboDelay / 1000) end
+            if WaitForSkill(btns.CursedStrike) then FireButton(btns.CursedStrike); task.wait(ComboDelay / 1000) end
+            if WaitForSkill(btns.DivergentFist) then FireButton(btns.DivergentFist); task.wait(ComboDelay / 1000) end
+            if WaitForSkill(btns.ManjiKick) then FireButton(btns.ManjiKick); task.wait(ComboDelay / 1000) end
         end
 
         task.wait(0.5)
@@ -1147,16 +1060,11 @@ task.spawn(function()
 end)
 
 Section(TabCombat, "Black Flash")
-
 local AutoBlackFlashEnabled = false
 local BlackFlashTiming = 350
 
-Toggle(TabCombat, "Auto Black Flash", false, function(v)
-    AutoBlackFlashEnabled = v
-end)
-Slider(TabCombat, "Black Flash Timing (ms)", 250, 450, 350, function(v)
-    BlackFlashTiming = v
-end)
+Toggle(TabCombat, "Auto Black Flash", false, function(v) AutoBlackFlashEnabled = v end)
+Slider(TabCombat, "Black Flash Timing (ms)", 250, 450, 350, function(v) BlackFlashTiming = v end)
 
 task.spawn(function()
     while task.wait(0.1) do
@@ -1165,42 +1073,30 @@ task.spawn(function()
         local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if not humanoid or humanoid.Health <= 0 then continue end
 
+        -- Проверяем что играем за Yuji
+        if not IsYuji() then continue end
+
         local target = GetNearestTarget(30)
         if not target then continue end
 
         local btns = GetYujiButtons()
         if not btns.DivergentFist then continue end
-
-        -- Ждём пока Divergent Fist не будет готов
-        if not IsSkillReady(btns.DivergentFist) then
-            continue
-        end
+        if not IsSkillReady(btns.DivergentFist) then continue end
 
         local behind = IsTargetBehind(target)
 
         if behind then
-            -- Враг спиной: Black Flash combo
             FireButton(btns.Dash)
             task.wait(0.15)
-
-            if not IsTargetBehind(target) then
-                continue
-            end
-
-            -- Первое нажатие Divergent Fist
+            if not IsTargetBehind(target) then continue end
             FireButton(btns.DivergentFist)
             task.wait(BlackFlashTiming / 1000)
-
-            -- Второе нажатие = Black Flash
             FireButton(btns.DivergentFist)
             task.wait(0.6)
-
-            -- Если враг всё ещё спиной и скилл готов — повторяем
             for i = 1, 3 do
                 if not AutoBlackFlashEnabled then break end
                 if not IsSkillReady(btns.DivergentFist) then break end
                 if not IsTargetBehind(target) then break end
-
                 FireButton(btns.Dash)
                 task.wait(0.15)
                 FireButton(btns.DivergentFist)
@@ -1209,7 +1105,6 @@ task.spawn(function()
                 task.wait(0.6)
             end
         else
-            -- Враг спереди: обычная атака
             FireButton(btns.Dash)
             task.wait(0.15)
             FireButton(btns.DivergentFist)
@@ -1224,9 +1119,7 @@ Section(TabCombat, "Aura")
 Toggle(TabCombat, "Aura Attack", false, function(v) end)
 
 
--- ============================== //
--- // ВКЛАДКА: SCRIPT //
--- ============================== //
+-- ВКЛАДКА SCRIPT //
 Section(TabScript, "Skills")
 Toggle(TabScript, "No Cooldown Skills", false, function(v) end)
 Toggle(TabScript, "Instant M1 Attack",  false, function(v) end)
@@ -1241,14 +1134,8 @@ Section(TabScript, "Combat Tweaks")
 Toggle(TabScript, "No Knockback M1", false, function(v) end)
 
 
--- ============================== //
--- // VISUALS / SETTINGS / CFG — пустые //
--- ============================== //
-
-
--- // УВЕДОМЛЕНИЕ //
 StarterGui:SetCore("SendNotification", {
     Title = "Mercedes Menu",
-    Text = "Скрипт v1.6 загружен.",
+    Text = "v1.9.1 — Counter/Black Flash только для Yuji.",
     Duration = 3
 })
