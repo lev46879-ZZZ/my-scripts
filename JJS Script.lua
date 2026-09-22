@@ -1,5 +1,5 @@
 -- // MERCEDES STYLE MENU // --
--- // v2.0.1 — Fly по камере + Invisibility // --
+-- // v2.0.2 — Стиль: белый + жёлтый + фиолетовый // --
 
 local Players           = game:GetService("Players")
 local RunService        = game:GetService("RunService")
@@ -9,17 +9,21 @@ local StarterGui        = game:GetService("StarterGui")
 local LocalPlayer       = Players.LocalPlayer
 local Camera            = workspace.CurrentCamera
 
+-- // НОВАЯ ТЕМА //
 local Theme = {
-    Background  = Color3.fromRGB(20, 20, 20),
-    Sidebar     = Color3.fromRGB(14, 14, 14),
-    Panel       = Color3.fromRGB(32, 32, 32),
-    PanelHover  = Color3.fromRGB(42, 42, 42),
-    Accent      = Color3.fromRGB(200, 45, 55),
-    Text        = Color3.fromRGB(240, 240, 240),
-    TextDim     = Color3.fromRGB(140, 140, 140),
-    ToggleOff   = Color3.fromRGB(60, 60, 60),
-    Border      = Color3.fromRGB(48, 48, 48),
-    Input       = Color3.fromRGB(38, 38, 38)
+    Background  = Color3.fromRGB(248, 246, 252),  -- почти белый с фиолет. оттенком
+    Sidebar     = Color3.fromRGB(238, 234, 248),  -- светло-фиолетовый
+    Panel       = Color3.fromRGB(255, 255, 255),  -- чистый белый
+    PanelHover  = Color3.fromRGB(255, 250, 225),  -- светло-жёлтый при наведении
+    Accent      = Color3.fromRGB(255, 195, 30),   -- жёлтый
+    AccentDark  = Color3.fromRGB(220, 160, 20),   -- тёмно-жёлтый
+    Purple      = Color3.fromRGB(120, 70, 200),   -- фиолетовый
+    PurpleSoft  = Color3.fromRGB(160, 120, 230),  -- мягкий фиолетовый
+    Text        = Color3.fromRGB(45, 30, 75),     -- тёмно-фиолетовый (текст)
+    TextDim     = Color3.fromRGB(140, 128, 165),  -- серо-фиолетовый
+    ToggleOff   = Color3.fromRGB(215, 208, 230),  -- светло-серый
+    Border      = Color3.fromRGB(225, 218, 240),  -- граница светлая
+    Input       = Color3.fromRGB(245, 242, 252)   -- поля ввода
 }
 
 local function Tween(obj, time, props, style, dir)
@@ -53,18 +57,18 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
 
--- КНОПКА //
+-- КНОПКА (уменьшена до 48x48) //
 local OpenButton = Instance.new("TextButton")
 OpenButton.Parent = ScreenGui
-OpenButton.Size = UDim2.new(0, 56, 0, 56)
+OpenButton.Size = UDim2.new(0, 48, 0, 48)
 OpenButton.Position = UDim2.new(0.08, 0, 0.28, 0)
-OpenButton.BackgroundColor3 = Theme.Background
+OpenButton.BackgroundColor3 = Theme.Panel
 OpenButton.Text = ""
 OpenButton.AutoButtonColor = false
 OpenButton.Active = true
 OpenButton.ZIndex = 10
-Corner(28)(OpenButton)
-local btnStroke = Stroke(Theme.Accent, 2, 0)
+Corner(24)(OpenButton)
+local btnStroke = Stroke(Theme.Purple, 2, 0)
 btnStroke.Parent = OpenButton
 
 local IconImage = Instance.new("ImageLabel")
@@ -79,24 +83,24 @@ IconImage.Active = false
 
 task.spawn(function()
     while ScreenGui.Parent do
-        Tween(btnStroke, 1.4, {Transparency = 0.7}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        Tween(btnStroke, 1.4, {Transparency = 0.7, Color = Theme.Accent}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
         task.wait(1.4)
-        Tween(btnStroke, 1.4, {Transparency = 0}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        Tween(btnStroke, 1.4, {Transparency = 0, Color = Theme.Purple}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
         task.wait(1.4)
     end
 end)
 
--- ОКНО //
+-- ОКНО (уменьшено до 600x420) //
 local MainFrame = Instance.new("Frame")
 MainFrame.Parent = ScreenGui
-MainFrame.Size = UDim2.new(0, 720, 0, 520)
-MainFrame.Position = UDim2.new(0.5, -360, 0.5, -260)
+MainFrame.Size = UDim2.new(0, 600, 0, 420)
+MainFrame.Position = UDim2.new(0.5, -300, 0.5, -210)
 MainFrame.BackgroundColor3 = Theme.Background
 MainFrame.Visible = false
 MainFrame.Active = true
 MainFrame.ClipsDescendants = true
 MainFrame.ZIndex = 5
-Corner(12)(MainFrame)
+Corner(14)(MainFrame)
 Stroke(Theme.Border, 1, 0).Parent = MainFrame
 
 local UIScale = Instance.new("UIScale")
@@ -161,71 +165,79 @@ end
 -- ВЕРХ //
 local TopBar = Instance.new("Frame")
 TopBar.Parent = MainFrame
-TopBar.Size = UDim2.new(1, 0, 0, 42)
-TopBar.BackgroundColor3 = Theme.Sidebar
+TopBar.Size = UDim2.new(1, 0, 0, 38)
+TopBar.BackgroundColor3 = Theme.Panel
 TopBar.BorderSizePixel = 0
-Corner(12)(TopBar)
+Corner(14)(TopBar)
 local TopBarFix = Instance.new("Frame")
 TopBarFix.Parent = TopBar
-TopBarFix.Size = UDim2.new(1, 0, 0, 14)
-TopBarFix.Position = UDim2.new(0, 0, 1, -14)
-TopBarFix.BackgroundColor3 = Theme.Sidebar
+TopBarFix.Size = UDim2.new(1, 0, 0, 12)
+TopBarFix.Position = UDim2.new(0, 0, 1, -12)
+TopBarFix.BackgroundColor3 = Theme.Panel
 TopBarFix.BorderSizePixel = 0
 
+-- Фиолетовый логотип
 local Logo = Instance.new("TextLabel")
 Logo.Parent = TopBar
-Logo.Position = UDim2.new(0, 16, 0, 0)
-Logo.Size = UDim2.new(0, 24, 1, 0)
+Logo.Position = UDim2.new(0, 12, 0, 0)
+Logo.Size = UDim2.new(0, 22, 1, 0)
 Logo.BackgroundTransparency = 1
 Logo.Text = "✦"
-Logo.TextColor3 = Theme.Accent
+Logo.TextColor3 = Theme.Purple
 Logo.Font = Enum.Font.GothamBold
-Logo.TextSize = 16
+Logo.TextSize = 14
 
 local TitleText = Instance.new("TextLabel")
 TitleText.Parent = TopBar
-TitleText.Position = UDim2.new(0, 42, 0, 0)
-TitleText.Size = UDim2.new(1, -100, 1, 0)
+TitleText.Position = UDim2.new(0, 36, 0, 0)
+TitleText.Size = UDim2.new(1, -90, 1, 0)
 TitleText.BackgroundTransparency = 1
 TitleText.Text = "Mercedes"
 TitleText.TextColor3 = Theme.Text
 TitleText.Font = Enum.Font.GothamBold
-TitleText.TextSize = 14
+TitleText.TextSize = 13
 TitleText.TextXAlignment = Enum.TextXAlignment.Left
 
+-- Жёлтая плашка версии
+local VersionBg = Instance.new("Frame")
+VersionBg.Parent = TopBar
+VersionBg.Size = UDim2.new(0, 50, 0, 20)
+VersionBg.Position = UDim2.new(1, -78, 0.5, -10)
+VersionBg.BackgroundColor3 = Theme.Accent
+VersionBg.BorderSizePixel = 0
+Corner(10)(VersionBg)
+
 local VersionText = Instance.new("TextLabel")
-VersionText.Parent = TopBar
-VersionText.Position = UDim2.new(1, -130, 0, 0)
-VersionText.Size = UDim2.new(0, 80, 1, 0)
+VersionText.Parent = VersionBg
+VersionText.Size = UDim2.new(1, 0, 1, 0)
 VersionText.BackgroundTransparency = 1
-VersionText.Text = "v2.0.1"
-VersionText.TextColor3 = Theme.TextDim
-VersionText.Font = Enum.Font.Gotham
-VersionText.TextSize = 12
-VersionText.TextXAlignment = Enum.TextXAlignment.Right
+VersionText.Text = "v2.0.2"
+VersionText.TextColor3 = Theme.Text
+VersionText.Font = Enum.Font.GothamBold
+VersionText.TextSize = 10
 
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Parent = TopBar
-CloseBtn.Size = UDim2.new(0, 28, 0, 28)
-CloseBtn.Position = UDim2.new(1, -36, 0.5, -14)
-CloseBtn.BackgroundColor3 = Theme.Panel
+CloseBtn.Size = UDim2.new(0, 24, 0, 24)
+CloseBtn.Position = UDim2.new(1, -30, 0.5, -12)
+CloseBtn.BackgroundColor3 = Theme.Purple
 CloseBtn.Text = "✕"
-CloseBtn.TextColor3 = Theme.TextDim
+CloseBtn.TextColor3 = Theme.Panel
 CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 14
+CloseBtn.TextSize = 12
 CloseBtn.AutoButtonColor = false
 Corner(8)(CloseBtn)
 CloseBtn.MouseButton1Click:Connect(ToggleMenu)
 CloseBtn.MouseEnter:Connect(function() Tween(CloseBtn, 0.15, {BackgroundColor3 = Theme.Accent, TextColor3 = Theme.Text}) end)
-CloseBtn.MouseLeave:Connect(function() Tween(CloseBtn, 0.15, {BackgroundColor3 = Theme.Panel, TextColor3 = Theme.TextDim}) end)
+CloseBtn.MouseLeave:Connect(function() Tween(CloseBtn, 0.15, {BackgroundColor3 = Theme.Purple, TextColor3 = Theme.Panel}) end)
 
 Drag(MainFrame, TopBar)
 
--- САЙДБАР //
+-- САЙДБАР (уменьшен до 120) //
 local Sidebar = Instance.new("Frame")
 Sidebar.Parent = MainFrame
-Sidebar.Size = UDim2.new(0, 150, 1, -62)
-Sidebar.Position = UDim2.new(0, 10, 0, 52)
+Sidebar.Size = UDim2.new(0, 120, 1, -56)
+Sidebar.Position = UDim2.new(0, 8, 0, 46)
 Sidebar.BackgroundColor3 = Theme.Sidebar
 Sidebar.BorderSizePixel = 0
 Corner(10)(Sidebar)
@@ -239,7 +251,7 @@ SideScroll.ScrollBarThickness = 0
 SideScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 SideScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 local sp = Instance.new("UIPadding", SideScroll)
-sp.PaddingTop = UDim.new(0, 8); sp.PaddingLeft = UDim.new(0, 8); sp.PaddingRight = UDim.new(0, 8)
+sp.PaddingTop = UDim.new(0, 6); sp.PaddingLeft = UDim.new(0, 6); sp.PaddingRight = UDim.new(0, 6)
 
 local SideLayout = Instance.new("UIListLayout", SideScroll)
 SideLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -247,8 +259,8 @@ SideLayout.Padding = UDim.new(0, 3)
 
 local ContentArea = Instance.new("Frame")
 ContentArea.Parent = MainFrame
-ContentArea.Size = UDim2.new(1, -170, 1, -62)
-ContentArea.Position = UDim2.new(0, 160, 0, 52)
+ContentArea.Size = UDim2.new(1, -138, 1, -56)
+ContentArea.Position = UDim2.new(0, 130, 0, 46)
 ContentArea.BackgroundTransparency = 1
 
 -- ВКЛАДКИ //
@@ -258,12 +270,12 @@ local ActiveTab = nil
 local function CreateTab(name, icon)
     local btn = Instance.new("TextButton")
     btn.Parent = SideScroll
-    btn.Size = UDim2.new(1, 0, 0, 34)
-    btn.BackgroundColor3 = Theme.Background
-    btn.Text = "   " .. icon .. "   " .. name
+    btn.Size = UDim2.new(1, 0, 0, 30)
+    btn.BackgroundColor3 = Theme.Panel
+    btn.Text = "  " .. icon .. "  " .. name
     btn.TextColor3 = Theme.TextDim
     btn.Font = Enum.Font.GothamMedium
-    btn.TextSize = 12
+    btn.TextSize = 11
     btn.TextXAlignment = Enum.TextXAlignment.Left
     btn.AutoButtonColor = false
     Corner(7)(btn)
@@ -282,36 +294,36 @@ local function CreateTab(name, icon)
     content.BackgroundTransparency = 1
     content.BorderSizePixel = 0
     content.Visible = false
-    content.ScrollBarThickness = 3
-    content.ScrollBarImageColor3 = Theme.Accent
+    content.ScrollBarThickness = 2
+    content.ScrollBarImageColor3 = Theme.Purple
     content.CanvasSize = UDim2.new(0, 0, 0, 0)
     content.AutomaticCanvasSize = Enum.AutomaticSize.Y
     local cp = Instance.new("UIPadding", content)
-    cp.PaddingTop = UDim.new(0, 4); cp.PaddingBottom = UDim.new(0, 20)
-    cp.PaddingLeft = UDim.new(0, 4); cp.PaddingRight = UDim.new(0, 4)
+    cp.PaddingTop = UDim.new(0, 2); cp.PaddingBottom = UDim.new(0, 16)
+    cp.PaddingLeft = UDim.new(0, 2); cp.PaddingRight = UDim.new(0, 2)
 
     local layout = Instance.new("UIListLayout", content)
     layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding = UDim.new(0, 8)
+    layout.Padding = UDim.new(0, 6)
 
     table.insert(Tabs, {Button = btn, Content = content, Indicator = ind, Name = name})
 
     btn.MouseButton1Click:Connect(function()
         for _, t in ipairs(Tabs) do
             t.Content.Visible = false
-            Tween(t.Button, 0.15, {BackgroundColor3 = Theme.Background, TextColor3 = Theme.TextDim})
+            Tween(t.Button, 0.15, {BackgroundColor3 = Theme.Panel, TextColor3 = Theme.TextDim})
             Tween(t.Indicator, 0.2, {Size = UDim2.new(0, 3, 0, 0)})
         end
         content.Visible = true
-        Tween(btn, 0.15, {BackgroundColor3 = Theme.Panel, TextColor3 = Theme.Text})
-        Tween(ind, 0.2, {Size = UDim2.new(0, 3, 0, 18)})
+        Tween(btn, 0.15, {BackgroundColor3 = Theme.Panel, TextColor3 = Theme.Purple})
+        Tween(ind, 0.2, {Size = UDim2.new(0, 3, 0, 16)})
         ActiveTab = name
     end)
     btn.MouseEnter:Connect(function()
-        if ActiveTab ~= name then Tween(btn, 0.15, {BackgroundColor3 = Theme.Panel, TextColor3 = Theme.Text}) end
+        if ActiveTab ~= name then Tween(btn, 0.15, {BackgroundColor3 = Theme.PanelHover, TextColor3 = Theme.Text}) end
     end)
     btn.MouseLeave:Connect(function()
-        if ActiveTab ~= name then Tween(btn, 0.15, {BackgroundColor3 = Theme.Background, TextColor3 = Theme.TextDim}) end
+        if ActiveTab ~= name then Tween(btn, 0.15, {BackgroundColor3 = Theme.Panel, TextColor3 = Theme.TextDim}) end
     end)
 
     return content
@@ -326,20 +338,20 @@ local TabConfig   = CreateTab("cfg",      "❒")
 
 Tabs[1].Content.Visible = true
 Tabs[1].Button.BackgroundColor3 = Theme.Panel
-Tabs[1].Button.TextColor3 = Theme.Text
+Tabs[1].Button.TextColor3 = Theme.Purple
 ActiveTab = "main"
-Tween(Tabs[1].Indicator, 0.3, {Size = UDim2.new(0, 3, 0, 18)})
+Tween(Tabs[1].Indicator, 0.3, {Size = UDim2.new(0, 3, 0, 16)})
 
 -- КОМПОНЕНТЫ //
 local function Section(parent, text)
     local lbl = Instance.new("TextLabel")
     lbl.Parent = parent
-    lbl.Size = UDim2.new(1, 0, 0, 22)
+    lbl.Size = UDim2.new(1, 0, 0, 18)
     lbl.BackgroundTransparency = 1
     lbl.Text = string.upper(text)
-    lbl.TextColor3 = Theme.Accent
+    lbl.TextColor3 = Theme.Purple
     lbl.Font = Enum.Font.GothamBold
-    lbl.TextSize = 11
+    lbl.TextSize = 10
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     return lbl
 end
@@ -350,35 +362,36 @@ local function Toggle(parent, text, default, callback)
 
     local box = Instance.new("Frame")
     box.Parent = parent
-    box.Size = UDim2.new(1, 0, 0, 36)
+    box.Size = UDim2.new(1, 0, 0, 32)
     box.BackgroundColor3 = Theme.Panel
     box.BorderSizePixel = 0
     Corner(8)(box)
+    Stroke(Theme.Border, 1, 0.5).Parent = box
 
     local lbl = Instance.new("TextLabel")
     lbl.Parent = box
-    lbl.Position = UDim2.new(0, 12, 0, 0)
-    lbl.Size = UDim2.new(1, -70, 1, 0)
+    lbl.Position = UDim2.new(0, 10, 0, 0)
+    lbl.Size = UDim2.new(1, -60, 1, 0)
     lbl.BackgroundTransparency = 1
     lbl.Text = text
     lbl.TextColor3 = Theme.Text
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 12
+    lbl.Font = Enum.Font.GothamMedium
+    lbl.TextSize = 11
     lbl.TextXAlignment = Enum.TextXAlignment.Left
 
     local bg = Instance.new("Frame")
     bg.Parent = box
-    bg.Size = UDim2.new(0, 36, 0, 20)
-    bg.Position = UDim2.new(1, -48, 0.5, -10)
+    bg.Size = UDim2.new(0, 32, 0, 18)
+    bg.Position = UDim2.new(1, -42, 0.5, -9)
     bg.BackgroundColor3 = default and Theme.Accent or Theme.ToggleOff
     bg.BorderSizePixel = 0
-    Corner(10)(bg)
+    Corner(9)(bg)
 
     local knob = Instance.new("Frame")
     knob.Parent = bg
-    knob.Size = UDim2.new(0, 14, 0, 14)
-    knob.Position = default and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
-    knob.BackgroundColor3 = Theme.Text
+    knob.Size = UDim2.new(0, 13, 0, 13)
+    knob.Position = default and UDim2.new(1, -15, 0.5, -6.5) or UDim2.new(0, 2, 0.5, -6.5)
+    knob.BackgroundColor3 = Theme.Panel
     knob.BorderSizePixel = 0
     Corner(7)(knob)
 
@@ -392,7 +405,7 @@ local function Toggle(parent, text, default, callback)
     btn.MouseButton1Click:Connect(function()
         state = not state
         Tween(bg, 0.22, {BackgroundColor3 = state and Theme.Accent or Theme.ToggleOff}, Enum.EasingStyle.Quart)
-        Tween(knob, 0.22, {Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)}, Enum.EasingStyle.Quart)
+        Tween(knob, 0.22, {Position = state and UDim2.new(1, -15, 0.5, -6.5) or UDim2.new(0, 2, 0.5, -6.5)}, Enum.EasingStyle.Quart)
         callback(state)
     end)
     btn.MouseEnter:Connect(function() Tween(box, 0.15, {BackgroundColor3 = Theme.PanelHover}) end)
@@ -408,56 +421,64 @@ local function Slider(parent, text, min, max, default, callback)
 
     local box = Instance.new("Frame")
     box.Parent = parent
-    box.Size = UDim2.new(1, 0, 0, 52)
+    box.Size = UDim2.new(1, 0, 0, 46)
     box.BackgroundColor3 = Theme.Panel
     box.BorderSizePixel = 0
     Corner(8)(box)
+    Stroke(Theme.Border, 1, 0.5).Parent = box
 
     local lbl = Instance.new("TextLabel")
     lbl.Parent = box
-    lbl.Position = UDim2.new(0, 12, 0, 6)
-    lbl.Size = UDim2.new(0.6, 0, 0, 18)
+    lbl.Position = UDim2.new(0, 10, 0, 5)
+    lbl.Size = UDim2.new(0.6, 0, 0, 16)
     lbl.BackgroundTransparency = 1
     lbl.Text = text
     lbl.TextColor3 = Theme.Text
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 12
+    lbl.Font = Enum.Font.GothamMedium
+    lbl.TextSize = 11
     lbl.TextXAlignment = Enum.TextXAlignment.Left
 
+    -- Жёлтая плашка со значением
+    local valBg = Instance.new("Frame")
+    valBg.Parent = box
+    valBg.Position = UDim2.new(0.6, 0, 0, 5)
+    valBg.Size = UDim2.new(0.4, -10, 0, 16)
+    valBg.BackgroundColor3 = Theme.Accent
+    valBg.BorderSizePixel = 0
+    Corner(6)(valBg)
+
     local val = Instance.new("TextLabel")
-    val.Parent = box
-    val.Position = UDim2.new(0.6, 0, 0, 6)
-    val.Size = UDim2.new(0.4, -12, 0, 18)
+    val.Parent = valBg
+    val.Size = UDim2.new(1, 0, 1, 0)
     val.BackgroundTransparency = 1
     val.Text = tostring(default)
-    val.TextColor3 = Theme.Accent
+    val.TextColor3 = Theme.Text
     val.Font = Enum.Font.GothamBold
-    val.TextSize = 12
-    val.TextXAlignment = Enum.TextXAlignment.Right
+    val.TextSize = 10
 
     local track = Instance.new("Frame")
     track.Parent = box
-    track.Position = UDim2.new(0, 12, 1, -20)
-    track.Size = UDim2.new(1, -24, 0, 5)
+    track.Position = UDim2.new(0, 10, 1, -16)
+    track.Size = UDim2.new(1, -20, 0, 4)
     track.BackgroundColor3 = Theme.ToggleOff
     track.BorderSizePixel = 0
-    Corner(3)(track)
+    Corner(2)(track)
 
     local fill = Instance.new("Frame")
     fill.Parent = track
     fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    fill.BackgroundColor3 = Theme.Accent
+    fill.BackgroundColor3 = Theme.Purple
     fill.BorderSizePixel = 0
-    Corner(3)(fill)
+    Corner(2)(fill)
 
     local knob = Instance.new("Frame")
     knob.Parent = track
-    knob.Size = UDim2.new(0, 14, 0, 14)
-    knob.Position = UDim2.new((default - min) / (max - min), -7, 0.5, -7)
-    knob.BackgroundColor3 = Theme.Text
+    knob.Size = UDim2.new(0, 12, 0, 12)
+    knob.Position = UDim2.new((default - min) / (max - min), -6, 0.5, -6)
+    knob.BackgroundColor3 = Theme.Panel
     knob.BorderSizePixel = 0
-    Corner(7)(knob)
-    Stroke(Theme.Accent, 2, 0).Parent = knob
+    Corner(6)(knob)
+    Stroke(Theme.Purple, 2, 0).Parent = knob
 
     local drag = false
     local function update(i)
@@ -468,21 +489,21 @@ local function Slider(parent, text, min, max, default, callback)
         local v = math.floor(min + (max - min) * pct + 0.5)
         val.Text = tostring(v)
         fill.Size = UDim2.new(pct, 0, 1, 0)
-        knob.Position = UDim2.new(pct, -7, 0.5, -7)
+        knob.Position = UDim2.new(pct, -6, 0.5, -6)
         callback(v)
     end
 
     local area = Instance.new("TextButton")
     area.Parent = box
-    area.Size = UDim2.new(1, 0, 0, 22)
-    area.Position = UDim2.new(0, 0, 1, -22)
+    area.Size = UDim2.new(1, 0, 0, 20)
+    area.Position = UDim2.new(0, 0, 1, -20)
     area.BackgroundTransparency = 1
     area.Text = ""
 
     area.InputBegan:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
             drag = true
-            Tween(knob, 0.1, {Size = UDim2.new(0, 18, 0, 18), Position = UDim2.new(knob.Position.X.Scale, -9, 0.5, -9)})
+            Tween(knob, 0.1, {Size = UDim2.new(0, 16, 0, 16), Position = UDim2.new(knob.Position.X.Scale, -8, 0.5, -8)})
             update(i)
         end
     end)
@@ -492,7 +513,7 @@ local function Slider(parent, text, min, max, default, callback)
     UserInputService.InputEnded:Connect(function(i)
         if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
             drag = false
-            Tween(knob, 0.15, {Size = UDim2.new(0, 14, 0, 14), Position = UDim2.new(knob.Position.X.Scale, -7, 0.5, -7)})
+            Tween(knob, 0.15, {Size = UDim2.new(0, 12, 0, 12), Position = UDim2.new(knob.Position.X.Scale, -6, 0.5, -6)})
         end
     end)
 
@@ -503,20 +524,21 @@ local function Button(parent, text, callback)
     callback = callback or function() end
     local btn = Instance.new("TextButton")
     btn.Parent = parent
-    btn.Size = UDim2.new(1, 0, 0, 34)
+    btn.Size = UDim2.new(1, 0, 0, 30)
     btn.BackgroundColor3 = Theme.Panel
     btn.Text = text
     btn.TextColor3 = Theme.Text
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 12
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextSize = 11
     btn.AutoButtonColor = false
     Corner(8)(btn)
-    btn.MouseEnter:Connect(function() Tween(btn, 0.15, {BackgroundColor3 = Theme.Accent}) end)
-    btn.MouseLeave:Connect(function() Tween(btn, 0.15, {BackgroundColor3 = Theme.Panel}) end)
+    Stroke(Theme.Border, 1, 0.5).Parent = btn
+    btn.MouseEnter:Connect(function() Tween(btn, 0.15, {BackgroundColor3 = Theme.Accent, TextColor3 = Theme.Text}) end)
+    btn.MouseLeave:Connect(function() Tween(btn, 0.15, {BackgroundColor3 = Theme.Panel, TextColor3 = Theme.Text}) end)
     btn.MouseButton1Click:Connect(function()
-        Tween(btn, 0.08, {Size = UDim2.new(0.97, 0, 0, 32)})
+        Tween(btn, 0.08, {Size = UDim2.new(0.97, 0, 0, 28)})
         task.wait(0.08)
-        Tween(btn, 0.12, {Size = UDim2.new(1, 0, 0, 34)})
+        Tween(btn, 0.12, {Size = UDim2.new(1, 0, 0, 30)})
         callback()
     end)
     return btn
@@ -527,8 +549,8 @@ local function Dropdown(parent, text, options, default, callback)
     default = default or (options[1] or "None")
     callback = callback or function() end
 
-    local BASE_HEIGHT = 36
-    local ITEM_HEIGHT = 28
+    local BASE_HEIGHT = 32
+    local ITEM_HEIGHT = 24
     local GAP = 4
 
     local box = Instance.new("Frame")
@@ -539,30 +561,38 @@ local function Dropdown(parent, text, options, default, callback)
     box.ClipsDescendants = false
     box.ZIndex = 20
     Corner(8)(box)
+    Stroke(Theme.Border, 1, 0.5).Parent = box
 
     local lbl = Instance.new("TextLabel")
     lbl.Parent = box
-    lbl.Position = UDim2.new(0, 12, 0, 0)
+    lbl.Position = UDim2.new(0, 10, 0, 0)
     lbl.Size = UDim2.new(0.5, 0, 0, BASE_HEIGHT)
     lbl.BackgroundTransparency = 1
     lbl.Text = text
     lbl.TextColor3 = Theme.Text
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 12
+    lbl.Font = Enum.Font.GothamMedium
+    lbl.TextSize = 11
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.ZIndex = 21
 
+    local currentBg = Instance.new("Frame")
+    currentBg.Parent = box
+    currentBg.Position = UDim2.new(0.5, 0, 0.5, -8)
+    currentBg.Size = UDim2.new(0.5, -10, 0, 16)
+    currentBg.BackgroundColor3 = Theme.Accent
+    currentBg.BorderSizePixel = 0
+    Corner(6)(currentBg)
+    currentBg.ZIndex = 21
+
     local current = Instance.new("TextLabel")
-    current.Parent = box
-    current.Position = UDim2.new(0.5, 0, 0, 0)
-    current.Size = UDim2.new(0.5, -30, 0, BASE_HEIGHT)
+    current.Parent = currentBg
+    current.Size = UDim2.new(1, 0, 1, 0)
     current.BackgroundTransparency = 1
-    current.Text = default .. "  ▾"
-    current.TextColor3 = Theme.Accent
-    current.Font = Enum.Font.Gotham
-    current.TextSize = 12
-    current.TextXAlignment = Enum.TextXAlignment.Right
-    current.ZIndex = 21
+    current.Text = default
+    current.TextColor3 = Theme.Text
+    current.Font = Enum.Font.GothamBold
+    current.TextSize = 10
+    current.ZIndex = 22
 
     local list = Instance.new("Frame")
     list.Parent = box
@@ -624,16 +654,16 @@ local function Dropdown(parent, text, options, default, callback)
             oBtn.Text = opt
             oBtn.TextColor3 = Theme.Text
             oBtn.Font = Enum.Font.Gotham
-            oBtn.TextSize = 11
+            oBtn.TextSize = 10
             oBtn.AutoButtonColor = false
             oBtn.LayoutOrder = i
             oBtn.ZIndex = 24
             Corner(5)(oBtn)
-            oBtn.MouseEnter:Connect(function() Tween(oBtn, 0.1, {BackgroundColor3 = Theme.Accent}) end)
+            oBtn.MouseEnter:Connect(function() Tween(oBtn, 0.1, {BackgroundColor3 = Theme.PanelHover}) end)
             oBtn.MouseLeave:Connect(function() Tween(oBtn, 0.1, {BackgroundColor3 = Theme.Panel}) end)
             oBtn.MouseButton1Click:Connect(function()
                 selectedValue = opt
-                current.Text = opt .. "  ▾"
+                current.Text = opt
                 callback(opt)
                 close()
             end)
@@ -660,7 +690,8 @@ local function Dropdown(parent, text, options, default, callback)
     return api
 end
 
--- ЛОГИКА //
+-- ЛОГИКА // (не изменена)
+
 local FlyEnabled = false
 local FlySpeed = 60
 local flyBodyVelocity = nil
@@ -685,34 +716,23 @@ RunService.RenderStepped:Connect(function()
             flyBodyGyro.Parent = hrp
         end
 
-        -- Камера: смотрим куда летим
         local camCF = Camera.CFrame
         local camLook = camCF.LookVector
         local camRight = camCF.RightVector
 
-        -- Джойстик: MoveDirection уже мировой вектор
         local moveDir = humanoid.MoveDirection
         local direction = Vector3.new(0, 0, 0)
 
         if moveDir.Magnitude > 0.05 then
-            -- Проецируем движение джойстика на оси камеры (включая вертикаль!)
             local dotForward = moveDir:Dot(camLook)
             local dotRight = moveDir:Dot(camRight)
-            -- Собираем направление с учётом наклона камеры (вверх/вниз)
             direction = (camLook * dotForward + camRight * dotRight)
-            if direction.Magnitude > 1 then
-                direction = direction.Unit
-            end
+            if direction.Magnitude > 1 then direction = direction.Unit end
         end
 
-        -- Ручная вертикаль для ПК
         local vertical = Vector3.new(0, 0, 0)
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            vertical = Vector3.new(0, 1, 0)
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-            vertical = Vector3.new(0, -1, 0)
-        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vertical = Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then vertical = Vector3.new(0, -1, 0) end
 
         flyBodyVelocity.Velocity = (direction * FlySpeed) + (vertical * FlySpeed)
         flyBodyGyro.CFrame = camCF
@@ -795,17 +815,14 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- // INVISIBILITY (несколько методов) //
+-- INVISIBILITY //
 local InvisEnabled = false
-local invisConns = {}
 
 local function ApplyInvis(char)
     if not char then return end
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") then
-            -- Метод 1: локальная прозрачность
             part.LocalTransparencyModifier = 1
-            -- Метод 2: серверная прозрачность (если сервер не проверяет)
             part.Transparency = 1
             part.CastShadow = false
         elseif part:IsA("Decal") or part:IsA("Texture") then
@@ -831,16 +848,12 @@ local function RemoveInvis(char)
     end
 end
 
--- Цикл поддержки невидимости
 task.spawn(function()
     while task.wait() do
-        if InvisEnabled and LocalPlayer.Character then
-            ApplyInvis(LocalPlayer.Character)
-        end
+        if InvisEnabled and LocalPlayer.Character then ApplyInvis(LocalPlayer.Character) end
     end
 end)
 
--- Автоприменение при респавне
 LocalPlayer.CharacterAdded:Connect(function(char)
     char:WaitForChild("Humanoid", 5)
     task.wait(1)
@@ -1056,17 +1069,13 @@ task.spawn(function()
     end
 end)
 
--- AUTO COUNTER — Manji Kick, только для Yuji
 local lastHealth = 0
 local autoCounterCooldown = 0
-
 RunService.Heartbeat:Connect(function()
     if not LocalPlayer.Character then return end
     local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
     if not humanoid then return end
-
     local currentHealth = humanoid.Health
-
     if AutoCounterEnabled and humanoid.Health > 0 then
         if IsYuji() then
             if currentHealth < lastHealth and lastHealth > 0 then
@@ -1074,11 +1083,7 @@ RunService.Heartbeat:Connect(function()
                     autoCounterCooldown = tick()
                     task.spawn(function()
                         local manjiBtn = FindButtonByNames({"manji"})
-                        if manjiBtn then
-                            FireButton(manjiBtn)
-                        else
-                            SimulateKey(Enum.KeyCode.Four)
-                        end
+                        if manjiBtn then FireButton(manjiBtn) else SimulateKey(Enum.KeyCode.Four) end
                     end)
                 end
             end
@@ -1144,7 +1149,6 @@ task.spawn(function()
         if not LocalPlayer.Character then continue end
         local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if not humanoid or humanoid.Health <= 0 then continue end
-
         if not IsYuji() then continue end
 
         local target = GetNearestTarget(30)
@@ -1194,11 +1198,8 @@ Toggle(TabCombat, "Aura Attack", false, function(v) end)
 Section(TabScript, "Invisibility")
 Toggle(TabScript, "Invisibility", false, function(v)
     InvisEnabled = v
-    if v and LocalPlayer.Character then
-        ApplyInvis(LocalPlayer.Character)
-    else
-        if LocalPlayer.Character then RemoveInvis(LocalPlayer.Character) end
-    end
+    if v and LocalPlayer.Character then ApplyInvis(LocalPlayer.Character)
+    else if LocalPlayer.Character then RemoveInvis(LocalPlayer.Character) end end
 end)
 
 Section(TabScript, "Skills")
@@ -1217,6 +1218,6 @@ Toggle(TabScript, "No Knockback M1", false, function(v) end)
 
 StarterGui:SetCore("SendNotification", {
     Title = "Mercedes Menu",
-    Text = "v2.0.1 — Fly по камере + Invisibility в Script.",
+    Text = "v2.0.2 — Новая светлая тема.",
     Duration = 3
 })
