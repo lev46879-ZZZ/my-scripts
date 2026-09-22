@@ -1,5 +1,5 @@
 -- // MERCEDES STYLE MENU // --
--- // v1.9.1 — Auto Counter/Black Flash только для Yuji // --
+-- // v2.0.1 — Fly по камере + Invisibility // --
 
 local Players           = game:GetService("Players")
 local RunService        = game:GetService("RunService")
@@ -198,7 +198,7 @@ VersionText.Parent = TopBar
 VersionText.Position = UDim2.new(1, -130, 0, 0)
 VersionText.Size = UDim2.new(0, 80, 1, 0)
 VersionText.BackgroundTransparency = 1
-VersionText.Text = "v1.9.1"
+VersionText.Text = "v2.0.1"
 VersionText.TextColor3 = Theme.TextDim
 VersionText.Font = Enum.Font.Gotham
 VersionText.TextSize = 12
@@ -685,16 +685,37 @@ RunService.RenderStepped:Connect(function()
             flyBodyGyro.Parent = hrp
         end
 
+        -- Камера: смотрим куда летим
+        local camCF = Camera.CFrame
+        local camLook = camCF.LookVector
+        local camRight = camCF.RightVector
+
+        -- Джойстик: MoveDirection уже мировой вектор
         local moveDir = humanoid.MoveDirection
         local direction = Vector3.new(0, 0, 0)
-        if moveDir.Magnitude > 0.05 then direction = moveDir end
 
+        if moveDir.Magnitude > 0.05 then
+            -- Проецируем движение джойстика на оси камеры (включая вертикаль!)
+            local dotForward = moveDir:Dot(camLook)
+            local dotRight = moveDir:Dot(camRight)
+            -- Собираем направление с учётом наклона камеры (вверх/вниз)
+            direction = (camLook * dotForward + camRight * dotRight)
+            if direction.Magnitude > 1 then
+                direction = direction.Unit
+            end
+        end
+
+        -- Ручная вертикаль для ПК
         local vertical = Vector3.new(0, 0, 0)
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vertical = Vector3.new(0, 1, 0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then vertical = Vector3.new(0, -1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            vertical = Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            vertical = Vector3.new(0, -1, 0)
+        end
 
         flyBodyVelocity.Velocity = (direction * FlySpeed) + (vertical * FlySpeed)
-        flyBodyGyro.CFrame = Camera.CFrame
+        flyBodyGyro.CFrame = camCF
     else
         if flyBodyVelocity then flyBodyVelocity:Destroy(); flyBodyVelocity = nil end
         if flyBodyGyro then flyBodyGyro:Destroy(); flyBodyGyro = nil end
@@ -774,6 +795,58 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+-- // INVISIBILITY (несколько методов) //
+local InvisEnabled = false
+local invisConns = {}
+
+local function ApplyInvis(char)
+    if not char then return end
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            -- Метод 1: локальная прозрачность
+            part.LocalTransparencyModifier = 1
+            -- Метод 2: серверная прозрачность (если сервер не проверяет)
+            part.Transparency = 1
+            part.CastShadow = false
+        elseif part:IsA("Decal") or part:IsA("Texture") then
+            part.Transparency = 1
+        elseif part:IsA("BillboardGui") or part:IsA("SurfaceGui") then
+            part.Enabled = false
+        end
+    end
+end
+
+local function RemoveInvis(char)
+    if not char then return end
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.LocalTransparencyModifier = 0
+            part.Transparency = 0
+            part.CastShadow = true
+        elseif part:IsA("Decal") or part:IsA("Texture") then
+            part.Transparency = 0
+        elseif part:IsA("BillboardGui") or part:IsA("SurfaceGui") then
+            part.Enabled = true
+        end
+    end
+end
+
+-- Цикл поддержки невидимости
+task.spawn(function()
+    while task.wait() do
+        if InvisEnabled and LocalPlayer.Character then
+            ApplyInvis(LocalPlayer.Character)
+        end
+    end
+end)
+
+-- Автоприменение при респавне
+LocalPlayer.CharacterAdded:Connect(function(char)
+    char:WaitForChild("Humanoid", 5)
+    task.wait(1)
+    if InvisEnabled then ApplyInvis(char) end
+end)
+
 local selectedPlayer = nil
 local function GetHRP(plr)
     if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
@@ -828,9 +901,6 @@ local function GetYujiButtons()
     }
 end
 
--- // ПРОВЕРКА ЧТО ИГРАЕМ ЗА YUJI //
--- Yuji — единственный персонаж с Divergent Fist
--- Если кнопка найдена — значит мы Yuji
 local function IsYuji()
     local btns = GetYujiButtons()
     return btns.DivergentFist ~= nil
@@ -958,7 +1028,6 @@ Toggle(TabCombat, "Auto Block", false, function(v) AutoBlockEnabled = v end)
 Toggle(TabCombat, "Auto Counter", false, function(v) AutoCounterEnabled = v end)
 Slider(TabCombat, "Attack Range (studs)", 5, 30, 12, function(v) AttackRange = v end)
 
--- Auto Attack
 task.spawn(function()
     while task.wait(0.1) do
         if not AutoAttackEnabled then continue end
@@ -973,7 +1042,6 @@ task.spawn(function()
     end
 end)
 
--- Auto Block
 task.spawn(function()
     while task.wait(0.1) do
         if not AutoBlockEnabled then continue end
@@ -988,7 +1056,7 @@ task.spawn(function()
     end
 end)
 
--- // AUTO COUNTER — только для Yuji //
+-- AUTO COUNTER — Manji Kick, только для Yuji
 local lastHealth = 0
 local autoCounterCooldown = 0
 
@@ -1000,13 +1068,17 @@ RunService.Heartbeat:Connect(function()
     local currentHealth = humanoid.Health
 
     if AutoCounterEnabled and humanoid.Health > 0 then
-        -- Проверяем что играем за Yuji
         if IsYuji() then
             if currentHealth < lastHealth and lastHealth > 0 then
-                if tick() - autoCounterCooldown > 0.5 then
+                if tick() - autoCounterCooldown > 0.4 then
                     autoCounterCooldown = tick()
                     task.spawn(function()
-                        SimulateKey(Enum.KeyCode.Four)
+                        local manjiBtn = FindButtonByNames({"manji"})
+                        if manjiBtn then
+                            FireButton(manjiBtn)
+                        else
+                            SimulateKey(Enum.KeyCode.Four)
+                        end
                     end)
                 end
             end
@@ -1073,7 +1145,6 @@ task.spawn(function()
         local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if not humanoid or humanoid.Health <= 0 then continue end
 
-        -- Проверяем что играем за Yuji
         if not IsYuji() then continue end
 
         local target = GetNearestTarget(30)
@@ -1120,6 +1191,16 @@ Toggle(TabCombat, "Aura Attack", false, function(v) end)
 
 
 -- ВКЛАДКА SCRIPT //
+Section(TabScript, "Invisibility")
+Toggle(TabScript, "Invisibility", false, function(v)
+    InvisEnabled = v
+    if v and LocalPlayer.Character then
+        ApplyInvis(LocalPlayer.Character)
+    else
+        if LocalPlayer.Character then RemoveInvis(LocalPlayer.Character) end
+    end
+end)
+
 Section(TabScript, "Skills")
 Toggle(TabScript, "No Cooldown Skills", false, function(v) end)
 Toggle(TabScript, "Instant M1 Attack",  false, function(v) end)
@@ -1136,6 +1217,6 @@ Toggle(TabScript, "No Knockback M1", false, function(v) end)
 
 StarterGui:SetCore("SendNotification", {
     Title = "Mercedes Menu",
-    Text = "v1.9.1 — Counter/Black Flash только для Yuji.",
+    Text = "v2.0.1 — Fly по камере + Invisibility в Script.",
     Duration = 3
 })
